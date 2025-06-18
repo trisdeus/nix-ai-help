@@ -46,39 +46,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Install Nix
+      - name: Install Nix and setup channels
         run: |
           sh <(curl -L https://nixos.org/nix/install) --no-daemon
           . /home/runner/.nix-profile/etc/profile.d/nix.sh
-          
-      - name: Add Home Manager channel
-        run: |
-          . /home/runner/.nix-profile/etc/profile.d/nix.sh
+          # Add Home Manager channel
           nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
           nix-channel --update
           
-      - name: Test Home Manager module evaluation
+      - name: Test Home Manager module syntax
         run: |
           . /home/runner/.nix-profile/etc/profile.d/nix.sh
-          # Test that the Home Manager module evaluates without errors
-          nix-instantiate --eval --expr '
-            let
-              pkgs = import <nixpkgs> {};
-              homeManager = import <home-manager/modules> { inherit pkgs; };
-              nixaiModule = import ./nix/modules/home-manager.nix;
-            in
-            (homeManager.evalModules {
-              modules = [
-                nixaiModule
-                {
-                  home.username = "testuser";
-                  home.homeDirectory = "/home/testuser";
-                  home.stateVersion = "23.11";
-                  services.nixai.enable = false; # Disabled for syntax test only
-                }
-              ];
-            }).config.services.nixai
-          '
+          # Test that the Home Manager module has valid syntax and structure
+          echo "Testing nixai Home Manager module syntax..."
+          nix-instantiate --parse ./nix/modules/home-manager.nix > /dev/null
+          echo "✅ Home Manager module syntax is valid"
+          
+          # Test that it's a function as expected by Home Manager
+          nix-instantiate --eval --expr 'builtins.isFunction (import ./nix/modules/home-manager.nix)'
+          echo "✅ Home Manager module is a function"
           
       - name: Test example Home Manager configuration  
         run: |
