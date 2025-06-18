@@ -40,10 +40,68 @@ jobs:
           . /home/runner/.nix-profile/etc/profile.d/nix.sh
           nix --extra-experimental-features 'nix-command flakes' build
 
+  test-home-manager:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Nix
+        run: |
+          sh <(curl -L https://nixos.org/nix/install) --no-daemon
+          . /home/runner/.nix-profile/etc/profile.d/nix.sh
+          
+      - name: Add Home Manager channel
+        run: |
+          . /home/runner/.nix-profile/etc/profile.d/nix.sh
+          nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
+          nix-channel --update
+          
+      - name: Test Home Manager module evaluation
+        run: |
+          . /home/runner/.nix-profile/etc/profile.d/nix.sh
+          # Test that the Home Manager module evaluates without errors
+          nix-instantiate --eval --expr '
+            let
+              pkgs = import <nixpkgs> {};
+              homeManager = import <home-manager/modules> { inherit pkgs; };
+              nixaiModule = import ./nix/modules/home-manager.nix;
+            in
+            (homeManager.evalModules {
+              modules = [
+                nixaiModule
+                {
+                  home.username = "testuser";
+                  home.homeDirectory = "/home/testuser";
+                  home.stateVersion = "23.11";
+                  services.nixai.enable = false; # Disabled for syntax test only
+                }
+              ];
+            }).config.services.nixai
+          '
+          
+      - name: Test example Home Manager configuration  
+        run: |
+          . /home/runner/.nix-profile/etc/profile.d/nix.sh
+          # Test that our dedicated CI Home Manager configuration builds
+          nix-build ci-test-home-manager.nix -A activationPackage
+          
+      - name: Validate example configurations
+        run: |
+          . /home/runner/.nix-profile/etc/profile.d/nix.sh
+          # Check that example files have valid syntax
+          for example in nix/examples/*home-manager*; do
+            if [ -f "$example" ]; then
+              echo "Validating $example"
+              nix-instantiate --parse "$example" > /dev/null
+              echo "✅ $example syntax is valid"
+            fi
+          done
+
   release:
     if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [build-and-test, test-home-manager]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
