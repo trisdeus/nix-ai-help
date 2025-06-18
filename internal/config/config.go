@@ -20,20 +20,7 @@ const EmbeddedDefaultConfig = `default:
         base_url: http://localhost:8080/api/generate  # HTTP API endpoint URL
         headers:  # Optional custom headers (e.g., for authentication)
             Authorization: "Bearer your-api-key-here"
-   		userCfg := &UserConfig{
-			AIProvider:  embeddedCfg.AIProvider,
-			AIModel:     embeddedCfg.AIModel,
-			NixosFolder: "~/nixos-config", // Default folder
-			LogLevel:    embeddedCfg.LogLevel,
-			AIModels:    embeddedCfg.AIModels,
-			MCPServer:   embeddedCfg.MCPServer,
-			Nixos:       embeddedCfg.Nixos,
-			Diagnostics: embeddedCfg.Diagnostics,
-			Commands:    embeddedCfg.Commands,
-			AITimeouts:  embeddedCfg.AITimeouts,
-			Devenv:      embeddedCfg.Devenv,
-			CustomAI:    embeddedCfg.CustomAI,
-			Discourse:   embeddedCfg.Discourse,ntent-Type: "application/json"  # Set automatically if not provided
+            Content-Type: "application/json"  # Set automatically if not provided
     # Basic AI models configuration (subset for embedded config)
     ai_models:
         providers:
@@ -72,6 +59,7 @@ const EmbeddedDefaultConfig = `default:
     mcp_server:
         host: localhost
         port: 8081
+        mcp_port: 39847
         socket_path: /tmp/nixai-mcp.sock
         auto_start: false
         documentation_sources:
@@ -138,6 +126,7 @@ type Config struct {
 type MCPServerConfig struct {
 	Host                 string   `yaml:"host" json:"host"`
 	Port                 int      `yaml:"port" json:"port"`
+	MCPPort              int      `yaml:"mcp_port" json:"mcp_port"`
 	SocketPath           string   `yaml:"socket_path" json:"socket_path"`
 	AutoStart            bool     `yaml:"auto_start" json:"auto_start"`
 	DocumentationSources []string `yaml:"documentation_sources" json:"documentation_sources"`
@@ -541,6 +530,7 @@ func DefaultUserConfig() *UserConfig {
 		MCPServer: MCPServerConfig{
 			Host:       "localhost",
 			Port:       8081,
+			MCPPort:    39847,
 			SocketPath: "/tmp/nixai-mcp.sock",
 			AutoStart:  false,
 			DocumentationSources: []string{

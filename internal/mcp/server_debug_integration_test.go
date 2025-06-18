@@ -31,7 +31,10 @@ func TestHandleQuery_DebugLogging(t *testing.T) {
 		documentationSources: srcs,
 		logger:               customLogger,
 		debugLogging:         true,
-		mcpServer:            &MCPServer{logger: *customLogger},
+		mcpServer: &MCPServer{
+			logger:   *customLogger,
+			shutdown: make(chan struct{}),
+		},
 	}
 
 	req := httptest.NewRequest("GET", "/query?q=services.nginx.enable", nil)

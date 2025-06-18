@@ -66,6 +66,13 @@ in {
         example = 8081;
       };
 
+      mcpPort = mkOption {
+        type = types.port;
+        default = 39847;
+        description = "Port for the MCP protocol server to listen on";
+        example = 39847;
+      };
+
       documentationSources = mkOption {
         type = types.listOf types.str;
         default = [
@@ -144,7 +151,7 @@ in {
             name = "test";
             socketPath = "/tmp/nixai-test.sock";
             host = "localhost";
-            port = 8082;
+            port = 39847;
           }
         ];
       };
@@ -220,6 +227,7 @@ in {
         mcp_server = {
           host = cfg.mcp.host;
           port = cfg.mcp.port;
+          mcp_port = cfg.mcp.mcpPort;
           socket_path = cfg.mcp.socketPath;
           auto_start = cfg.mcp.enable;
           documentation_sources = cfg.mcp.documentationSources;

@@ -400,6 +400,7 @@ services.nixai.mcp = {
   # Network configuration
   host = "localhost";        # Host to bind to
   port = 8080;              # HTTP port (NixOS: 8080, Home Manager: 8081)
+  mcpPort = 39847;          # MCP protocol TCP port (default: 39847)
   socketPath = "/path/to/socket";  # Unix socket path
   
   # Documentation sources
@@ -410,6 +411,12 @@ services.nixai.mcp = {
     # Add custom sources here
   ];
 };
+```
+
+**Port Configuration Notes:**
+- `port`: HTTP server port for REST API access
+- `mcpPort`: TCP port for Model Context Protocol communication (replaces Unix sockets for better reliability)
+- `socketPath`: Unix socket path (legacy, being phased out in favor of TCP)
 ```
 
 ### Editor Integration Options
@@ -477,7 +484,7 @@ services.nixai.mcp = {
 home-manager.users.yourusername.services.nixai.mcp = {
   aiProvider = "openai";
   aiModel = "gpt-4";
-  port = 8082;  # Different port
+  port = 39847;  # Different port
 };
 ```
 
@@ -619,7 +626,7 @@ journalctl --user -u nixai-mcp -f
 #### 3. Port Conflicts
 If you get port binding errors, change the port:
 ```nix
-services.nixai.mcp.port = 8082;  # Use different port
+services.nixai.mcp.port = 39847;  # Use different port
 ```
 
 #### 4. AI Provider Issues
@@ -787,7 +794,7 @@ services.nixai = {
       name = "test";
       socketPath = "/tmp/nixai-test.sock";
       host = "localhost";
-      port = 8082;
+      port = 39847;
     };
   ];
 };

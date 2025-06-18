@@ -265,7 +265,7 @@ services.nixai = {
       name = "test";
       socketPath = "/tmp/nixai-test.sock";
       host = "localhost";
-      port = 8082;
+      port = 39847;
     }
   ];
 };

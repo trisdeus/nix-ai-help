@@ -338,7 +338,7 @@ func setConfig(key, value string) {
 	case "mcp_host":
 		cfg.MCPServer.Host = value
 	case "mcp_port":
-		port, err := fmt.Sscanf(value, "%d", &cfg.MCPServer.Port)
+		port, err := fmt.Sscanf(value, "%d", &cfg.MCPServer.MCPPort)
 		if err != nil || port != 1 {
 			fmt.Println(utils.FormatError("Invalid port number"))
 			os.Exit(1)
@@ -382,7 +382,7 @@ func getConfig(key string) {
 	case "mcp_host":
 		value = cfg.MCPServer.Host
 	case "mcp_port":
-		value = fmt.Sprintf("%d", cfg.MCPServer.Port)
+		value = fmt.Sprintf("%d", cfg.MCPServer.MCPPort)
 	default:
 		fmt.Println(utils.FormatError("Unknown configuration key: " + key))
 		fmt.Println(utils.FormatTip("Available keys: ai_provider, ai_model, log_level, nixos_folder, mcp_host, mcp_port"))

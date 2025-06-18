@@ -235,7 +235,7 @@ func setConfigWithOutput(out io.Writer, key, value string) {
 	case "mcp_host":
 		cfg.MCPServer.Host = value
 	case "mcp_port":
-		port, parseErr := fmt.Sscanf(value, "%d", &cfg.MCPServer.Port)
+		port, parseErr := fmt.Sscanf(value, "%d", &cfg.MCPServer.MCPPort)
 		if parseErr != nil || port != 1 {
 			_, _ = fmt.Fprintln(out, utils.FormatError("Invalid port number"))
 			return
@@ -276,7 +276,7 @@ func getConfigWithOutput(out io.Writer, key string) {
 	case "mcp_host":
 		value = cfg.MCPServer.Host
 	case "mcp_port":
-		value = fmt.Sprintf("%d", cfg.MCPServer.Port)
+		value = fmt.Sprintf("%d", cfg.MCPServer.MCPPort)
 	default:
 		_, _ = fmt.Fprintln(out, utils.FormatError("Unknown configuration key: "+key))
 		_, _ = fmt.Fprintln(out, utils.FormatTip("Available keys: ai_provider, ai_model, log_level, nixos_folder, mcp_host, mcp_port"))
@@ -1431,7 +1431,6 @@ func runAskCmdWithStreaming(args []string, out io.Writer, providerParam, modelPa
 		selectedProvider = "ollama"
 	}
 
-
 	var provider ai.Provider
 	if modelParam != "" {
 		provider, err = manager.GetProviderWithModel(selectedProvider, modelParam)
@@ -1528,7 +1527,6 @@ func runAskCmdWithConciseMode(args []string, out io.Writer, providerParam, model
 	if selectedProvider == "" {
 		selectedProvider = "ollama"
 	}
-
 
 	var provider ai.Provider
 	if modelParam != "" {
@@ -2034,7 +2032,6 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 	if selectedProvider == "" {
 		selectedProvider = "ollama"
 	}
-
 
 	// Get the provider with optional model specification
 	var provider ai.Provider

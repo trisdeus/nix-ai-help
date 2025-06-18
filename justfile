@@ -105,11 +105,6 @@ test-core:
 	@echo "Running core package tests only..."
 	go test -v ./internal/ai/function/... ./internal/ai/context/... ./internal/ai/ ./internal/config/... ./internal/mcp/... ./internal/nixos/... ./pkg/...
 
-# Test the application
-test:
-	@echo "Running tests..."
-	go test ./...
-
 # Run all tests (including Go tests, MCP tests, VS Code integration tests, provider tests)
 test-all:
 	@echo "Running all tests..."

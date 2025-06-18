@@ -12,10 +12,12 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/logger"
 	"os"
+	"os/signal"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -58,6 +60,9 @@ type MCPServer struct {
 	listener    net.Listener
 	mu          sync.Mutex
 	lspProvider *NixLSPProvider
+	ctx         context.Context
+	cancel      context.CancelFunc
+	shutdown    chan struct{}
 }
 
 // MCPRequest represents an MCP protocol request
@@ -1255,6 +1260,12 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 
 // Start starts the MCP server on Unix socket
 func (m *MCPServer) Start(socketPath string) error {
+	// Initialize context and shutdown channel
+	m.mu.Lock()
+	m.ctx, m.cancel = context.WithCancel(context.Background())
+	m.shutdown = make(chan struct{})
+	m.mu.Unlock()
+
 	// Remove existing socket file if it exists
 	_ = os.Remove(socketPath)
 
@@ -1271,31 +1282,177 @@ func (m *MCPServer) Start(socketPath string) error {
 
 	m.logger.Info(fmt.Sprintf("MCP server listening on Unix socket | socketPath=%s", socketPath))
 
-	// Accept connections in a blocking loop
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			m.logger.Error(fmt.Sprintf("Failed to accept connection | error=%v", err))
-			continue
+	// Setup signal handling for graceful shutdown
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start signal handler in a separate goroutine
+	go func() {
+		select {
+		case sig := <-sigCh:
+			m.logger.Info(fmt.Sprintf("Received signal %v, initiating graceful shutdown", sig))
+			m.Stop()
+		case <-m.ctx.Done():
+			// Context cancelled, normal shutdown
 		}
+	}()
 
-		go func(conn net.Conn) {
-			defer func() { _ = conn.Close() }()
-			m.logger.Debug(fmt.Sprintf("New MCP client connected | remoteAddr=%v", conn.RemoteAddr()))
+	// Accept connections in a loop with proper error handling
+	for {
+		select {
+		case <-m.ctx.Done():
+			m.logger.Info("MCP server context cancelled, shutting down")
+			return nil
+		case <-m.shutdown:
+			m.logger.Info("MCP server shutdown signal received")
+			return nil
+		default:
+			// Set a short timeout for accept to allow checking for cancellation
+			if tcpListener, ok := listener.(*net.UnixListener); ok {
+				tcpListener.SetDeadline(time.Now().Add(1 * time.Second))
+			}
 
-			// Handle connection with JSON-RPC2
-			stream := jsonrpc2.NewPlainObjectStream(conn)
-			m.logger.Debug("Created buffered stream")
+			conn, err := listener.Accept()
+			if err != nil {
+				// Check if this is a timeout error (expected)
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					continue // Continue the loop to check for shutdown
+				}
 
-			jsonConn := jsonrpc2.NewConn(context.Background(), stream, m)
-			m.logger.Debug("Created JSON-RPC2 connection")
-			defer func() { _ = jsonConn.Close() }()
+				// Check if this is because the listener was closed
+				if strings.Contains(err.Error(), "use of closed network connection") {
+					m.logger.Info("MCP server listener closed, shutting down gracefully")
+					return nil
+				}
 
-			// Keep connection alive
-			m.logger.Debug("Waiting for disconnect notification")
-			<-jsonConn.DisconnectNotify()
-			m.logger.Debug("MCP client disconnected")
-		}(conn)
+				m.logger.Error(fmt.Sprintf("Failed to accept connection | error=%v", err))
+				// For other errors, don't continue indefinitely
+				select {
+				case <-time.After(100 * time.Millisecond):
+					// Brief pause before retrying to avoid tight error loop
+				case <-m.ctx.Done():
+					return nil
+				}
+				continue
+			}
+
+			// Handle connection in a goroutine
+			go func(conn net.Conn) {
+				defer func() { _ = conn.Close() }()
+				m.logger.Debug(fmt.Sprintf("New MCP client connected | remoteAddr=%v", conn.RemoteAddr()))
+
+				// Handle connection with JSON-RPC2
+				stream := jsonrpc2.NewPlainObjectStream(conn)
+				m.logger.Debug("Created buffered stream")
+
+				jsonConn := jsonrpc2.NewConn(m.ctx, stream, m)
+				m.logger.Debug("Created JSON-RPC2 connection")
+				defer func() { _ = jsonConn.Close() }()
+
+				// Keep connection alive
+				m.logger.Debug("Waiting for disconnect notification")
+				<-jsonConn.DisconnectNotify()
+				m.logger.Debug("MCP client disconnected")
+			}(conn)
+		}
+	}
+}
+
+// StartTCP starts the MCP server on TCP port instead of Unix socket
+func (m *MCPServer) StartTCP(host string, port int) error {
+	// Initialize context and shutdown channel
+	m.mu.Lock()
+	m.ctx, m.cancel = context.WithCancel(context.Background())
+	m.shutdown = make(chan struct{})
+	m.mu.Unlock()
+
+	addr := fmt.Sprintf("%s:%d", host, port)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		m.logger.Error(fmt.Sprintf("Failed to listen on TCP | addr=%s error=%v", addr, err))
+		return fmt.Errorf("failed to listen on TCP %s: %v", addr, err)
+	}
+
+	// Store listener for cleanup
+	m.mu.Lock()
+	m.listener = listener
+	m.mu.Unlock()
+
+	m.logger.Info(fmt.Sprintf("MCP server listening on TCP | addr=%s", addr))
+
+	// Setup signal handling for graceful shutdown
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	// Start signal handler in a separate goroutine
+	go func() {
+		select {
+		case sig := <-sigCh:
+			m.logger.Info(fmt.Sprintf("Received signal %v, initiating graceful shutdown", sig))
+			m.Stop()
+		case <-m.ctx.Done():
+			// Context cancelled, normal shutdown
+		}
+	}()
+
+	// Accept connections in a loop with proper error handling
+	for {
+		select {
+		case <-m.ctx.Done():
+			m.logger.Info("MCP server context cancelled, shutting down")
+			return nil
+		case <-m.shutdown:
+			m.logger.Info("MCP server shutdown signal received")
+			return nil
+		default:
+			// Set a short timeout for accept to allow checking for cancellation
+			if tcpListener, ok := listener.(*net.TCPListener); ok {
+				tcpListener.SetDeadline(time.Now().Add(1 * time.Second))
+			}
+
+			conn, err := listener.Accept()
+			if err != nil {
+				// Check if this is a timeout error (expected)
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					continue // Continue the loop to check for shutdown
+				}
+
+				// Check if this is because the listener was closed
+				if strings.Contains(err.Error(), "use of closed network connection") {
+					m.logger.Info("MCP server listener closed, shutting down gracefully")
+					return nil
+				}
+
+				m.logger.Error(fmt.Sprintf("Failed to accept connection | error=%v", err))
+				// For other errors, don't continue indefinitely
+				select {
+				case <-time.After(100 * time.Millisecond):
+					// Brief pause before retrying to avoid tight error loop
+				case <-m.ctx.Done():
+					return nil
+				}
+				continue
+			}
+
+			// Handle connection in a goroutine
+			go func(conn net.Conn) {
+				defer func() { _ = conn.Close() }()
+				m.logger.Debug(fmt.Sprintf("New MCP client connected | remoteAddr=%v", conn.RemoteAddr()))
+
+				// Handle connection with JSON-RPC2
+				stream := jsonrpc2.NewPlainObjectStream(conn)
+				m.logger.Debug("Created buffered stream")
+
+				jsonConn := jsonrpc2.NewConn(m.ctx, stream, m)
+				m.logger.Debug("Created JSON-RPC2 connection")
+				defer func() { _ = jsonConn.Close() }()
+
+				// Keep connection alive
+				m.logger.Debug("Waiting for disconnect notification")
+				<-jsonConn.DisconnectNotify()
+				m.logger.Debug("MCP client disconnected")
+			}(conn)
+		}
 	}
 }
 
@@ -1303,6 +1460,22 @@ func (m *MCPServer) Start(socketPath string) error {
 func (m *MCPServer) Stop() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Cancel the context to signal all goroutines to stop
+	if m.cancel != nil {
+		m.cancel()
+	}
+
+	// Signal shutdown
+	if m.shutdown != nil {
+		select {
+		case m.shutdown <- struct{}{}:
+		default:
+			// Channel might be full or closed, that's ok
+		}
+	}
+
+	// Close the listener
 	if m.listener != nil {
 		_ = m.listener.Close()
 		m.listener = nil
@@ -1507,7 +1680,11 @@ func NewServer(addr string, documentationSources []string) *Server {
 		documentationSources: documentationSources,
 		logger:               log,
 		debugLogging:         false,
-		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
+		mcpServer: &MCPServer{
+			logger:      *log,
+			lspProvider: lspProvider,
+			shutdown:    make(chan struct{}),
+		},
 	}
 
 	// Set the global server instance for cross-referencing
@@ -1533,7 +1710,11 @@ func NewServerWithDebug(addr string, documentationSources []string) *Server {
 		documentationSources: documentationSources,
 		logger:               log,
 		debugLogging:         true,
-		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
+		mcpServer: &MCPServer{
+			logger:      *log,
+			lspProvider: lspProvider,
+			shutdown:    make(chan struct{}),
+		},
 	}
 
 	// Set the global server instance for cross-referencing
@@ -1583,9 +1764,13 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		documentationSources: userCfg.MCPServer.DocumentationSources,
 		logger:               log,
 		debugLogging:         strings.ToLower(userCfg.LogLevel) == "debug",
-		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
-		configPath:           configPath,
-		watcher:              nil,
+		mcpServer: &MCPServer{
+			logger:      *log,
+			lspProvider: lspProvider,
+			shutdown:    make(chan struct{}),
+		},
+		configPath: configPath,
+		watcher:    nil,
 	}
 
 	// Set the global server instance for cross-referencing
