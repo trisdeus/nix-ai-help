@@ -632,9 +632,17 @@ func DefaultUserConfig() *UserConfig {
 }
 
 func ConfigFilePath() (string, error) {
+	// Check for system-wide config first (for system services)
+	systemConfig := "/etc/nixai/config.yaml"
+	if _, err := os.Stat(systemConfig); err == nil {
+		return systemConfig, nil
+	}
+
+	// Fall back to user config for normal user sessions
 	usr, err := user.Current()
 	if err != nil {
-		return "", err
+		// If we can't get user info (e.g., in systemd service), try system config
+		return systemConfig, nil
 	}
 	configDir := filepath.Join(usr.HomeDir, ".config", "nixai")
 	return filepath.Join(configDir, "config.yaml"), nil
@@ -645,22 +653,47 @@ func EnsureConfigFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// #nosec G304 -- Config file paths are validated and not user-supplied
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return "", err
-		}
-		cfg := DefaultUserConfig()
-		data, err := yaml.Marshal(cfg)
-		if err != nil {
-			return "", err
-		}
-		// #nosec G306 -- Config files are not sensitive, 0644 is intentional for user config
-		if err := os.WriteFile(path, data, 0600); err != nil {
-			return "", err
-		}
+
+	// Check if config file already exists
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
 	}
+
+	// If it's the system config path and doesn't exist, that's expected
+	// The NixOS module will create it at system build time
+	systemConfig := "/etc/nixai/config.yaml"
+	if path == systemConfig {
+		// For system services, don't try to create the config file
+		// It should be created by the NixOS module
+		return path, nil
+	}
+
+	// Try to create user config directory and file
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		// If we can't create the user config directory (e.g., in systemd service),
+		// fall back to system config path if it exists
+		if _, sysErr := os.Stat(systemConfig); sysErr == nil {
+			return systemConfig, nil
+		}
+		return "", err
+	}
+
+	cfg := DefaultUserConfig()
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	// #nosec G306 -- Config files are not sensitive, 0644 is intentional for user config
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		// If we can't write the user config file, fall back to system config if it exists
+		if _, sysErr := os.Stat(systemConfig); sysErr == nil {
+			return systemConfig, nil
+		}
+		return "", err
+	}
+
 	return path, nil
 }
 
@@ -755,64 +788,87 @@ func EnsureConfigFileFromEmbedded() (string, error) {
 		return "", err
 	}
 
-	// If config file doesn't exist, create it from embedded default
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			return "", err
-		}
-
-		// Parse embedded config and extract the content under 'default:' key
-		embeddedCfg, err := LoadEmbeddedYAMLConfig()
-		if err != nil {
-			return "", err
-		}
-
-		// Convert to UserConfig structure and write as YAML
-		userCfg := &UserConfig{
-			AIProvider:  embeddedCfg.AIProvider,
-			AIModel:     "llama3",         // Default model
-			NixosFolder: "~/nixos-config", // Default folder
-			LogLevel:    embeddedCfg.LogLevel,
-			AIModels:    embeddedCfg.AIModels,
-			MCPServer:   embeddedCfg.MCPServer,
-			Nixos:       embeddedCfg.Nixos,
-			Diagnostics: embeddedCfg.Diagnostics,
-			Commands:    embeddedCfg.Commands,
-			Devenv:      embeddedCfg.Devenv,
-			CustomAI:    embeddedCfg.CustomAI,
-			Discourse:   embeddedCfg.Discourse,
-			NixOSContext: NixOSContext{
-				UsesFlakes:            false,
-				UsesChannels:          false,
-				NixOSConfigPath:       "",
-				SystemType:            "unknown",
-				HasHomeManager:        false,
-				HomeManagerType:       "none",
-				HomeManagerConfigPath: "",
-				NixOSVersion:          "",
-				NixVersion:            "",
-				ConfigurationFiles:    []string{},
-				EnabledServices:       []string{},
-				InstalledPackages:     []string{},
-				FlakeFile:             "",
-				ConfigurationNix:      "",
-				HardwareConfigNix:     "",
-				LastDetected:          time.Time{},
-				CacheValid:            false,
-				DetectionErrors:       []string{},
-			},
-		}
-
-		// Marshal to YAML and write to user config file
-		data, err := yaml.Marshal(userCfg)
-		if err != nil {
-			return "", err
-		}
-
-		if err := os.WriteFile(path, data, 0600); err != nil {
-			return "", err
-		}
+	// If config file already exists, return it
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
 	}
+
+	// If it's the system config path and doesn't exist, that's expected
+	// The NixOS module will create it at system build time
+	systemConfig := "/etc/nixai/config.yaml"
+	if path == systemConfig {
+		// For system services, don't try to create the config file
+		// It should be created by the NixOS module
+		return path, nil
+	}
+
+	// Try to create user config from embedded defaults
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		// If we can't create the user config directory (e.g., in systemd service),
+		// fall back to system config path if it exists
+		if _, sysErr := os.Stat(systemConfig); sysErr == nil {
+			return systemConfig, nil
+		}
+		return "", err
+	}
+
+	// Parse embedded config and extract the content under 'default:' key
+	embeddedCfg, err := LoadEmbeddedYAMLConfig()
+	if err != nil {
+		return "", err
+	}
+
+	// Convert to UserConfig structure and write as YAML
+	userCfg := &UserConfig{
+		AIProvider:  embeddedCfg.AIProvider,
+		AIModel:     "llama3",         // Default model
+		NixosFolder: "~/nixos-config", // Default folder
+		LogLevel:    embeddedCfg.LogLevel,
+		AIModels:    embeddedCfg.AIModels,
+		MCPServer:   embeddedCfg.MCPServer,
+		Nixos:       embeddedCfg.Nixos,
+		Diagnostics: embeddedCfg.Diagnostics,
+		Commands:    embeddedCfg.Commands,
+		AITimeouts:  embeddedCfg.AITimeouts,
+		Devenv:      embeddedCfg.Devenv,
+		CustomAI:    embeddedCfg.CustomAI,
+		Discourse:   embeddedCfg.Discourse,
+		NixOSContext: NixOSContext{
+			UsesFlakes:            false,
+			UsesChannels:          false,
+			NixOSConfigPath:       "",
+			SystemType:            "unknown",
+			HasHomeManager:        false,
+			HomeManagerType:       "none",
+			HomeManagerConfigPath: "",
+			NixOSVersion:          "",
+			NixVersion:            "",
+			ConfigurationFiles:    []string{},
+			EnabledServices:       []string{},
+			InstalledPackages:     []string{},
+			FlakeFile:             "",
+			ConfigurationNix:      "",
+			HardwareConfigNix:     "",
+			LastDetected:          time.Time{},
+			CacheValid:            false,
+			DetectionErrors:       []string{},
+		},
+	}
+
+	// Marshal to YAML and write to user config file
+	data, err := yaml.Marshal(userCfg)
+	if err != nil {
+		return "", err
+	}
+
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		// If we can't write the user config file, fall back to system config if it exists
+		if _, sysErr := os.Stat(systemConfig); sysErr == nil {
+			return systemConfig, nil
+		}
+		return "", err
+	}
+
 	return path, nil
 }

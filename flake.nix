@@ -17,7 +17,7 @@
     in {
       packages.default = self.packages.${system}.nixai;
       packages.nixai = pkgs.callPackage ./nix/package.nix {
-        version = "1.0.8";
+        version = "1.0.9";
         src = ./.; # Use src instead of srcOverride for direct source
         rev = self.rev or null;
         gitCommit =

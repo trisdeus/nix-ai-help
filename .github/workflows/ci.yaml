@@ -17,7 +17,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.18'
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
@@ -94,7 +94,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.18'
       - name: Build binary
         run: |
           go build -o nixai ./cmd/nixai
