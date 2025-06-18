@@ -185,7 +185,12 @@ func FormatKeyValue(key, value string) string {
 func FormatBox(title, content string) string {
 	if title != "" {
 		titleLine := AccentStyle.Render("┌─ " + title + " ")
-		titleLine += MutedStyle.Render(strings.Repeat("─", max(0, 60-len(title)-3)) + "┐")
+		// Use custom max function for Go 1.18 compatibility
+		maxLen := 60 - len(title) - 3
+		if maxLen < 0 {
+			maxLen = 0
+		}
+		titleLine += MutedStyle.Render(strings.Repeat("─", maxLen) + "┐")
 
 		lines := strings.Split(content, "\n")
 		var boxedLines []string

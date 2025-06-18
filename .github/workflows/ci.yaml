@@ -17,7 +17,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.18'
+          go-version: '1.22'
       - name: Cache Go modules
         uses: actions/cache@v4
         with:
@@ -27,12 +27,23 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Install dependencies
+        run: go mod download
+      - name: Verify dependencies
+        run: go mod verify
+      - name: Run linting
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m
       - name: Install Nix
         run: |
           sh <(curl -L https://nixos.org/nix/install) --no-daemon
           . /home/runner/.nix-profile/etc/profile.d/nix.sh
       - name: Build
         run: go build ./...
+      - name: Run tests
+        run: go test -v ./...
       - name: Build with flake.nix
         run: |
           . /home/runner/.nix-profile/etc/profile.d/nix.sh
@@ -92,7 +103,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.18'
+          go-version: '1.22'
       - name: Build binary
         run: |
           go build -o nixai ./cmd/nixai
