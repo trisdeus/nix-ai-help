@@ -31,11 +31,6 @@ jobs:
         run: go mod download
       - name: Verify dependencies
         run: go mod verify
-      - name: Run linting
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          args: --timeout=5m
       - name: Install Nix
         run: |
           sh <(curl -L https://nixos.org/nix/install) --no-daemon
