@@ -18,10 +18,30 @@ in {
 
       package = mkOption {
         type = types.package;
-        default =
-          if (pkgs ? nixai)
-          then pkgs.nixai
-          else pkgs.callPackage ../package.nix {inherit (pkgs) lib buildGoModule;};
+        default = throw ''
+          nixai package not found in pkgs.
+
+          Please provide the nixai package explicitly. Options:
+
+          1. Use a flake input:
+             services.nixai.mcp.package = inputs.nixai.packages.''${pkgs.system}.nixai;
+
+          2. Build from source:
+             services.nixai.mcp.package = pkgs.callPackage /path/to/nixai/package.nix {};
+
+          3. Use fetchFromGitHub with explicit package:
+             let
+               nixai-src = pkgs.fetchFromGitHub {
+                 owner = "olafkfreund";
+                 repo = "nix-ai-help";
+                 rev = "main";  # or specific commit
+                 sha256 = ""; # leave empty for first build
+               };
+               nixai-pkg = pkgs.callPackage (nixai-src + "/package.nix") {};
+             in {
+               services.nixai.mcp.package = nixai-pkg;
+             }
+        '';
         description = "The nixai package to use";
       };
 

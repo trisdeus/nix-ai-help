@@ -101,6 +101,7 @@ var aiProvider string
 var aiModel string
 var contextFile string
 var globalTUI bool
+var socketPath string
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
@@ -112,6 +113,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&contextFile, "context-file", "", "Path to a file containing context information (JSON or text)")
 	rootCmd.PersistentFlags().BoolVar(&globalTUI, "tui", false, "Launch TUI mode for any command")
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
+	mcpServerCmd.Flags().StringVar(&socketPath, "socket-path", "/tmp/nixai-mcp.sock", "Specify the MCP server socket path")
 	doctorCmd.Flags().BoolP("verbose", "v", false, "Show detailed output and progress information")
 
 	// Add ask command flags
@@ -2453,13 +2455,13 @@ func handleMCPServerCommand(args []string) error {
 	subcommand := args[0]
 	switch subcommand {
 	case "start":
-		return handleMCPServerStart(cfg, daemonMode)
+		return handleMCPServerStart(cfg, daemonMode, socketPath)
 	case "stop":
 		return handleMCPServerStop(cfg)
 	case "status":
 		return handleMCPServerStatus(cfg)
 	case "restart":
-		return handleMCPServerRestart(cfg)
+		return handleMCPServerRestart(cfg, socketPath)
 	case "query":
 		if len(args) < 2 {
 			return fmt.Errorf("query command requires a query string")
@@ -2490,14 +2492,18 @@ func handleMCPServerCommand(args []string) error {
 }
 
 // handleMCPServerStart starts the MCP server
-func handleMCPServerStart(cfg *config.UserConfig, daemon bool) error {
+func handleMCPServerStart(cfg *config.UserConfig, daemon bool, socketPath string) error {
 	fmt.Println(utils.FormatHeader("🚀 Starting MCP Server"))
 	fmt.Println()
 
 	// If daemon mode is requested, fork the process
 	if daemon {
 		// Create a command to start the server without daemon flag
-		cmd := exec.Command(os.Args[0], "mcp-server", "start")
+		args := []string{"mcp-server", "start"}
+		if socketPath != "" {
+			args = append(args, "--socket-path", socketPath)
+		}
+		cmd := exec.Command(os.Args[0], args...)
 
 		// Start the background process without complex process group management
 		err := cmd.Start()
@@ -2513,7 +2519,7 @@ func handleMCPServerStart(cfg *config.UserConfig, daemon bool) error {
 		fmt.Println(utils.FormatSuccess("MCP server started in daemon mode"))
 		fmt.Println(utils.FormatKeyValue("Process ID", fmt.Sprintf("%d", cmd.Process.Pid)))
 		fmt.Println(utils.FormatKeyValue("HTTP Server", fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)))
-		fmt.Println(utils.FormatKeyValue("Unix Socket", cfg.MCPServer.SocketPath))
+		fmt.Println(utils.FormatKeyValue("Unix Socket", socketPath))
 		fmt.Println()
 		fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check server health"))
 		fmt.Println(utils.FormatTip("Use 'nixai mcp-server stop' to stop the server"))
@@ -2532,6 +2538,11 @@ func handleMCPServerStart(cfg *config.UserConfig, daemon bool) error {
 		return fmt.Errorf("failed to create MCP server: %v", err)
 	}
 
+	// Override socket path if specified
+	if socketPath != "" {
+		server.SetSocketPath(socketPath)
+	}
+
 	fmt.Print(utils.FormatInfo("Initializing MCP server... "))
 
 	// Start the server (this will block)
@@ -2545,7 +2556,7 @@ func handleMCPServerStart(cfg *config.UserConfig, daemon bool) error {
 	fmt.Println(utils.FormatSuccess("done"))
 	fmt.Println()
 	fmt.Println(utils.FormatKeyValue("HTTP Server", fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)))
-	fmt.Println(utils.FormatKeyValue("Unix Socket", cfg.MCPServer.SocketPath))
+	fmt.Println(utils.FormatKeyValue("Unix Socket", socketPath))
 	fmt.Println()
 	fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check server health"))
 	fmt.Println(utils.FormatTip("Use 'nixai mcp-server stop' to stop the server"))
@@ -2623,7 +2634,7 @@ func handleMCPServerStatus(cfg *config.UserConfig) error {
 }
 
 // handleMCPServerRestart restarts the MCP server
-func handleMCPServerRestart(cfg *config.UserConfig) error {
+func handleMCPServerRestart(cfg *config.UserConfig, socketPath string) error {
 	fmt.Println(utils.FormatHeader("🔄 Restarting MCP Server"))
 	fmt.Println()
 
@@ -2638,7 +2649,7 @@ func handleMCPServerRestart(cfg *config.UserConfig) error {
 	fmt.Println(utils.FormatSuccess("done"))
 
 	// Start again
-	return handleMCPServerStart(cfg, false)
+	return handleMCPServerStart(cfg, false, socketPath)
 }
 
 // handleMCPServerQuery queries the MCP server directly
