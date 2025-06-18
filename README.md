@@ -158,7 +158,7 @@ nix profile install github:olafkfreund/nix-ai-help
 
 **4. Add to your NixOS/Home Manager configuration:**
 
-See the [modules README](modules/README.md) for complete integration examples.
+See the [modules README](nix/modules/README.md) for complete integration examples.
 
 ### 🏗️ Traditional Package Installation (Non-flake Users)
 

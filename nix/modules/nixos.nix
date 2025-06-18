@@ -24,7 +24,7 @@ in {
           else
             pkgs.callPackage ../package.nix {
               # Explicitly pass the source from the module directory
-              src = lib.cleanSource ../.;
+              src = lib.cleanSource ../../.;
             };
         description = "The nixai package to use";
       };

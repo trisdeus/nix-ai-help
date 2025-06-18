@@ -96,7 +96,7 @@ error: attribute 'nixai' missing
 If you must use the module without flakes, you need to provide the nixai package yourself:
 
 ```nix
-imports = [ ./path/to/nixai/modules/nixos.nix ];
+imports = [ ./path/to/nixai/nix/modules/nixos.nix ];
 services.nixai = {
   enable = true;
   mcp = {
@@ -126,7 +126,7 @@ Add the module to your NixOS configuration:
 {
   imports = [ 
     # Path to the nixai module
-    ./path/to/nixai/modules/nixos.nix
+    ./path/to/nixai/nix/modules/nixos.nix
   ];
 
   services.nixai = {
@@ -148,7 +148,7 @@ Full configuration with all available options:
 
 {
   imports = [ 
-    ./path/to/nixai/modules/nixos.nix
+    ./path/to/nixai/nix/modules/nixos.nix
   ];
 
   services.nixai = {
@@ -189,7 +189,7 @@ Add the module to your Home Manager configuration:
 
 {
   imports = [ 
-    ./path/to/nixai/modules/home-manager.nix
+    ./path/to/nixai/nix/modules/home-manager.nix
   ];
 
   services.nixai = {
@@ -211,7 +211,7 @@ Full configuration with all available options:
 
 {
   imports = [ 
-    ./path/to/nixai/modules/home-manager.nix
+    ./path/to/nixai/nix/modules/home-manager.nix
   ];
 
   services.nixai = {

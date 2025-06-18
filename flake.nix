@@ -16,7 +16,7 @@
       pkgs = import nixpkgs {inherit system;};
     in {
       packages.default = self.packages.${system}.nixai;
-      packages.nixai = pkgs.callPackage ./package.nix {
+      packages.nixai = pkgs.callPackage ./nix/package.nix {
         version = "1.0.8";
         src = ./.; # Use src instead of srcOverride for direct source
         rev = self.rev or null;
@@ -103,8 +103,8 @@
     })
     // {
       # System-independent modules
-      nixosModules.default = import ./modules/nixos.nix;
-      homeManagerModules.default = import ./modules/home-manager.nix;
+      nixosModules.default = import ./nix/modules/nixos.nix;
+      homeManagerModules.default = import ./nix/modules/home-manager.nix;
 
       # Flake-level overlays - provide nixai package for each system
       overlays.default = final: prev: {

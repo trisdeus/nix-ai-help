@@ -12,7 +12,7 @@
     rev = "main"; # or use a specific commit for reproducibility
     sha256 = ""; # Leave empty for first build, then add the hash from error message
   };
-  nixai-package = pkgs.callPackage (nixai-src + "/package.nix") {};
+  nixai-package = pkgs.callPackage (nixai-src + "/nix/package.nix") {};
 in {
   # Example Home Manager configuration
   services.nixai = {

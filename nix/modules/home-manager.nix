@@ -336,7 +336,7 @@ in {
           vim.g.nixai_socket_path = "${cfg.mcp.socketPath}"
           dofile("${pkgs.writeTextFile {
             name = "nixai-nvim.lua";
-            text = builtins.readFile ../../modules/nixai-nvim.lua;
+            text = builtins.readFile ./nixai-nvim.lua;
           }}")
           require("nixai-nvim").setup_keymaps()
         '';

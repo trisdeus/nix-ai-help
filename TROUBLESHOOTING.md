@@ -49,7 +49,7 @@ git clone https://github.com/olafkfreund/nix-ai-help.git /etc/nixos/nixai
 
 # Import the module in your configuration.nix
 imports = [
-  /etc/nixos/nixai/modules/nixos.nix
+  /etc/nixos/nixai/nix/modules/nixos.nix
 ];
 
 services.nixai.enable = true;
