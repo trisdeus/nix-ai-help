@@ -1,11 +1,20 @@
 package nixos
 
 import (
+	"os/exec"
 	"strings"
 	"testing"
 )
 
+func nixAvailable() bool {
+	_, err := exec.LookPath("nix")
+	return err == nil
+}
+
 func TestSearchNixPackages(t *testing.T) {
+	if !nixAvailable() {
+		t.Skip("nix command not available, skipping test")
+	}
 	exec := NewExecutor("")
 	output, err := exec.SearchNixPackages("hello")
 	if err != nil {
@@ -17,6 +26,9 @@ func TestSearchNixPackages(t *testing.T) {
 }
 
 func TestSearchNixPackages_Firefox(t *testing.T) {
+	if !nixAvailable() {
+		t.Skip("nix command not available, skipping test")
+	}
 	exec := NewExecutor("")
 	output, err := exec.SearchNixPackages("firefox")
 	if err != nil {
@@ -31,6 +43,9 @@ func TestSearchNixPackages_Firefox(t *testing.T) {
 }
 
 func TestSearchNixPackages_MultiWord(t *testing.T) {
+	if !nixAvailable() {
+		t.Skip("nix command not available, skipping test")
+	}
 	exec := NewExecutor("")
 	output, err := exec.SearchNixPackages("libre office")
 	if err != nil {

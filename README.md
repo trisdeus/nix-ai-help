@@ -908,10 +908,29 @@ go build -o nixai cmd/nixai/main.go
 
 ### Testing & Quality
 
+**Local Development Testing:**
 ```zsh
-just test                    # Run all tests
+# Quick tests (CI equivalent - recommended for development)
+just test                    # Runs core package tests only (fast)
+./scripts/test-quick.sh      # Same as above
+
+# Full comprehensive testing (when needed)
+just test-full               # Runs ALL tests including CLI/TUI
+./scripts/test-local-full.sh # Same as above
+
+# Specific test categories  
+just test-cli                # CLI tests only (local development)
+just test-core               # Core packages only (matches CI)
+```
+
+**CI vs Local Testing:**
+- **CI runs**: Core packages only (`internal/ai/function`, `internal/ai/context`, `internal/ai`, `internal/config`, `internal/mcp`, `internal/nixos`, `pkg/*`)
+- **Local testing**: All packages including CLI/TUI which have environment-specific behavior
+
+**Other Quality Tools:**
+```zsh
 just test-coverage          # Generate coverage report
-just lint                   # Run linters
+just lint                   # Run linters  
 just format                 # Format code
 just build                  # Build nixai binary
 just run                    # Build and run locally

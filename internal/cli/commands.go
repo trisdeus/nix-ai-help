@@ -3492,8 +3492,16 @@ func displayBasicLogSummaryToWriter(out io.Writer, logData, logType string) {
 	}
 }
 
+// commandsInitialized tracks whether commands have been added to avoid duplicates
+var commandsInitialized bool
+
 // initializeCommands adds all commands to the root command
 func initializeCommands() {
+	// Prevent duplicate command registration
+	if commandsInitialized {
+		return
+	}
+
 	rootCmd.AddCommand(askCmd)
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(explainOptionCmd)
@@ -3523,6 +3531,8 @@ func initializeCommands() {
 	rootCmd.AddCommand(mcpServerCmd)
 	rootCmd.AddCommand(neovimSetupCmd)
 	rootCmd.AddCommand(packageRepoCmd)
+
+	commandsInitialized = true
 }
 
 // Execute runs the root command

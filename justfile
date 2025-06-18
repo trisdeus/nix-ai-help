@@ -88,6 +88,23 @@ run-debug: build
 	@echo "Running nixai with debug logging..."
 	./nixai --log-level debug
 
+# Test commands
+test:
+	@echo "Running quick test suite (CI equivalent)..."
+	./scripts/test-quick.sh
+
+test-full:
+	@echo "Running full local test suite..."
+	./scripts/test-local-full.sh
+
+test-cli:
+	@echo "Running CLI tests only (local development)..."
+	go test -v ./internal/cli/...
+
+test-core:
+	@echo "Running core package tests only..."
+	go test -v ./internal/ai/function/... ./internal/ai/context/... ./internal/ai/ ./internal/config/... ./internal/mcp/... ./internal/nixos/... ./pkg/...
+
 # Test the application
 test:
 	@echo "Running tests..."
