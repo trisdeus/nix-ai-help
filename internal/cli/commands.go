@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -291,7 +292,8 @@ func showConfig() {
 	fmt.Println(utils.FormatKeyValue("Log Level", cfg.LogLevel))
 	fmt.Println(utils.FormatKeyValue("NixOS Folder", cfg.NixosFolder))
 	fmt.Println(utils.FormatKeyValue("MCP Server Host", cfg.MCPServer.Host))
-	fmt.Println(utils.FormatKeyValue("MCP Server Port", fmt.Sprintf("%d", cfg.MCPServer.Port)))
+	fmt.Println(utils.FormatKeyValue("HTTP Server Port", fmt.Sprintf("%d", cfg.MCPServer.Port)))
+	fmt.Println(utils.FormatKeyValue("MCP TCP Port", fmt.Sprintf("%d", cfg.MCPServer.MCPPort)))
 	if len(cfg.MCPServer.DocumentationSources) > 0 {
 		fmt.Println(utils.FormatKeyValue("Documentation Sources", strings.Join(cfg.MCPServer.DocumentationSources, ", ")))
 	}
@@ -2519,6 +2521,7 @@ func handleMCPServerStart(cfg *config.UserConfig, daemon bool, socketPath string
 		fmt.Println(utils.FormatSuccess("MCP server started in daemon mode"))
 		fmt.Println(utils.FormatKeyValue("Process ID", fmt.Sprintf("%d", cmd.Process.Pid)))
 		fmt.Println(utils.FormatKeyValue("HTTP Server", fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)))
+		fmt.Println(utils.FormatKeyValue("MCP Server", fmt.Sprintf("tcp://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.MCPPort)))
 		fmt.Println(utils.FormatKeyValue("Unix Socket", socketPath))
 		fmt.Println()
 		fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check server health"))
@@ -2545,17 +2548,104 @@ func handleMCPServerStart(cfg *config.UserConfig, daemon bool, socketPath string
 
 	fmt.Print(utils.FormatInfo("Initializing MCP server... "))
 
-	// Start the server (this will block)
-	go func() {
-		if err := server.Start(); err != nil {
-			fmt.Println(utils.FormatError("failed"))
-			fmt.Printf("Error: %v\n", err)
-		}
-	}()
+	// Create channels for communication between startup goroutines
+	startupCh := make(chan bool, 1)
+	errorCh := make(chan error, 1)
 
-	fmt.Println(utils.FormatSuccess("done"))
+	// Attempt TCP startup if MCPPort is configured
+	if cfg.MCPServer.MCPPort > 0 {
+		fmt.Print(utils.FormatInfo("Starting TCP server... "))
+
+		go func() {
+			// Give a moment for the server to start listening before signaling success
+			time.Sleep(100 * time.Millisecond)
+
+			// Test if the server is actually listening
+			conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", cfg.MCPServer.Host, cfg.MCPServer.MCPPort), 100*time.Millisecond)
+			if err == nil {
+				conn.Close()
+				fmt.Println(utils.FormatSuccess("started"))
+				startupCh <- true
+				return
+			}
+
+			// If can't connect, start the server (this blocks)
+			if err := server.StartTCP(cfg.MCPServer.Host, cfg.MCPServer.MCPPort); err != nil {
+				fmt.Println(utils.FormatError("failed"))
+				errorCh <- fmt.Errorf("TCP startup failed: %v", err)
+			}
+		}()
+
+		// Start the actual TCP server in a separate goroutine
+		go func() {
+			if err := server.StartTCP(cfg.MCPServer.Host, cfg.MCPServer.MCPPort); err != nil {
+				// Only report error if it's not because the server is already running
+				if !strings.Contains(err.Error(), "address already in use") {
+					errorCh <- fmt.Errorf("TCP startup failed: %v", err)
+				}
+			}
+		}()
+
+		// Wait for startup confirmation or error
+		select {
+		case <-startupCh:
+			fmt.Printf("✅ TCP server started successfully\n")
+		case err := <-errorCh:
+			fmt.Printf("❌ %v\n", err)
+
+			// Try Unix socket fallback
+			fmt.Print(utils.FormatInfo("Falling back to Unix socket... "))
+			go func() {
+				if err := server.StartUnixSocket(socketPath); err != nil {
+					fmt.Println(utils.FormatError("failed"))
+					errorCh <- fmt.Errorf("Unix socket startup failed: %v", err)
+				} else {
+					fmt.Println(utils.FormatSuccess("started"))
+					startupCh <- true
+				}
+			}()
+
+			// Wait for Unix socket result
+			select {
+			case <-startupCh:
+				fmt.Printf("✅ Unix socket server started successfully\n")
+			case err := <-errorCh:
+				return fmt.Errorf("failed to start MCP server: %v", err)
+			case <-time.After(5 * time.Second):
+				return fmt.Errorf("timeout waiting for Unix socket server to start")
+			}
+		case <-time.After(3 * time.Second):
+			return fmt.Errorf("timeout waiting for TCP server to start")
+		}
+	} else {
+		// No TCP port configured, use Unix socket directly
+		fmt.Print(utils.FormatInfo("Starting Unix socket server... "))
+		go func() {
+			if err := server.StartUnixSocket(socketPath); err != nil {
+				fmt.Println(utils.FormatError("failed"))
+				errorCh <- fmt.Errorf("Unix socket startup failed: %v", err)
+			} else {
+				fmt.Println(utils.FormatSuccess("started"))
+				startupCh <- true
+			}
+		}()
+
+		// Wait for Unix socket result
+		select {
+		case <-startupCh:
+			fmt.Printf("✅ Unix socket server started successfully\n")
+		case err := <-errorCh:
+			return fmt.Errorf("failed to start MCP server: %v", err)
+		case <-time.After(5 * time.Second):
+			return fmt.Errorf("timeout waiting for Unix socket server to start")
+		}
+	}
+
 	fmt.Println()
 	fmt.Println(utils.FormatKeyValue("HTTP Server", fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)))
+	if cfg.MCPServer.MCPPort > 0 {
+		fmt.Println(utils.FormatKeyValue("MCP Server (TCP)", fmt.Sprintf("tcp://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.MCPPort)))
+	}
 	fmt.Println(utils.FormatKeyValue("Unix Socket", socketPath))
 	fmt.Println()
 	fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check server health"))
@@ -2608,6 +2698,20 @@ func handleMCPServerStatus(cfg *config.UserConfig) error {
 		fmt.Println(utils.FormatKeyValue("HTTP Status", "✅ Running"))
 	}
 
+	// Check MCP TCP port
+	mcpAddr := net.JoinHostPort(cfg.MCPServer.Host, fmt.Sprintf("%d", cfg.MCPServer.MCPPort))
+	fmt.Print(utils.FormatInfo("Checking MCP TCP port... "))
+
+	conn, err := net.DialTimeout("tcp", mcpAddr, 3*time.Second)
+	if err != nil {
+		fmt.Println(utils.FormatError("unreachable"))
+		fmt.Println(utils.FormatKeyValue("MCP TCP Status", "❌ Not running"))
+	} else {
+		defer conn.Close()
+		fmt.Println(utils.FormatSuccess("reachable"))
+		fmt.Println(utils.FormatKeyValue("MCP TCP Status", "✅ Running"))
+	}
+
 	// Check Unix socket
 	socketPath := cfg.MCPServer.SocketPath
 	if socketPath == "" {
@@ -2617,8 +2721,16 @@ func handleMCPServerStatus(cfg *config.UserConfig) error {
 	fmt.Print(utils.FormatInfo("Checking Unix socket... "))
 
 	if _, err := os.Stat(socketPath); err == nil {
-		fmt.Println(utils.FormatSuccess("exists"))
-		fmt.Println(utils.FormatKeyValue("Socket Status", "✅ Available"))
+		// Socket file exists, try to connect to it
+		conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+		if err != nil {
+			fmt.Println(utils.FormatError("not accessible"))
+			fmt.Println(utils.FormatKeyValue("Socket Status", "❌ File exists but not accessible"))
+		} else {
+			defer conn.Close()
+			fmt.Println(utils.FormatSuccess("accessible"))
+			fmt.Println(utils.FormatKeyValue("Socket Status", "✅ Available and accessible"))
+		}
 		fmt.Println(utils.FormatKeyValue("Socket Path", socketPath))
 	} else {
 		fmt.Println(utils.FormatError("missing"))

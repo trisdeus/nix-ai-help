@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -638,6 +639,16 @@ func ConfigFilePath() (string, error) {
 	return filepath.Join(configDir, "config.yaml"), nil
 }
 
+// UserConfigFilePath always returns the user config path (for saving contexts and user data)
+func UserConfigFilePath() (string, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return "", fmt.Errorf("unable to determine user config path: %v", err)
+	}
+	configDir := filepath.Join(usr.HomeDir, ".config", "nixai")
+	return filepath.Join(configDir, "config.yaml"), nil
+}
+
 func EnsureConfigFile() (string, error) {
 	path, err := ConfigFilePath()
 	if err != nil {
@@ -705,10 +716,17 @@ func LoadUserConfig() (*UserConfig, error) {
 }
 
 func SaveUserConfig(cfg *UserConfig) error {
-	path, err := ConfigFilePath()
+	path, err := UserConfigFilePath()
 	if err != nil {
 		return err
 	}
+
+	// Ensure the directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create config directory: %v", err)
+	}
+
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return err

@@ -1911,6 +1911,37 @@ func (s *Server) Start() error {
 	}
 }
 
+// StartTCP starts the MCP server using TCP protocol instead of Unix sockets
+func (s *Server) StartTCP(host string, port int) error {
+	s.logger.Info(fmt.Sprintf("Starting MCP server with TCP protocol | host=%s port=%d", host, port))
+
+	// Start the MCP server on TCP (this will block)
+	return s.mcpServer.StartTCP(host, port)
+}
+
+// StartWithHTTP starts both the MCP TCP server and HTTP server
+func (s *Server) StartWithHTTP(host string, port int) error {
+	s.logger.Info(fmt.Sprintf("Starting MCP server with TCP and HTTP | tcp_host=%s tcp_port=%d http_addr=%s", host, port, s.addr))
+
+	// Start the HTTP server in the background for health checks and metrics
+	go func() {
+		if err := s.Start(); err != nil {
+			s.logger.Warn(fmt.Sprintf("HTTP server failed to start (continuing with TCP only) | error=%v", err))
+		}
+	}()
+
+	// Start the MCP server on TCP (this will block)
+	return s.mcpServer.StartTCP(host, port)
+}
+
+// StartUnixSocket starts the MCP server using Unix socket
+func (s *Server) StartUnixSocket(socketPath string) error {
+	s.logger.Info(fmt.Sprintf("Starting MCP server with Unix socket | socket_path=%s", socketPath))
+
+	// Start the MCP server on Unix socket (this will block)
+	return s.mcpServer.Start(socketPath)
+}
+
 // Levenshtein distance for fuzzy matching
 func levenshtein(a, b string) int {
 	la, lb := len(a), len(b)

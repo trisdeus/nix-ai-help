@@ -103,7 +103,7 @@ Add nixai to your NixOS system configuration:
             # Enable MCP server for advanced features
             mcp = {
               enable = true;
-              port = 8080;
+              port = 39847;
               aiProvider = "ollama";  # or "gemini", "openai"
               aiModel = "llama3";
             };
@@ -132,7 +132,7 @@ For a complete setup with all features enabled:
       
       # Network configuration
       host = "localhost";
-      port = 8080;
+      port = 39847;
       socketPath = "/run/nixai/mcp.sock";
       
       # AI Provider settings
@@ -185,7 +185,7 @@ For a complete setup with all features enabled:
             
             mcp = {
               enable = true;
-              port = 8081;  # Different port to avoid conflicts
+              port = 39847;  # Different port to avoid conflicts
             };
           };
         }
@@ -212,7 +212,7 @@ Complete setup with editor integrations:
       # User-specific paths
       socketPath = "$HOME/.local/share/nixai/mcp.sock";
       host = "localhost";
-      port = 8081;
+      port = 39847;
       
       # AI settings
       aiProvider = "ollama";
@@ -388,7 +388,7 @@ services.nixai.mcp = {
 
 Set environment variable:
 ```sh
-export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+export LLAMACPP_ENDPOINT="http://localhost:39847/completion"
 ```
 
 ### MCP Server Options
@@ -399,7 +399,7 @@ services.nixai.mcp = {
   
   # Network configuration
   host = "localhost";        # Host to bind to
-  port = 8080;              # HTTP port (NixOS: 8080, Home Manager: 8081)
+  port = 39847;              # HTTP port (NixOS: 39847, Home Manager: 8081)
   mcpPort = 39847;          # MCP protocol TCP port (default: 39847)
   socketPath = "/path/to/socket";  # Unix socket path
   
@@ -417,7 +417,6 @@ services.nixai.mcp = {
 - `port`: HTTP server port for REST API access
 - `mcpPort`: TCP port for Model Context Protocol communication (replaces Unix sockets for better reliability)
 - `socketPath`: Unix socket path (legacy, being phased out in favor of TCP)
-```
 
 ### Editor Integration Options
 
@@ -514,7 +513,7 @@ services.nixai = {
   mcp = {
     enable = true;
     host = "127.0.0.1";  # Bind only to localhost
-    port = 8080;
+    port = 39847;
     
     # Use secure socket path
     socketPath = "/var/lib/nixai/secure.sock";
@@ -711,7 +710,7 @@ Here's a complete example combining all features:
             enable = true;
             mcp = {
               enable = true;
-              port = 8080;
+              port = 39847;
               aiProvider = "ollama";
               aiModel = "llama3";
               documentationSources = [
@@ -738,7 +737,7 @@ Here's a complete example combining all features:
               enable = true;
               mcp = {
                 enable = true;
-                port = 8081;  # Different port for user
+                port = 39847;  # Different port for user
                 aiProvider = "openai";  # Different provider for user
                 aiModel = "gpt-4";
               };
@@ -788,7 +787,7 @@ services.nixai = {
       name = "default";
       socketPath = "/run/nixai/mcp.sock";
       host = "localhost";
-      port = 8080;
+      port = 39847;
     }
     {
       name = "test";

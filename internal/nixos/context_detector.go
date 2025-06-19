@@ -479,9 +479,9 @@ func (cd *ContextDetector) ClearCache() error {
 // GetCacheLocation returns the location where context cache is stored
 func (cd *ContextDetector) GetCacheLocation() string {
 	// The context is cached in the user config file
-	configPath, err := config.ConfigFilePath()
+	configPath, err := config.UserConfigFilePath()
 	if err != nil {
-		return "unknown (config path unavailable)"
+		return "unknown (user config path unavailable)"
 	}
 	return configPath
 }

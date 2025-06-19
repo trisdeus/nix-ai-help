@@ -211,7 +211,7 @@ services.nixai = {
   mcp = {
     enable = true;
     host = "localhost";
-    port = 8080;  # Use 8081 for Home Manager to avoid conflicts
+    port = 39847;  # Use 8081 for Home Manager to avoid conflicts
     aiProvider = "ollama";  # "ollama", "openai", or "gemini"
     aiModel = "llama3";     # Model varies by provider
     

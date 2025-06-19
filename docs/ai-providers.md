@@ -65,7 +65,7 @@ ai_provider: llamacpp
 ai_model: llama-2-7b-chat
 
 # Environment variable
-export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+export LLAMACPP_ENDPOINT="http://localhost:39847/completion"
 ```
 
 **Setup:**
@@ -78,7 +78,7 @@ cd llama.cpp && make
 wget https://huggingface.co/TheBloke/Llama-2-7b-Chat-GGUF/resolve/main/llama-2-7b-chat.q4_0.gguf
 
 # Start server
-./server -m llama-2-7b-chat.q4_0.gguf --port 8080
+./server -m llama-2-7b-chat.q4_0.gguf --port 39847
 ```
 
 **Pros:**
@@ -217,7 +217,7 @@ ai_model: custom-model
 
 # Custom configuration
 custom_ai:
-  base_url: "http://your-api-endpoint:8080/api/generate"
+  base_url: "http://your-api-endpoint:39847/api/generate"
   headers:
     Authorization: "Bearer your-token"
 ```
@@ -288,8 +288,8 @@ echo 'ai_provider: ollama' >> ~/.config/nixai/config.yaml
 # LlamaCpp (for custom models)
 git clone https://github.com/ggerganov/llama.cpp
 cd llama.cpp && make
-./server -m your-model.gguf --port 8080 &
-export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+./server -m your-model.gguf --port 39847 &
+export LLAMACPP_ENDPOINT="http://localhost:39847/completion"
 echo 'ai_provider: llamacpp' >> ~/.config/nixai/config.yaml
 ```
 
@@ -362,7 +362,7 @@ ollama list
 curl http://localhost:11434/api/tags
 
 # Check LlamaCpp server
-curl http://localhost:8080/health
+curl http://localhost:39847/health
 ```
 
 **Provider Timeout:**

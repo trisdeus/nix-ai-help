@@ -45,9 +45,9 @@ in {
 
       port = mkOption {
         type = types.port;
-        default = 8080;
+        default = 39847;
         description = "Port for the MCP HTTP server to listen on";
-        example = 8080;
+        example = 39847;
       };
 
       mcpPort = mkOption {

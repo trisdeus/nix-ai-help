@@ -11,7 +11,7 @@ default:
     # If unset, defaults to http://localhost:8080/completion
     # Custom AI provider configuration (used if ai_provider: custom)
     custom_ai:
-        base_url: http://localhost:8080/api/generate  # HTTP API endpoint URL
+        base_url: http://localhost:39847/api/generate  # HTTP API endpoint URL
         headers:  # Optional custom headers (e.g., for authentication)
             Authorization: "Bearer your-api-key-here"
             # Content-Type: "application/json"  # Set automatically if not provided
@@ -266,7 +266,7 @@ default:
                 name: "Llama.cpp"
                 description: "Local CPU-optimized inference server"
                 type: "local"
-                base_url: "http://localhost:8080"
+                base_url: "http://localhost:39847"
                 available: true
                 supports_streaming: true
                 supports_tools: false
@@ -287,7 +287,7 @@ default:
                 name: "Custom API"
                 description: "User-defined API endpoint"
                 type: "custom"
-                base_url: "http://localhost:8080/api/generate"
+                base_url: "http://localhost:39847/api/generate"
                 available: true
                 supports_streaming: false
                 supports_tools: false
@@ -345,7 +345,7 @@ default:
     log_level: debug
     mcp_server:
         host: localhost
-        port: 8081
+        port: 39847
         mcp_port: 39847
         socket_path: /tmp/nixai-mcp.sock
         auto_start: false
