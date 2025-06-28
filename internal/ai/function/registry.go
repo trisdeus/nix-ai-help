@@ -19,7 +19,6 @@ import (
 	"nix-ai-help/internal/ai/function/gc"
 	"nix-ai-help/internal/ai/function/hardware"
 	"nix-ai-help/internal/ai/function/help"
-	"nix-ai-help/internal/ai/function/interactive"
 	"nix-ai-help/internal/ai/function/learning"
 	"nix-ai-help/internal/ai/function/logs"
 	"nix-ai-help/internal/ai/function/machines"
@@ -74,7 +73,6 @@ func registerAllFunctions() {
 		{"gc", gc.NewGcFunction()},
 		{"hardware", hardware.NewHardwareFunction()},
 		{"help", help.NewHelpFunction()},
-		{"interactive", interactive.NewInteractiveFunction()},
 		{"learning", learning.NewLearningFunction()},
 		{"logs", logs.NewLogsFunction()},
 		{"machines", machines.NewMachinesFunction()},

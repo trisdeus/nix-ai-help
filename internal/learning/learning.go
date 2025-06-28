@@ -1,4 +1,4 @@
-// Package learning provides interactive learning modules, quizzes, and onboarding for NixOS users.
+// Package learning provides learning modules, quizzes, and onboarding for NixOS users.
 package learning
 
 import (

@@ -263,41 +263,6 @@ func (cli *CLIIntegration) ValidateCall(functionName string, paramsJSON string) 
 	return nil
 }
 
-// InteractiveMode starts an interactive mode for function calling
-func (cli *CLIIntegration) InteractiveMode() {
-	fmt.Println(utils.FormatHeader("AI Function Calling - Interactive Mode"))
-	fmt.Println("Type 'help' for available commands, 'exit' to quit")
-	fmt.Println(utils.FormatDivider())
-
-	for {
-		fmt.Print("nixai-func> ")
-
-		var input string
-		fmt.Scanln(&input)
-
-		switch input {
-		case "exit", "quit":
-			fmt.Println("Goodbye!")
-			return
-		case "help":
-			cli.showInteractiveHelp()
-		case "list":
-			cli.ListFunctions()
-		default:
-			fmt.Printf("Unknown command: %s. Type 'help' for available commands.\n", input)
-		}
-	}
-}
-
-// showInteractiveHelp displays help for interactive mode
-func (cli *CLIIntegration) showInteractiveHelp() {
-	fmt.Println(utils.FormatHeader("Interactive Mode Commands"))
-	fmt.Println(utils.FormatKeyValue("help", "Show this help message"))
-	fmt.Println(utils.FormatKeyValue("list", "List all available functions"))
-	fmt.Println(utils.FormatKeyValue("exit/quit", "Exit interactive mode"))
-	fmt.Println(utils.FormatDivider())
-}
-
 // CreateSampleCall creates a sample function call for testing
 func CreateSampleCall() FunctionCall {
 	params := map[string]interface{}{

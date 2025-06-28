@@ -43,21 +43,7 @@ Usage:
   nixai [command]`,
 	SilenceUsage: true,
 	Version:      version.Get().Version,
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Check for global TUI flag and handle it for any command except interactive
-		if globalTUI && cmd.Name() != "interactive" {
-			// For non-interactive commands, launch TUI with the command pre-selected
-			return LaunchTUIMode(cmd, append([]string{cmd.Name()}, args...))
-		}
-		return nil
-	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Check for global TUI flag first
-		if globalTUI {
-			// If TUI mode is requested, launch the TUI with any provided args
-			return LaunchTUIMode(cmd, args)
-		}
-
 		if askQuestion != "" {
 			// Get current provider and model flag values directly from the command
 			currentProvider, _ := cmd.PersistentFlags().GetString("provider")
@@ -101,7 +87,6 @@ var agentType string
 var aiProvider string
 var aiModel string
 var contextFile string
-var globalTUI bool
 var socketPath string
 
 func init() {
@@ -112,7 +97,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&aiProvider, "provider", "", "Specify the AI provider (ollama, openai, gemini, etc.)")
 	rootCmd.PersistentFlags().StringVar(&aiModel, "model", "", "Specify the AI model (llama3, gpt-4, gemini-1.5-pro, etc.)")
 	rootCmd.PersistentFlags().StringVar(&contextFile, "context-file", "", "Path to a file containing context information (JSON or text)")
-	rootCmd.PersistentFlags().BoolVar(&globalTUI, "tui", false, "Launch TUI mode for any command")
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
 	mcpServerCmd.Flags().StringVar(&socketPath, "socket-path", "/tmp/nixai-mcp.sock", "Specify the MCP server socket path")
 	doctorCmd.Flags().BoolP("verbose", "v", false, "Show detailed output and progress information")
@@ -180,8 +164,6 @@ func createAgentFromFlags(provider ai.Provider) (agent.Agent, error) {
 				return agent.NewHardwareAgent(provider), nil
 			case "gc":
 				return agent.NewGCAgent(provider), nil
-			case "interactive":
-				return agent.NewInteractiveAgent(provider), nil
 			case "learn":
 				return agent.NewLearnAgent(provider), nil
 			case "migrate":
@@ -223,8 +205,6 @@ func createAgentFromFlags(provider ai.Provider) (agent.Agent, error) {
 		return agent.NewHardwareAgent(provider), nil
 	case "gc":
 		return agent.NewGCAgent(provider), nil
-	case "interactive":
-		return agent.NewInteractiveAgent(provider), nil
 	case "learn":
 		return agent.NewLearnAgent(provider), nil
 	case "migrate":
@@ -796,38 +776,6 @@ func NewExplainOptionCommand() *cobra.Command {
 	return cmd
 }
 
-// interactiveCmd implements the interactive CLI mode
-var interactiveCmd = &cobra.Command{
-	Use:   "interactive",
-	Short: "Launch interactive AI-powered NixOS assistant shell",
-	Long: `Start an interactive shell for NixOS troubleshooting, package search, option explanation, and more.
-
-Features:
-- Modern TUI interface with two-panel layout
-- Live command search and filtering
-- Parameter input for commands that need it
-- Real-time command execution
-- All advanced features available in non-interactive mode
-
-Examples:
-  nixai interactive              # Start modern TUI interface (default)
-  nixai interactive --classic    # Start classic interactive mode
-`,
-	Run: func(cmd *cobra.Command, args []string) {
-		useClassic, _ := cmd.Flags().GetBool("classic")
-		if useClassic {
-			InteractiveMode()
-		} else {
-			InteractiveModeTUI()
-		}
-	},
-}
-
-func init() {
-	// Add the --classic flag to the interactive command (TUI is now default)
-	interactiveCmd.Flags().Bool("classic", false, "Launch classic interactive mode instead of modern TUI")
-}
-
 // Flake management command implementation
 var flakeCmd = &cobra.Command{
 	Use:   "flake",
@@ -1099,10 +1047,6 @@ Examples:
 // and bypasses argument validation if so
 func conditionalArgsValidator(minArgs int) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
-		// If TUI mode is requested, don't validate args
-		if globalTUI {
-			return nil
-		}
 		// Otherwise, apply the minimum args validation
 		return cobra.MinimumNArgs(minArgs)(cmd, args)
 	}
@@ -1112,10 +1056,6 @@ func conditionalArgsValidator(minArgs int) cobra.PositionalArgs {
 // and bypasses exact argument validation if so
 func conditionalExactArgsValidator(exactArgs int) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
-		// If TUI mode is requested, don't validate args
-		if globalTUI {
-			return nil
-		}
 		// Otherwise, apply the exact args validation
 		return cobra.ExactArgs(exactArgs)(cmd, args)
 	}
@@ -1125,10 +1065,6 @@ func conditionalExactArgsValidator(exactArgs int) cobra.PositionalArgs {
 // and bypasses range argument validation if so
 func conditionalRangeArgsValidator(min, max int) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
-		// If TUI mode is requested, don't validate args
-		if globalTUI {
-			return nil
-		}
 		// Otherwise, apply the range args validation
 		return cobra.RangeArgs(min, max)(cmd, args)
 	}
@@ -1138,10 +1074,6 @@ func conditionalRangeArgsValidator(min, max int) cobra.PositionalArgs {
 // and bypasses maximum argument validation if so
 func conditionalMaximumArgsValidator(maxArgs int) cobra.PositionalArgs {
 	return func(cmd *cobra.Command, args []string) error {
-		// If TUI mode is requested, don't validate args
-		if globalTUI {
-			return nil
-		}
 		// Otherwise, apply the maximum args validation
 		return cobra.MaximumNArgs(maxArgs)(cmd, args)
 	}
@@ -2798,10 +2730,6 @@ func handleMCPServerQuery(cfg *config.UserConfig, query string, sources ...strin
 
 // handleFlakeCommand handles the flake command
 func handleFlakeCommand(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	// TODO: Implement flake command functionality
 	fmt.Println("Flake command functionality is coming soon!")
@@ -2809,10 +2737,6 @@ func handleFlakeCommand(cmd *cobra.Command, args []string) {
 
 // handleLearnCommand handles the learn command
 func handleLearnCommand(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	// Use the proper implementation from direct_commands.go
 	runLearnCmd(args, cmd.OutOrStdout())
@@ -2820,10 +2744,6 @@ func handleLearnCommand(cmd *cobra.Command, args []string) {
 
 // handleLogsCommand is the main handler for the logs command
 func handleLogsCommand(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	// If no subcommand specified, show help
 	if len(args) == 0 {
@@ -2837,10 +2757,6 @@ func handleLogsCommand(cmd *cobra.Command, args []string) {
 
 // handleLogsErrors handles error log analysis
 func handleLogsErrors(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	fmt.Println(utils.FormatHeader("🚨 Error Logs Analysis"))
 	fmt.Println()
@@ -2893,10 +2809,6 @@ func handleLogsErrors(cmd *cobra.Command, args []string) {
 
 // handleLogsAnalyze handles analysis of specific log files
 func handleLogsAnalyze(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	fmt.Println(utils.FormatHeader("🔍 Log File Analysis"))
 	fmt.Println()
@@ -2964,10 +2876,6 @@ func handleLogsAnalyze(cmd *cobra.Command, args []string) {
 
 // handleNeovimSetupCommand handles the neovim-setup command
 func handleNeovimSetupCommand(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	// TODO: Implement neovim setup functionality
 	fmt.Println("Neovim setup functionality is coming soon!")
@@ -3295,20 +3203,12 @@ func analyzeSystemLogs(out io.Writer) {
 
 // handleLogsSystem handles system log analysis
 func handleLogsSystem(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	analyzeSystemLogs(os.Stdout)
 }
 
 // handleLogsBoot handles boot log analysis
 func handleLogsBoot(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	fmt.Println(utils.FormatHeader("🚀 Boot Logs Analysis"))
 	fmt.Println()
@@ -3364,10 +3264,6 @@ func handleLogsBoot(cmd *cobra.Command, args []string) {
 
 // handleLogsService handles service-specific log analysis
 func handleLogsService(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	fmt.Println(utils.FormatHeader("🔧 Service Logs Analysis"))
 	fmt.Println()
@@ -3441,10 +3337,6 @@ func handleLogsService(cmd *cobra.Command, args []string) {
 
 // handleLogsBuild handles build log analysis
 func handleLogsBuild(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
-		return
-	}
 
 	fmt.Println(utils.FormatHeader("🔨 Build Logs Analysis"))
 	fmt.Println()
@@ -3618,7 +3510,6 @@ func initializeCommands() {
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(explainOptionCmd)
 	rootCmd.AddCommand(explainHomeOptionCmd)
-	rootCmd.AddCommand(interactiveCmd)
 	rootCmd.AddCommand(completionCmd)
 	rootCmd.AddCommand(gcCmd)
 	rootCmd.AddCommand(hardwareCmd)

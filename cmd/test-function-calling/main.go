@@ -21,7 +21,6 @@ func main() {
 		listFunctions = flag.Bool("list", false, "List all available functions")
 		showSchema    = flag.String("schema", "", "Show schema for specific function")
 		validate      = flag.Bool("validate", false, "Only validate parameters, don't execute")
-		interactive   = flag.Bool("interactive", false, "Start interactive mode")
 		sample        = flag.Bool("sample", false, "Run a sample diagnose call")
 	)
 	flag.Parse()
@@ -40,11 +39,6 @@ func main() {
 			logger.Error(fmt.Sprintf("Error showing schema: %v", err))
 			os.Exit(1)
 		}
-		return
-	}
-
-	if *interactive {
-		cli.InteractiveMode()
 		return
 	}
 
