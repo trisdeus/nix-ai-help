@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
+	"nix-ai-help/internal/cache"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/performance"
 	"nix-ai-help/pkg/logger"
 )
 
@@ -14,7 +18,9 @@ import (
 type ProviderManager struct {
 	registry  *config.ModelRegistry
 	config    *config.UserConfig
-	providers map[string]Provider // Cache of initialized providers
+	providers map[string]Provider  // Cache of initialized providers
+	cache     *cache.Manager       // Response cache manager
+	monitor   *performance.Monitor // Performance monitoring
 	logger    *logger.Logger
 }
 
@@ -26,10 +32,41 @@ func NewProviderManager(cfg *config.UserConfig, log *logger.Logger) *ProviderMan
 
 	registry := config.NewModelRegistry(cfg)
 
+	// Initialize cache manager with configuration-based settings
+	var cacheManager *cache.Manager
+	if cfg.Cache.Enabled {
+		// Convert config.CacheConfig to cache.ConfigCacheConfig
+		configCache := cache.ConfigCacheConfig{
+			Enabled:         cfg.Cache.Enabled,
+			MemoryMaxSize:   cfg.Cache.MemoryMaxSize,
+			MemoryTTL:       cfg.Cache.MemoryTTL,
+			DiskEnabled:     cfg.Cache.DiskEnabled,
+			DiskPath:        cfg.Cache.DiskPath,
+			DiskMaxSize:     cfg.Cache.DiskMaxSize,
+			DiskTTL:         cfg.Cache.DiskTTL,
+			CleanupInterval: cfg.Cache.CleanupInterval,
+			CompactInterval: cfg.Cache.CompactInterval,
+		}
+
+		cacheConfig := cache.FromConfigCacheConfig(configCache)
+		var err error
+		cacheManager, err = cache.NewManager(cacheConfig, log)
+		if err != nil {
+			log.Warn(fmt.Sprintf("Failed to initialize cache manager: %v", err))
+			cacheManager = nil
+		} else {
+			log.Info("Cache manager initialized with user configuration")
+		}
+	} else {
+		log.Info("Caching is disabled in configuration")
+	}
+
 	return &ProviderManager{
 		registry:  registry,
 		config:    cfg,
 		providers: make(map[string]Provider),
+		cache:     cacheManager,
+		monitor:   performance.NewMonitor(log),
 		logger:    log,
 	}
 }
@@ -570,4 +607,313 @@ func getProviderFromModel(model string) string {
 		return provider
 	}
 	return "ollama" // default fallback
+}
+
+// QueryWithCache attempts to get a cached response first, then queries the provider
+func (pm *ProviderManager) QueryWithCache(ctx context.Context, providerName, modelName, prompt string) (string, error) {
+	// Start performance monitoring
+	operationName := fmt.Sprintf("ai_query_%s_%s", providerName, modelName)
+	finishTimer := pm.monitor.StartTimer(performance.MetricAIQuery, operationName, map[string]string{
+		"provider": providerName,
+		"model":    modelName,
+	})
+
+	// Try to get cached response first
+	if pm.cache != nil {
+		if cachedResponse, found := pm.cache.GetAIResponse(ctx, providerName, modelName, prompt); found {
+			pm.logger.Debug(fmt.Sprintf("Cache hit for AI query (provider: %s, model: %s)", providerName, modelName))
+
+			// Record cache hit
+			pm.monitor.RecordMetric(performance.Metric{
+				Type: performance.MetricCacheHit,
+				Name: operationName,
+				Tags: map[string]string{
+					"provider": providerName,
+					"model":    modelName,
+				},
+				Success: true,
+			})
+
+			finishTimer(true, nil)
+			return string(cachedResponse), nil
+		}
+
+		// Record cache miss
+		pm.monitor.RecordMetric(performance.Metric{
+			Type: performance.MetricCacheMiss,
+			Name: operationName,
+			Tags: map[string]string{
+				"provider": providerName,
+				"model":    modelName,
+			},
+			Success: true,
+		})
+	}
+
+	// Cache miss or no cache available, query the provider
+	provider, providerErr := pm.GetProviderWithModel(providerName, modelName)
+	if providerErr != nil {
+		finishTimer(false, providerErr)
+		return "", providerErr
+	}
+
+	// Try context-aware methods first, then fallback to legacy
+	var response string
+	var err error
+
+	if p, ok := provider.(interface {
+		GenerateResponse(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.GenerateResponse(ctx, prompt)
+	} else if p, ok := provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else {
+		// Fallback to legacy Query method
+		response, err = provider.Query(prompt)
+	}
+
+	if err != nil {
+		finishTimer(false, err)
+		return "", err
+	}
+
+	// Cache the successful response
+	if pm.cache != nil {
+		if err := pm.cache.SetAIResponse(ctx, providerName, modelName, prompt, []byte(response)); err != nil {
+			pm.logger.Debug(fmt.Sprintf("Failed to cache AI response: %v", err))
+		} else {
+			pm.logger.Debug(fmt.Sprintf("Cached AI response (provider: %s, model: %s)", providerName, modelName))
+		}
+	}
+
+	finishTimer(true, nil)
+	return response, nil
+}
+
+// GetCacheStats returns cache statistics
+func (pm *ProviderManager) GetCacheStats() *cache.CombinedCacheStats {
+	if pm.cache == nil {
+		return nil
+	}
+
+	stats := pm.cache.Stats()
+	return &stats
+}
+
+// ClearCache clears all cached AI responses
+func (pm *ProviderManager) ClearCache(ctx context.Context) error {
+	if pm.cache == nil {
+		return fmt.Errorf("cache not available")
+	}
+
+	return pm.cache.Clear(ctx)
+}
+
+// Close gracefully shuts down the provider manager and cache
+func (pm *ProviderManager) Close() error {
+	if pm.cache != nil {
+		return pm.cache.Close()
+	}
+	return nil
+}
+
+// GetPerformanceStats returns comprehensive performance statistics
+func (pm *ProviderManager) GetPerformanceStats() performance.MetricsSummary {
+	return pm.monitor.GetSummary()
+}
+
+// GetCachePerformance returns cache-specific performance metrics
+func (pm *ProviderManager) GetCachePerformance() performance.CachePerformance {
+	cacheStats := pm.GetCacheStats()
+	return pm.monitor.GetCachePerformance(cacheStats)
+}
+
+// FormatPerformanceReport returns a human-readable performance report
+func (pm *ProviderManager) FormatPerformanceReport() string {
+	return pm.monitor.FormatSummary()
+}
+
+// ResetPerformanceMetrics clears all performance metrics (useful for testing)
+func (pm *ProviderManager) ResetPerformanceMetrics() {
+	pm.monitor.Reset()
+}
+
+// ParallelQueryResult represents the result of a parallel query
+type ParallelQueryResult struct {
+	ProviderName string
+	ModelName    string
+	Prompt       string
+	Response     string
+	Error        error
+	Duration     time.Duration
+}
+
+// ParallelQuery executes multiple AI queries concurrently
+func (pm *ProviderManager) ParallelQuery(ctx context.Context, queries []struct {
+	ProviderName string
+	ModelName    string
+	Prompt       string
+}) []ParallelQueryResult {
+	results := make([]ParallelQueryResult, len(queries))
+	var wg sync.WaitGroup
+
+	// Limit concurrent operations to avoid overwhelming providers
+	semaphore := make(chan struct{}, 5) // Max 5 concurrent queries
+
+	for i, query := range queries {
+		wg.Add(1)
+		go func(index int, q struct {
+			ProviderName string
+			ModelName    string
+			Prompt       string
+		}) {
+			defer wg.Done()
+			semaphore <- struct{}{}        // Acquire semaphore
+			defer func() { <-semaphore }() // Release semaphore
+
+			start := time.Now()
+			response, err := pm.QueryWithCache(ctx, q.ProviderName, q.ModelName, q.Prompt)
+			duration := time.Since(start)
+
+			results[index] = ParallelQueryResult{
+				ProviderName: q.ProviderName,
+				ModelName:    q.ModelName,
+				Prompt:       q.Prompt,
+				Response:     response,
+				Error:        err,
+				Duration:     duration,
+			}
+		}(i, query)
+	}
+
+	wg.Wait()
+	return results
+}
+
+// BatchQuerySameSources executes the same query across multiple providers/models
+func (pm *ProviderManager) BatchQuerySameSources(ctx context.Context, prompt string, sources []struct {
+	ProviderName string
+	ModelName    string
+}) []ParallelQueryResult {
+	queries := make([]struct {
+		ProviderName string
+		ModelName    string
+		Prompt       string
+	}, len(sources))
+
+	for i, source := range sources {
+		queries[i] = struct {
+			ProviderName string
+			ModelName    string
+			Prompt       string
+		}{
+			ProviderName: source.ProviderName,
+			ModelName:    source.ModelName,
+			Prompt:       prompt,
+		}
+	}
+
+	return pm.ParallelQuery(ctx, queries)
+}
+
+// QueryWithFallback attempts multiple providers in parallel and returns the first successful result
+func (pm *ProviderManager) QueryWithFallback(ctx context.Context, prompt string, fallbackSources []struct {
+	ProviderName string
+	ModelName    string
+}) (string, error) {
+	if len(fallbackSources) == 0 {
+		return "", fmt.Errorf("no fallback sources provided")
+	}
+
+	// Use a channel to get the first successful result
+	resultChan := make(chan ParallelQueryResult, len(fallbackSources))
+	var wg sync.WaitGroup
+
+	// Start all queries concurrently
+	for _, source := range fallbackSources {
+		wg.Add(1)
+		go func(providerName, modelName string) {
+			defer wg.Done()
+			start := time.Now()
+			response, err := pm.QueryWithCache(ctx, providerName, modelName, prompt)
+			duration := time.Since(start)
+
+			resultChan <- ParallelQueryResult{
+				ProviderName: providerName,
+				ModelName:    modelName,
+				Prompt:       prompt,
+				Response:     response,
+				Error:        err,
+				Duration:     duration,
+			}
+		}(source.ProviderName, source.ModelName)
+	}
+
+	// Close the channel when all goroutines are done
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// Return the first successful result
+	var errors []error
+	for result := range resultChan {
+		if result.Error == nil {
+			pm.logger.Info(fmt.Sprintf("Successful query with %s/%s in %v",
+				result.ProviderName, result.ModelName, result.Duration))
+			return result.Response, nil
+		}
+		errors = append(errors, fmt.Errorf("%s/%s: %w",
+			result.ProviderName, result.ModelName, result.Error))
+	}
+
+	// If all failed, return combined error
+	if len(errors) > 0 {
+		return "", fmt.Errorf("all providers failed: %v", errors)
+	}
+
+	return "", fmt.Errorf("no results received")
+}
+
+// PrewarmCache preloads cache with common queries in background
+func (pm *ProviderManager) PrewarmCache(ctx context.Context, commonQueries []struct {
+	ProviderName string
+	ModelName    string
+	Prompt       string
+}) {
+	if pm.cache == nil {
+		pm.logger.Debug("Cache not available, skipping prewarm")
+		return
+	}
+
+	go func() {
+		pm.logger.Info(fmt.Sprintf("Prewarming cache with %d common queries", len(commonQueries)))
+
+		// Process queries in smaller batches to avoid overwhelming the system
+		batchSize := 3
+		for i := 0; i < len(commonQueries); i += batchSize {
+			end := i + batchSize
+			if end > len(commonQueries) {
+				end = len(commonQueries)
+			}
+
+			batch := commonQueries[i:end]
+			results := pm.ParallelQuery(ctx, batch)
+
+			// Log successful prewarm operations
+			for _, result := range results {
+				if result.Error == nil {
+					pm.logger.Debug(fmt.Sprintf("Prewarmed cache: %s/%s",
+						result.ProviderName, result.ModelName))
+				}
+			}
+
+			// Small delay between batches to be respectful to AI providers
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		pm.logger.Info("Cache prewarming completed")
+	}()
 }

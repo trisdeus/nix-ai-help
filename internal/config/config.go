@@ -115,6 +115,16 @@ const EmbeddedDefaultConfig = `default:
         api_key: ""  # Optional: set via DISCOURSE_API_KEY environment variable
         username: ""  # Optional: set via DISCOURSE_USERNAME environment variable
         enabled: true
+    cache:
+        enabled: true
+        memory_max_size: 1000        # Max entries in memory
+        memory_ttl: 30               # Memory cache TTL in minutes
+        disk_enabled: true           # Enable persistent disk cache
+        disk_path: ""                # Path for disk cache (will be set to user cache dir)
+        disk_max_size: 100           # Max disk cache size in MB
+        disk_ttl: 24                 # Disk cache TTL in hours
+        cleanup_interval: 5          # Cleanup interval in minutes
+        compact_interval: 60         # Compaction interval in minutes
 `
 
 type Config struct {
@@ -235,6 +245,19 @@ type DiscourseConfig struct {
 	Enabled  bool   `yaml:"enabled" json:"enabled"`
 }
 
+// CacheConfig represents cache configuration settings
+type CacheConfig struct {
+	Enabled         bool   `yaml:"enabled" json:"enabled"`                   // Enable/disable caching
+	MemoryMaxSize   int    `yaml:"memory_max_size" json:"memory_max_size"`   // Max entries in memory
+	MemoryTTL       int    `yaml:"memory_ttl" json:"memory_ttl"`             // Memory cache TTL in minutes
+	DiskEnabled     bool   `yaml:"disk_enabled" json:"disk_enabled"`         // Enable persistent disk cache
+	DiskPath        string `yaml:"disk_path" json:"disk_path"`               // Path for disk cache
+	DiskMaxSize     int64  `yaml:"disk_max_size" json:"disk_max_size"`       // Max disk cache size in MB
+	DiskTTL         int    `yaml:"disk_ttl" json:"disk_ttl"`                 // Disk cache TTL in hours
+	CleanupInterval int    `yaml:"cleanup_interval" json:"cleanup_interval"` // Cleanup interval in minutes
+	CompactInterval int    `yaml:"compact_interval" json:"compact_interval"` // Compaction interval in minutes
+}
+
 // AI Models Configuration Structures
 
 // AIModelConfig represents a single AI model configuration
@@ -305,6 +328,7 @@ type YAMLConfig struct {
 	Devenv      DevenvConfig      `yaml:"devenv" json:"devenv"`
 	CustomAI    CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
 	Discourse   DiscourseConfig   `yaml:"discourse" json:"discourse"`
+	Cache       CacheConfig       `yaml:"cache" json:"cache"`
 }
 
 type UserConfig struct {
@@ -322,6 +346,7 @@ type UserConfig struct {
 	CustomAI     CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
 	Discourse    DiscourseConfig   `yaml:"discourse" json:"discourse"`
 	NixOSContext NixOSContext      `yaml:"nixos_context" json:"nixos_context"`
+	Cache        CacheConfig       `yaml:"cache" json:"cache"`
 }
 
 // GetAITimeout returns the timeout for a specific AI provider
@@ -618,6 +643,17 @@ func DefaultUserConfig() *UserConfig {
 			LastDetected:          time.Time{},
 			CacheValid:            false,
 			DetectionErrors:       []string{},
+		},
+		Cache: CacheConfig{
+			Enabled:         true,
+			MemoryMaxSize:   1000, // 1000 entries in memory
+			MemoryTTL:       30,   // 30 minutes for memory cache
+			DiskEnabled:     true, // Enable disk persistence
+			DiskPath:        "",   // Will be set to user cache dir
+			DiskMaxSize:     100,  // 100MB disk cache limit
+			DiskTTL:         24,   // 24 hours for disk cache
+			CleanupInterval: 5,    // Cleanup every 5 minutes
+			CompactInterval: 60,   // Compact every hour
 		},
 	}
 }

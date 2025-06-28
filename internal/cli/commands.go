@@ -3522,6 +3522,7 @@ func initializeCommands() {
 	rootCmd.AddCommand(devenvCmd)
 	rootCmd.AddCommand(NewDepsCommand())
 	rootCmd.AddCommand(contextCmd)
+	rootCmd.AddCommand(createPerformanceCommand())
 	// Register stub commands for missing features
 	rootCmd.AddCommand(communityCmd)
 	rootCmd.AddCommand(configCmd)

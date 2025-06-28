@@ -1660,7 +1660,7 @@ type Server struct {
 
 // Add a simple in-memory cache for query results
 var (
-	cache      = make(map[string]string)
+	queryCache = make(map[string]string)
 	cacheMutex sync.RWMutex
 )
 
@@ -2057,7 +2057,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	// Check cache first
 	cacheMutex.RLock()
-	if cached, ok := cache[cacheKey]; ok {
+	if cached, ok := queryCache[cacheKey]; ok {
 		cacheMutex.RUnlock()
 		writeJSON(cached)
 		return
@@ -2081,7 +2081,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 
 	// Cache the result
 	cacheMutex.Lock()
-	cache[cacheKey] = result
+	queryCache[cacheKey] = result
 	cacheMutex.Unlock()
 
 	// Return the result
