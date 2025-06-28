@@ -34,7 +34,7 @@ in
 
     src = sourceToUse;
 
-    vendorHash = "sha256-1cvAWy7O++LBUB7GtAwRo+OD2BsAtTbPk/L3itgGbfw=";
+    vendorHash = "sha256-KWIUpLwf+1pjRsQk70pTFkOa4paVbdvBpt65ZOe7U/A=";
     doCheck = false;
 
     # Force Go to use modules instead of vendor
