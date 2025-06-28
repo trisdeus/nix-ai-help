@@ -1,6 +1,6 @@
 default:
-    ai_provider: copilot  # Options: openai, ollama, gemini, claude, groq, llamacpp, custom, copilot
-    ai_model: gpt-4  # Model name for ollama or gemini, e.g., "llama3", "gemini-1.5-flash"
+    ai_provider: ollama  # Options: openai, ollama, gemini, claude, groq, llamacpp, custom, copilot
+    ai_model: llama3  # Model name for ollama or gemini, e.g., "llama3", "gemini-1.5-flash"
     # For llamacpp, set endpoint via LLAMACPP_ENDPOINT env var (default: http://localhost:8080/completion)
     # Example: export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
     # Example configuration for llamacpp provider:
