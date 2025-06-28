@@ -4,15 +4,15 @@ AI-powered migration assistant for NixOS and Home Manager configurations with au
 
 ---
 
-## 🆕 TUI Integration & Enhanced Features
+## 🆕 Enhanced Features
 
-The `nixai migrate` command now features **comprehensive TUI integration** with intelligent migration capabilities:
+The `nixai migrate` command features **comprehensive CLI integration** with intelligent migration capabilities:
 
-### ✨ **Interactive TUI Features**
-- **🎯 Interactive Parameter Input**: Migration options and target configuration through modern TUI interface
-- **📊 Real-Time Migration Progress**: Live migration analysis and conversion progress within the TUI
-- **⌨️ Command Discovery**: Enhanced command browser with `[INPUT]` indicators for 2 subcommands and 3 flags
-- **🔄 Interactive Migration Wizard**: Step-by-step migration with AI-guided recommendations
+### ✨ **CLI Features**
+- **🎯 Parameter Input**: Migration options and target configuration through CLI interface
+- **📊 Real-Time Migration Progress**: Live migration analysis and conversion progress
+- **⌨️ Command Discovery**: Enhanced options with support for 2 subcommands and 3 flags
+- **🔄 Migration Wizard**: Step-by-step migration with AI-guided recommendations
 - **📋 Context-Aware Migration**: Automatic analysis of existing configuration for intelligent conversion
 
 ### 🔄 **AI-Powered Migration Features**
@@ -32,18 +32,18 @@ nixai migrate [subcommand] [flags]
 
 ### Available Subcommands (2 Total)
 
-| Subcommand | Description | TUI Support |
+| Subcommand | Description | CLI Support |
 |------------|-------------|-------------|
-| `to-flakes` | Migrate from channels to flakes with AI guidance | ✅ Interactive |
-| `format` | Convert between configuration formats (config.nix ↔ flake.nix) | ✅ Interactive |
+| `to-flakes` | Migrate from channels to flakes with AI guidance | ✅ Full Support |
+| `format` | Convert between configuration formats (config.nix ↔ flake.nix) | ✅ Full Support |
 
 ### Enhanced Flags (3 Total)
 
-| Flag | Description | TUI Input |
-|------|-------------|-----------|
-| `--from <file>` | Source configuration file for migration | ✅ Interactive |
-| `--to <file>` | Destination configuration file path | ✅ Interactive |
-| `--backup` | Create automatic backup before migration | ✅ Interactive |
+| Flag | Description | CLI Support |
+|------|-------------|-------------|
+| `--from <file>` | Source configuration file for migration | ✅ Full Support |
+| `--to <file>` | Destination configuration file path | ✅ Full Support |
+| `--backup` | Create automatic backup before migration | ✅ Full Support |
 
 ## Command Help Output
 

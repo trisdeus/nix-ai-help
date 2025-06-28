@@ -5,7 +5,7 @@
 - Supports direct AI-powered help via `nixai "question"` or `nixai --ask "question"`.
 - Integrates multiple LLMs (Ollama, Gemini, OpenAI, etc.), defaulting to local Ollama for privacy, with user-selectable providers.
 - Leverages an MCP server to query NixOS documentation from multiple official and community sources.
-- Parses log outputs, accepts piped logs, executes and diagnoses local NixOS commands, and supports both interactive and CLI-driven workflows.
+- Parses log outputs, accepts piped logs, executes and diagnoses local NixOS commands, and supports CLI-driven workflows.
 - Modular submodules for community, packaging, learning, devenv, neovim, machines, and more.
 
 ## Coding Guidelines
@@ -16,7 +16,7 @@
 - Use `internal/nixos` for log parsing, diagnostics, and NixOS command execution.
 - Use `pkg/logger` for all logging, respecting log level from config.
 - Use `pkg/utils` for utility functions (file checks, string helpers, formatting, etc.).
-- All CLI commands and interactive logic must be in `internal/cli`. Each submodule may have its own Copilot instructions.
+- All CLI commands and logic must be in `internal/cli`. Each submodule may have its own Copilot instructions.
 - Main entrypoint: `cmd/nixai/main.go`.
 - All new features must be testable and documented.
 
@@ -37,7 +37,7 @@
 - **Home Manager Option Support**: Explain Home Manager options with `explain-home-option` command.
 - **Community, Learning, Devenv, Machines, Neovim**: Modular commands for each area, each with its own help menu and Copilot instructions.
 - **CLI Help Menus**: All commands must provide clear, formatted, actionable help menus with examples.
-- **Interactive & Piped Input**: Accept logs/configs via pipe or file for analysis.
+- **Piped Input**: Accept logs/configs via pipe or file for analysis.
 - **Progress Indicators**: Show progress during API calls and long operations.
 
 ## Best Practices

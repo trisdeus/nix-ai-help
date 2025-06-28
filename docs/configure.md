@@ -1,18 +1,18 @@
 # nixai configure
 
-Interactive NixOS and Home Manager configuration with AI-guided setup wizard, preset templates, and intelligent recommendation system.
+NixOS and Home Manager configuration with AI-guided setup wizard, preset templates, and intelligent recommendation system.
 
 ---
 
-## 🆕 TUI Integration & Enhanced Features
+## 🆕 Enhanced Features
 
-The `nixai configure` command now features **comprehensive TUI integration** with advanced configuration capabilities:
+The `nixai configure` command features **comprehensive CLI integration** with advanced configuration capabilities:
 
-### ✨ **Interactive TUI Features**
-- **🎯 Interactive Parameter Input**: Complete configuration wizard through modern TUI interface
-- **📊 Real-Time Configuration Preview**: Live configuration generation with validation within the TUI
-- **⌨️ Command Discovery**: Enhanced command browser with `[INPUT]` indicators for all 8 configurable flags
-- **🔧 Interactive Configuration Wizard**: Step-by-step setup with AI-guided recommendations
+### ✨ **CLI Features**
+- **🎯 Parameter Input**: Complete configuration wizard through CLI interface
+- **📊 Real-Time Configuration Preview**: Live configuration generation with validation
+- **⌨️ Command Discovery**: Enhanced command options with all 8 configurable flags
+- **🔧 Configuration Wizard**: Step-by-step setup with AI-guided recommendations
 - **📋 Context-Aware Configuration**: Automatic detection of existing setup for seamless integration
 
 ### ⚙️ **Advanced Configuration Features**
@@ -33,16 +33,16 @@ nixai configure [flags]
 
 ### Enhanced Flags (8 Total)
 
-| Flag | Description | TUI Input |
-|------|-------------|-----------|
-| `--preset <type>` | Use configuration preset (desktop/server/minimal/dev/gaming) | ✅ Interactive |
-| `--hardware` | Enable automatic hardware optimization | ✅ Interactive |
-| `--desktop <env>` | Configure desktop environment (gnome/kde/xfce/i3/custom) | ✅ Interactive |
-| `--services` | Interactive service selection and configuration | ✅ Interactive |
-| `--security` | Apply security hardening configurations | ✅ Interactive |
-| `--file <path>` | Specify custom configuration file to use | ✅ Interactive |
-| `--home` | Configure Home Manager instead of NixOS | ✅ Interactive |
-| `--validate` | Validate configuration without applying changes | ✅ Interactive |
+| Flag | Description | CLI Support |
+|------|-------------|-------------|
+| `--preset <type>` | Use configuration preset (desktop/server/minimal/dev/gaming) | ✅ Full Support |
+| `--hardware` | Enable automatic hardware optimization | ✅ Full Support |
+| `--desktop <env>` | Configure desktop environment (gnome/kde/xfce/i3/custom) | ✅ Full Support |
+| `--services` | Service selection and configuration | ✅ Full Support |
+| `--security` | Apply security hardening configurations | ✅ Full Support |
+| `--file <path>` | Specify custom configuration file to use | ✅ Full Support |
+| `--home` | Configure Home Manager instead of NixOS | ✅ Full Support |
+| `--validate` | Validate configuration without applying changes | ✅ Full Support |
 
 ## Command Help Output
 

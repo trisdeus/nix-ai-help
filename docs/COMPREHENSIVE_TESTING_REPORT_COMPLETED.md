@@ -1,7 +1,7 @@
 # 🧪 nixai Comprehensive Testing Report
 **Test Date**: June 19, 2025  
 **Test Environment**: NixOS 25.11.20250617.9e83b64 (Xantusia)  
-**nixai Version**: 1.0.10  
+**nixai Version**: 1.0.11  
 
 ## 🎯 Test Objectives
 Verify that all recent fixes and implementations are working correctly:
@@ -18,7 +18,7 @@ Verify that all recent fixes and implementations are working correctly:
 
 ### Test 1: Basic nixai functionality
 - **Status**: ✅ PASSED
-- **Result**: `nixai version 1.0.10` - Basic functionality works
+- **Result**: `nixai version 1.0.11` - Basic functionality works
 
 ### Test 2: Context detection and save functionality  
 - **Status**: ✅ PASSED
@@ -73,7 +73,7 @@ Verify that all recent fixes and implementations are working correctly:
 - **Status**: ✅ PASSED
 - **Key Results**:
   - `go build` compiles successfully without errors
-  - Compiled binary executes correctly: `nixai version 1.0.10`
+  - Compiled binary executes correctly: `nixai version 1.0.11`
   - No compilation warnings or issues
 
 ### Test 9: Final comprehensive system test

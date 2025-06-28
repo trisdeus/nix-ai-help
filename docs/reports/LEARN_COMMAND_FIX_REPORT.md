@@ -9,26 +9,17 @@ The issue was in `/home/olafkfreund/Source/NIX/nix-ai-help/internal/cli/commands
 **Before (Broken):**
 ```go
 func handleLearnCommand(cmd *cobra.Command, args []string) {
-    if globalTUI {
-        LaunchTUIMode(cmd, args)
-        return
-    }
-
-    // TODO: Implement learn command functionality  
-    fmt.Println("Learn command functionality is coming soon!")
+    // Execute learn command with CLI interface
+    runLearnCmd(args, cmd.OutOrStdout())
 }
 ```
 
 **After (Fixed):**
 ```go
 func handleLearnCommand(cmd *cobra.Command, args []string) {
-    if globalTUI {
-        LaunchTUIMode(cmd, args)
-        return
-    }
-
-    // Use the proper implementation from direct_commands.go
+    // Execute learn command with CLI interface
     runLearnCmd(args, cmd.OutOrStdout())
+}
 }
 ```
 

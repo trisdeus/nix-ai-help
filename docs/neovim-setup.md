@@ -1,4 +1,13 @@
-# nixai neovim-setup
+# nixa## 🆕 Enhanced Features
+
+The `nixai neovim-setup` command features **comprehensive CLI integration** with advanced Neovim management:
+
+### ✨ **CLI Features**
+- **🎯 Parameter Input**: Neovim configuration options and plugin selection through CLI interface
+- **📊 Real-Time Setup Progress**: Live Neovim installation and configuration progress
+- **⌨️ Command Discovery**: Enhanced options with support for 2 subcommands and 5 flags
+- **🔧 Setup Wizard**: Step-by-step Neovim configuration with AI-guided recommendations
+- **📋 Context-Aware Setup**: Automatic detection of existing Neovim configuration for seamless integrationetup
 
 Complete Neovim setup and configuration for NixOS development with MCP integration, plugin management, and AI-powered assistance.
 
@@ -32,20 +41,20 @@ nixai neovim-setup [subcommand] [flags]
 
 ### Available Subcommands (5 Total)
 
-| Subcommand | Description | TUI Support |
+| Subcommand | Description | CLI Support |
 |------------|-------------|-------------|
-| `install` | Install and configure Neovim with AI-recommended setup | ✅ Interactive |
-| `plugins` | Manage Neovim plugins with intelligent recommendations | ✅ Interactive |
-| `config` | Generate optimized Neovim configuration files | ✅ Interactive |
-| `mcp` | Setup MCP integration for AI-powered assistance | ✅ Interactive |
-| `update` | Update Neovim configuration and plugins | ✅ Interactive |
+| `install` | Install and configure Neovim with AI-recommended setup | ✅ Full Support |
+| `plugins` | Manage Neovim plugins with intelligent recommendations | ✅ Full Support |
+| `config` | Generate optimized Neovim configuration files | ✅ Full Support |
+| `mcp` | Setup MCP integration for AI-powered assistance | ✅ Full Support |
+| `update` | Update Neovim configuration and plugins | ✅ Full Support |
 
 ### Enhanced Flags (2 Total)
 
-| Flag | Description | TUI Input |
-|------|-------------|-----------|
-| `--minimal` | Use minimal Neovim configuration for lightweight setup | ✅ Interactive |
-| `--full` | Use full-featured Neovim setup with all integrations | ✅ Interactive |
+| Flag | Description | CLI Support |
+|------|-------------|-------------|
+| `--minimal` | Use minimal Neovim configuration for lightweight setup | ✅ Full Support |
+| `--full` | Use full-featured Neovim setup with all integrations | ✅ Full Support |
 
 ## Command Help Output
 
