@@ -437,7 +437,7 @@ Please:
 
 Return the enhanced configuration:`, plan.SourceSystem.Type, plan.SourceSystem.Version, config)
 
-	response, err := me.aiProvider.Query(ctx, prompt)
+	response, err := me.aiProvider.Query(prompt)
 	if err != nil {
 		return "", err
 	}

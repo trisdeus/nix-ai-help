@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/olafkfreund/nixai/pkg/logger"
+	"nix-ai-help/pkg/logger"
 )
 
 // PreviewMode represents the type of preview being generated
@@ -649,7 +649,7 @@ func (rtp *RealTimePreview) validateConfiguration(config string, result *Preview
 	if rtp.options.Mode == PreviewNixOS {
 		nixosErrors, nixosWarnings, err := rtp.validator.ValidateNixOS(config)
 		if err != nil {
-			rtp.logger.Warning(fmt.Sprintf("NixOS validation failed: %v", err))
+			rtp.logger.Warn(fmt.Sprintf("NixOS validation failed: %v", err))
 		} else {
 			result.Errors = append(result.Errors, nixosErrors...)
 			result.Warnings = append(result.Warnings, nixosWarnings...)

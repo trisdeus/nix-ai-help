@@ -42,7 +42,7 @@ func AddVersioningCommands(rootCmd *cobra.Command, logger *logger.Logger) {
 				return fmt.Errorf("failed to get absolute path: %w", err)
 			}
 
-			repo, err := repository.NewConfigRepository(absPath, logger)
+			_, err = repository.NewConfigRepository(absPath, logger)
 			if err != nil {
 				return fmt.Errorf("failed to initialize repository: %w", err)
 			}
@@ -243,7 +243,7 @@ func AddVersioningCommands(rootCmd *cobra.Command, logger *logger.Logger) {
 			for _, snapshot := range snapshots {
 				fmt.Printf("📄 %s - %s\n", snapshot.ID[:8], snapshot.Message)
 				fmt.Printf("   Author: %s | Date: %s\n", snapshot.Author, snapshot.Timestamp.Format("2006-01-02 15:04:05"))
-				fmt.Printf("   Files: %d | Hash: %s\n", len(snapshot.Files), snapshot.Hash[:16])
+				fmt.Printf("   Files: %d | Hash: %s\n", len(snapshot.Files), snapshot.ID[:16])
 				fmt.Println()
 			}
 			return nil

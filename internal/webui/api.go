@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"nix-ai-help/internal/webui/config_builder"
 	"nix-ai-help/pkg/logger"
+
+	"github.com/gorilla/mux"
 )
 
 // ConfigBuilderAPI provides API endpoints for the visual configuration builder
@@ -674,7 +675,7 @@ func (api *ConfigBuilderAPI) sendError(w http.ResponseWriter, statusCode int, me
 	}
 
 	json.NewEncoder(w).Encode(response)
-	api.logger.Warning(fmt.Sprintf("API error: %d - %s", statusCode, message))
+	api.logger.Warn(fmt.Sprintf("API error: %d - %s", statusCode, message))
 }
 
 func (api *ConfigBuilderAPI) decodeJSON(r *http.Request, dest interface{}) error {
