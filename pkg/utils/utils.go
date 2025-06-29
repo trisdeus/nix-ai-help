@@ -53,6 +53,16 @@ func Contains(slice []string, item string) bool {
 	return false
 }
 
+// ContainsAny checks if a string contains any of the provided substrings.
+func ContainsAny(str string, substrings []string) bool {
+	for _, substr := range substrings {
+		if strings.Contains(strings.ToLower(str), strings.ToLower(substr)) {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidatePath checks if the provided path is valid and returns an error if not.
 func ValidatePath(path string) error {
 	if path == "" {
@@ -84,6 +94,14 @@ func GetConfigDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(usr.HomeDir, ".config", "nixai"), nil
+}
+
+// GetAnalyticsDir returns the analytics directory for error tracking
+func GetAnalyticsDir() string {
+	if home := os.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".config", "nixai", "error_analytics")
+	}
+	return "/tmp/nixai/error_analytics"
 }
 
 // GenerateID generates a unique ID for community resources

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -11,17 +12,19 @@ import (
 	"nix-ai-help/internal/cache"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/performance"
+	"nix-ai-help/pkg/errors"
 	"nix-ai-help/pkg/logger"
 )
 
 // ProviderManager manages AI providers using the configuration system.
 type ProviderManager struct {
-	registry  *config.ModelRegistry
-	config    *config.UserConfig
-	providers map[string]Provider  // Cache of initialized providers
-	cache     *cache.Manager       // Response cache manager
-	monitor   *performance.Monitor // Performance monitoring
-	logger    *logger.Logger
+	registry     *config.ModelRegistry
+	config       *config.UserConfig
+	providers    map[string]Provider  // Cache of initialized providers
+	cache        *cache.Manager       // Response cache manager
+	monitor      *performance.Monitor // Performance monitoring
+	errorManager *errors.ErrorManager // Error handling and analytics
+	logger       *logger.Logger
 }
 
 // NewProviderManager creates a new provider manager with the given configuration.
@@ -61,13 +64,31 @@ func NewProviderManager(cfg *config.UserConfig, log *logger.Logger) *ProviderMan
 		log.Info("Caching is disabled in configuration")
 	}
 
+	// Initialize error manager
+	debugMode := cfg.LogLevel == "debug" || cfg.LogLevel == "trace"
+	analyticsDir := filepath.Join(os.Getenv("HOME"), ".config", "nixai", "error_analytics")
+	if home := os.Getenv("HOME"); home == "" {
+		analyticsDir = "/tmp/nixai/error_analytics"
+	}
+
+	errorManagerConfig := &errors.ErrorManagerConfig{
+		DebugMode:           debugMode,
+		GracefulDegradation: true,
+		AnalyticsEnabled:    true,
+		AnalyticsDataDir:    analyticsDir,
+		RetryConfig:         errors.DefaultRetryConfig(),
+		MaxLastErrors:       50,
+	}
+	errorManager := errors.NewErrorManager(errorManagerConfig)
+
 	return &ProviderManager{
-		registry:  registry,
-		config:    cfg,
-		providers: make(map[string]Provider),
-		cache:     cacheManager,
-		monitor:   performance.NewMonitor(log),
-		logger:    log,
+		registry:     registry,
+		config:       cfg,
+		providers:    make(map[string]Provider),
+		cache:        cacheManager,
+		monitor:      performance.NewMonitor(log),
+		errorManager: errorManager,
+		logger:       log,
 	}
 }
 

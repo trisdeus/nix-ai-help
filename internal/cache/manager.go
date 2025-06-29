@@ -6,15 +6,17 @@ import (
 	"strings"
 	"time"
 
+	"nix-ai-help/pkg/errors"
 	"nix-ai-help/pkg/logger"
 )
 
 // Manager coordinates multiple cache layers (memory + disk)
 type Manager struct {
-	memory Cache
-	disk   Cache
-	config *CacheConfig
-	logger *logger.Logger
+	memory       Cache
+	disk         Cache
+	config       *CacheConfig
+	logger       *logger.Logger
+	errorManager *errors.ErrorManager
 }
 
 // NewManager creates a new multi-tier cache manager
@@ -27,6 +29,17 @@ func NewManager(config *CacheConfig, log *logger.Logger) (*Manager, error) {
 		log = logger.NewLogger()
 	}
 
+	// Initialize error manager for cache operations
+	errorManagerConfig := &errors.ErrorManagerConfig{
+		DebugMode:           false,
+		GracefulDegradation: true,
+		AnalyticsEnabled:    true,
+		AnalyticsDataDir:    "/tmp/nixai/cache_error_analytics",
+		RetryConfig:         errors.DefaultRetryConfig(),
+		MaxLastErrors:       20,
+	}
+	errorManager := errors.NewErrorManager(errorManagerConfig)
+
 	// Create memory cache
 	memoryCache := NewMemoryCache(config)
 
@@ -35,6 +48,13 @@ func NewManager(config *CacheConfig, log *logger.Logger) (*Manager, error) {
 	if config.DiskEnabled {
 		dc, err := NewDiskCache(config)
 		if err != nil {
+			// Handle error through error manager
+			cacheErr := errors.NewError(errors.ErrorCodeCacheUnavailable, "Failed to create disk cache").
+				WithCause(err).
+				WithSuggestion("Check disk permissions and available space").
+				Build()
+			errorManager.HandleError(cacheErr, "cache_disk_init")
+
 			log.Warn(fmt.Sprintf("Failed to create disk cache, using memory only: %v", err))
 			diskCache = nil
 		} else {
@@ -43,10 +63,11 @@ func NewManager(config *CacheConfig, log *logger.Logger) (*Manager, error) {
 	}
 
 	return &Manager{
-		memory: memoryCache,
-		disk:   diskCache,
-		config: config,
-		logger: log,
+		memory:       memoryCache,
+		disk:         diskCache,
+		config:       config,
+		logger:       log,
+		errorManager: errorManager,
 	}, nil
 }
 
@@ -77,13 +98,25 @@ func (m *Manager) Get(ctx context.Context, key string) ([]byte, bool) {
 func (m *Manager) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
 	// Store in memory cache
 	if err := m.memory.Set(ctx, key, value, ttl); err != nil {
+		// Handle memory cache error
+		cacheErr := errors.NewError(errors.ErrorCodeCacheUnavailable, "Failed to store in memory cache").
+			WithCause(err).
+			WithContext("operation", "memory_set").
+			WithContext("key", key).
+			Build()
+		m.errorManager.HandleError(cacheErr, "cache_memory_set")
 		m.logger.Error(fmt.Sprintf("Failed to store in memory cache: %v", err))
 	}
 
 	// Store in disk cache if available
 	if m.disk != nil {
 		if err := m.disk.Set(ctx, key, value, ttl); err != nil {
-			m.logger.Debug(fmt.Sprintf("Failed to store in disk cache: %v", err))
+			// Handle disk cache error with retry
+			if _, retryErr := m.errorManager.HandleErrorWithRetry(func() (interface{}, error) {
+				return nil, m.disk.Set(ctx, key, value, ttl)
+			}, "cache_disk_set"); retryErr != nil {
+				m.logger.Debug(fmt.Sprintf("Failed to store in disk cache after retry: %v", retryErr))
+			}
 		}
 	}
 

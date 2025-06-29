@@ -11,6 +11,7 @@ import (
 
 	"nix-ai-help/internal/ai/function/build"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/errors"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 )
@@ -20,6 +21,7 @@ type BuildRecoverySystem struct {
 	buildFunction *build.BuildFunction
 	logger        *logger.Logger
 	recoveryCache map[string][]RecoveryStrategy
+	errorManager  *errors.ErrorManager
 }
 
 // RecoveryStrategy represents a specific approach to fixing build issues
@@ -43,10 +45,21 @@ type BuildRecoveryRequest struct {
 
 // NewBuildRecoverySystem creates a new intelligent recovery system
 func NewBuildRecoverySystem() *BuildRecoverySystem {
+	// Initialize error manager for build recovery
+	errorManagerConfig := &errors.ErrorManagerConfig{
+		DebugMode:           false,
+		GracefulDegradation: true,
+		AnalyticsEnabled:    true,
+		AnalyticsDataDir:    "/tmp/nixai/build_recovery_analytics",
+		RetryConfig:         errors.DefaultRetryConfig(),
+		MaxLastErrors:       30,
+	}
+
 	return &BuildRecoverySystem{
 		buildFunction: build.NewBuildFunction(),
 		logger:        logger.NewLogger(),
 		recoveryCache: make(map[string][]RecoveryStrategy),
+		errorManager:  errors.NewErrorManager(errorManagerConfig),
 	}
 }
 

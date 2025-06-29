@@ -3523,6 +3523,7 @@ func initializeCommands() {
 	rootCmd.AddCommand(NewDepsCommand())
 	rootCmd.AddCommand(contextCmd)
 	rootCmd.AddCommand(createPerformanceCommand())
+	rootCmd.AddCommand(NewErrorCommand())
 	// Register stub commands for missing features
 	rootCmd.AddCommand(communityCmd)
 	rootCmd.AddCommand(configCmd)
@@ -3546,6 +3547,11 @@ func Execute() {
 			if err := os.Setenv("NIXAI_NIXOS_PATH", nixosPath); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: failed to set NIXAI_NIXOS_PATH: %v\n", err)
 			}
+		}
+
+		// Initialize global error handling and performance monitoring
+		if err := InitializeGlobalErrorHandling(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to initialize error handling: %v\n", err)
 		}
 	})
 	initializeCommands()

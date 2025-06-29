@@ -9,16 +9,19 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"nix-ai-help/internal/config"
-	"nix-ai-help/pkg/logger"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/errors"
+	"nix-ai-help/pkg/logger"
 
 	"github.com/fsnotify/fsnotify"
 	retryablehttp "github.com/hashicorp/go-retryablehttp"
@@ -56,13 +59,14 @@ type ESResponse struct {
 
 // MCPServer represents the MCP protocol server
 type MCPServer struct {
-	logger      logger.Logger
-	listener    net.Listener
-	mu          sync.Mutex
-	lspProvider *NixLSPProvider
-	ctx         context.Context
-	cancel      context.CancelFunc
-	shutdown    chan struct{}
+	logger       logger.Logger
+	listener     net.Listener
+	mu           sync.Mutex
+	lspProvider  *NixLSPProvider
+	ctx          context.Context
+	cancel       context.CancelFunc
+	shutdown     chan struct{}
+	errorManager *errors.ErrorManager
 }
 
 // MCPRequest represents an MCP protocol request
@@ -97,6 +101,14 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 	m.logger.Debug(fmt.Sprintf("Handle called | method=%s id=%v", req.Method, req.ID))
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Record analytics if error manager is available
+	if m.errorManager != nil && req.Method != "initialize" {
+		if m.errorManager.GetAnalyticsReport() != nil {
+			// Track request metrics (use HandleError for internal tracking)
+			_ = m.errorManager.HandleError(nil, fmt.Sprintf("mcp_request_%s", req.Method))
+		}
+	}
 
 	switch req.Method {
 	case "initialize":
@@ -314,6 +326,12 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				}
 
 				result := m.handleDocQuery(query, sources...)
+				if result == "" || strings.Contains(result, "Error") {
+					// Track documentation query failures
+					if m.errorManager != nil {
+						_ = m.errorManager.HandleError(fmt.Errorf("documentation query failed: %s", query), "ErrorCodeMCPToolFailure")
+					}
+				}
 				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"content": []map[string]interface{}{
 						{
@@ -323,6 +341,10 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					},
 				})
 			} else {
+				// Track parameter validation errors
+				if m.errorManager != nil {
+					_ = m.errorManager.HandleError(fmt.Errorf("missing query parameter for query_nixos_docs"), "ErrorCodeMCPInvalidParams")
+				}
 				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing query parameter",
@@ -332,6 +354,12 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		case "explain_nixos_option":
 			if option, ok := params.Arguments["option"].(string); ok {
 				result := m.handleOptionExplain(option)
+				if result == "" || strings.Contains(result, "Error") {
+					// Track option explanation failures
+					if m.errorManager != nil {
+						_ = m.errorManager.HandleError(fmt.Errorf("option explanation failed: %s", option), "ErrorCodeMCPToolFailure")
+					}
+				}
 				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"content": []map[string]interface{}{
 						{
@@ -341,6 +369,9 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					},
 				})
 			} else {
+				if m.errorManager != nil {
+					_ = m.errorManager.HandleError(fmt.Errorf("missing option parameter for explain_nixos_option"), "ErrorCodeMCPInvalidParams")
+				}
 				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing option parameter",
@@ -350,6 +381,12 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		case "explain_home_manager_option":
 			if option, ok := params.Arguments["option"].(string); ok {
 				result := m.handleHomeManagerOptionExplain(option)
+				if result == "" || strings.Contains(result, "Error") {
+					// Track Home Manager option explanation failures
+					if m.errorManager != nil {
+						_ = m.errorManager.HandleError(fmt.Errorf("home manager option explanation failed: %s", option), "ErrorCodeMCPToolFailure")
+					}
+				}
 				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"content": []map[string]interface{}{
 						{
@@ -359,6 +396,9 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					},
 				})
 			} else {
+				if m.errorManager != nil {
+					_ = m.errorManager.HandleError(fmt.Errorf("missing option parameter for explain_home_manager_option"), "ErrorCodeMCPInvalidParams")
+				}
 				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing option parameter",
@@ -368,6 +408,12 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		case "search_nixos_packages":
 			if query, ok := params.Arguments["query"].(string); ok {
 				result := m.handlePackageSearch(query)
+				if result == "" || strings.Contains(result, "Error") || strings.Contains(result, "not yet implemented") {
+					// Track package search failures
+					if m.errorManager != nil {
+						_ = m.errorManager.HandleError(fmt.Errorf("package search failed: %s", query), "ErrorCodeMCPToolFailure")
+					}
+				}
 				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"content": []map[string]interface{}{
 						{
@@ -377,6 +423,9 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					},
 				})
 			} else {
+				if m.errorManager != nil {
+					_ = m.errorManager.HandleError(fmt.Errorf("missing query parameter for search_nixos_packages"), "ErrorCodeMCPInvalidParams")
+				}
 				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing query parameter",
@@ -390,6 +439,9 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					"options": results,
 				})
 			} else {
+				if m.errorManager != nil {
+					_ = m.errorManager.HandleError(fmt.Errorf("missing prefix parameter for complete_nixos_option"), "ErrorCodeMCPInvalidParams")
+				}
 				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing prefix parameter",
@@ -398,6 +450,9 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 
 		case "nix_lsp_completion":
 			if m.lspProvider == nil {
+				if m.errorManager != nil {
+					_ = m.errorManager.HandleError(fmt.Errorf("LSP provider not initialized for completion"), "ErrorCodeMCPNotAvailable")
+				}
 				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInternalError,
 					Message: "LSP provider not initialized",
@@ -410,6 +465,9 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			character, ok3 := params.Arguments["character"].(float64)
 
 			if !ok1 || !ok2 || !ok3 {
+				if m.errorManager != nil {
+					_ = m.errorManager.HandleError(fmt.Errorf("missing LSP completion parameters"), "ErrorCodeMCPInvalidParams")
+				}
 				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing required parameters: fileContent, line, character",
@@ -420,6 +478,9 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			position := LSPPosition{Line: int(line), Character: int(character)}
 			completions, err := m.lspProvider.ProvideCompletion(fileContent, position)
 			if err != nil {
+				if m.errorManager != nil {
+					_ = m.errorManager.HandleError(fmt.Errorf("LSP completion failed: %v", err), "ErrorCodeMCPToolFailure")
+				}
 				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInternalError,
 					Message: "Failed to provide completions: " + err.Error(),
@@ -439,6 +500,9 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 
 		case "nix_lsp_diagnostics":
 			if m.lspProvider == nil {
+				if m.errorManager != nil {
+					_ = m.errorManager.HandleError(fmt.Errorf("LSP provider not initialized for diagnostics"), "ErrorCodeMCPNotAvailable")
+				}
 				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInternalError,
 					Message: "LSP provider not initialized",
@@ -1674,6 +1738,17 @@ func NewServer(addr string, documentationSources []string) *Server {
 		log.Error(fmt.Sprintf("Failed to load NixOS options for LSP: %v", err))
 	}
 
+	// Initialize error manager
+	errorManagerConfig := &errors.ErrorManagerConfig{
+		DebugMode:           false,
+		GracefulDegradation: true,
+		AnalyticsEnabled:    true,
+		AnalyticsDataDir:    filepath.Join(os.Getenv("HOME"), ".config", "nixai", "error_analytics"),
+		RetryConfig:         errors.DefaultRetryConfig(),
+		MaxLastErrors:       50,
+	}
+	errorManager := errors.NewErrorManager(errorManagerConfig)
+
 	server := &Server{
 		addr:                 addr,
 		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
@@ -1681,9 +1756,10 @@ func NewServer(addr string, documentationSources []string) *Server {
 		logger:               log,
 		debugLogging:         false,
 		mcpServer: &MCPServer{
-			logger:      *log,
-			lspProvider: lspProvider,
-			shutdown:    make(chan struct{}),
+			logger:       *log,
+			lspProvider:  lspProvider,
+			shutdown:     make(chan struct{}),
+			errorManager: errorManager,
 		},
 	}
 
@@ -1704,6 +1780,17 @@ func NewServerWithDebug(addr string, documentationSources []string) *Server {
 		log.Error(fmt.Sprintf("Failed to load NixOS options for LSP: %v", err))
 	}
 
+	// Initialize error manager with debug mode
+	errorManagerConfig := &errors.ErrorManagerConfig{
+		DebugMode:           true,
+		GracefulDegradation: true,
+		AnalyticsEnabled:    true,
+		AnalyticsDataDir:    filepath.Join(os.Getenv("HOME"), ".config", "nixai", "error_analytics"),
+		RetryConfig:         errors.DefaultRetryConfig(),
+		MaxLastErrors:       50,
+	}
+	errorManager := errors.NewErrorManager(errorManagerConfig)
+
 	server := &Server{
 		addr:                 addr,
 		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
@@ -1711,9 +1798,10 @@ func NewServerWithDebug(addr string, documentationSources []string) *Server {
 		logger:               log,
 		debugLogging:         true,
 		mcpServer: &MCPServer{
-			logger:      *log,
-			lspProvider: lspProvider,
-			shutdown:    make(chan struct{}),
+			logger:       *log,
+			lspProvider:  lspProvider,
+			shutdown:     make(chan struct{}),
+			errorManager: errorManager,
 		},
 	}
 
@@ -1758,16 +1846,34 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		log.Error(fmt.Sprintf("Failed to load NixOS options for LSP: %v", err))
 	}
 
+	// Initialize error manager
+	debugMode := strings.ToLower(userCfg.LogLevel) == "debug" || strings.ToLower(userCfg.LogLevel) == "trace"
+	analyticsDir := filepath.Join(os.Getenv("HOME"), ".config", "nixai", "error_analytics")
+	if home := os.Getenv("HOME"); home == "" {
+		analyticsDir = "/tmp/nixai/error_analytics"
+	}
+
+	errorManagerConfig := &errors.ErrorManagerConfig{
+		DebugMode:           debugMode,
+		GracefulDegradation: true,
+		AnalyticsEnabled:    true,
+		AnalyticsDataDir:    analyticsDir,
+		RetryConfig:         errors.DefaultRetryConfig(),
+		MaxLastErrors:       50,
+	}
+	errorManager := errors.NewErrorManager(errorManagerConfig)
+
 	srv := &Server{
 		addr:                 addr,
 		socketPath:           socketPath,
 		documentationSources: userCfg.MCPServer.DocumentationSources,
 		logger:               log,
-		debugLogging:         strings.ToLower(userCfg.LogLevel) == "debug",
+		debugLogging:         debugMode,
 		mcpServer: &MCPServer{
-			logger:      *log,
-			lspProvider: lspProvider,
-			shutdown:    make(chan struct{}),
+			logger:       *log,
+			lspProvider:  lspProvider,
+			shutdown:     make(chan struct{}),
+			errorManager: errorManager,
 		},
 		configPath: configPath,
 		watcher:    nil,
