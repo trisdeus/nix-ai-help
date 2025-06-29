@@ -1,0 +1,88 @@
+name: System Update Workflow
+description: Automated NixOS system update with backup and verification
+version: "1.0.0"
+author: nixai
+tags:
+  - system
+  - update
+  - maintenance
+  - backup
+
+config:
+  maxConcurrentTasks: 3
+  timeout: 1h
+  retryCount: 2
+  onFailure: rollback
+  logLevel: info
+
+variables:
+  backup_location: "/tmp/nixos-backup-{{.timestamp}}"
+  flake_path: "."
+
+tasks:
+  - id: backup-generation
+    name: Backup Current Generation
+    description: Create a backup of the current system generation
+    type: action
+    action:
+      type: command
+      parameters:
+        command: "nixos-rebuild"
+        args: ["list-generations"]
+        workDir: "{{.flake_path}}"
+    timeout: 5m
+    retryCount: 1
+
+  - id: update-system
+    name: Update NixOS System
+    description: Perform system update using nixos-rebuild
+    type: action
+    dependsOn:
+      - backup-generation
+    action:
+      type: nixos-rebuild
+      parameters:
+        operation: switch
+        flakePath: "{{.flake_path}}"
+        upgradeFlake: true
+    timeout: 30m
+    retryCount: 2
+    onFailure: rollback
+
+  - id: verify-system
+    name: Verify System Health
+    description: Run basic system health checks after update
+    type: action
+    dependsOn:
+      - update-system
+    action:
+      type: command
+      parameters:
+        command: "systemctl"
+        args: ["is-system-running"]
+    timeout: 2m
+    retryCount: 1
+
+  - id: cleanup-old-generations
+    name: Cleanup Old Generations
+    description: Remove old system generations to save space
+    type: action
+    dependsOn:
+      - verify-system
+    condition: "{{.cleanup_enabled}}"
+    action:
+      type: command
+      parameters:
+        command: "nix-collect-garbage"
+        args: ["-d", "--delete-older-than", "7d"]
+    timeout: 10m
+
+triggers:
+  - type: schedule
+    parameters:
+      schedule: "0 2 * * 0"  # Weekly on Sunday at 2 AM
+      timezone: "UTC"
+  
+  - type: manual
+    parameters:
+      description: "Run system update manually"

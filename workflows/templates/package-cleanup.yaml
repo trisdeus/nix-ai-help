@@ -1,0 +1,117 @@
+name: Package Cleanup Workflow
+description: Automated package cleanup and garbage collection
+version: "1.0.0"
+author: nixai
+tags:
+  - cleanup
+  - garbage-collection
+  - maintenance
+  - optimization
+
+config:
+  maxConcurrentTasks: 1
+  timeout: 1h
+  retryCount: 2
+  onFailure: continue
+  logLevel: info
+
+variables:
+  keep_generations: "7"
+  keep_days: "7d"
+  min_free_space: "5G"
+
+tasks:
+  - id: check-disk-space
+    name: Check Available Disk Space
+    description: Check current disk usage before cleanup
+    type: action
+    action:
+      type: command
+      parameters:
+        command: "df"
+        args: ["-h", "/nix"]
+    timeout: 1m
+
+  - id: list-generations
+    name: List Current Generations
+    description: Display current system generations before cleanup
+    type: action
+    dependsOn:
+      - check-disk-space
+    action:
+      type: command
+      parameters:
+        command: "nixos-rebuild"
+        args: ["list-generations"]
+    timeout: 2m
+
+  - id: delete-old-generations
+    name: Delete Old Generations
+    description: Remove old system generations
+    type: action
+    dependsOn:
+      - list-generations
+    action:
+      type: command
+      parameters:
+        command: "nix-env"
+        args: ["--delete-generations", "old"]
+    timeout: 5m
+
+  - id: delete-old-profiles
+    name: Delete Old User Profiles
+    description: Clean up old user profile generations
+    type: action
+    dependsOn:
+      - delete-old-generations
+    action:
+      type: command
+      parameters:
+        command: "nix-env"
+        args: ["--delete-generations", "{{.keep_days}}"]
+    timeout: 5m
+
+  - id: garbage-collect
+    name: Run Garbage Collection
+    description: Run nix garbage collection to free up space
+    type: action
+    dependsOn:
+      - delete-old-profiles
+    action:
+      type: command
+      parameters:
+        command: "nix-collect-garbage"
+        args: ["-d"]
+    timeout: 30m
+
+  - id: optimize-store
+    name: Optimize Nix Store
+    description: Optimize the Nix store by hard-linking identical files
+    type: action
+    dependsOn:
+      - garbage-collect
+    action:
+      type: command
+      parameters:
+        command: "nix-store"
+        args: ["--optimize"]
+    timeout: 20m
+
+  - id: verify-cleanup
+    name: Verify Cleanup Results
+    description: Check disk space after cleanup
+    type: action
+    dependsOn:
+      - optimize-store
+    action:
+      type: command
+      parameters:
+        command: "df"
+        args: ["-h", "/nix"]
+    timeout: 1m
+
+triggers:
+  - type: schedule
+    parameters:
+      schedule: "0 4 * * 0"  # Weekly on Sunday at 4 AM
+      timezone: "UTC"

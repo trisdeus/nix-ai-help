@@ -1,0 +1,61 @@
+name: System Backup Workflow
+description: Complete system backup including configuration and user data
+version: "1.0.0"
+author: nixai
+tags:
+  - backup
+  - system
+  - maintenance
+  - data-protection
+
+config:
+  maxConcurrentTasks: 2
+  timeout: 2h
+  retryCount: 3
+  onFailure: stop
+  logLevel: info
+
+variables:
+  backup_root: "/backup/nixos"
+  config_path: "/etc/nixos"
+
+tasks:
+  - id: prepare-backup
+    name: Prepare Backup Environment
+    description: Create backup directory and check space
+    type: action
+    action:
+      type: command
+      parameters:
+        command: "mkdir"
+        args: ["-p", "{{.backup_root}}/{{.timestamp}}"]
+
+  - id: backup-configuration
+    name: Backup NixOS Configuration
+    description: Backup NixOS configuration files
+    type: action
+    dependsOn:
+      - prepare-backup
+    action:
+      type: command
+      parameters:
+        command: "cp"
+        args: ["-r", "{{.config_path}}", "{{.backup_root}}/{{.timestamp}}/configuration"]
+
+  - id: backup-user-profiles
+    name: Backup User Profiles
+    description: Backup user profiles and generations
+    type: action
+    dependsOn:
+      - prepare-backup
+    action:
+      type: command
+      parameters:
+        command: "cp"
+        args: ["-r", "/nix/var/nix/profiles", "{{.backup_root}}/{{.timestamp}}/profiles"]
+
+triggers:
+  - type: schedule
+    parameters:
+      schedule: "0 3 * * 1"
+      timezone: "UTC"

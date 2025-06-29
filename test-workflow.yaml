@@ -1,0 +1,14 @@
+name: Simple Test Workflow
+description: A simple test workflow for debugging
+version: "1.0.0"
+
+tasks:
+  - id: test-task
+    name: Test Task
+    description: A simple test task
+    type: action
+    action:
+      type: command
+      parameters:
+        command: "echo"
+        args: ["Hello World"]

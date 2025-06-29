@@ -3524,6 +3524,7 @@ func initializeCommands() {
 	rootCmd.AddCommand(createPerformanceCommand())
 	rootCmd.AddCommand(NewErrorCommand())
 	rootCmd.AddCommand(createIntelligenceCommand())
+	rootCmd.AddCommand(CreateWorkflowCommand())
 	// Register stub commands for missing features
 	rootCmd.AddCommand(communityCmd)
 	rootCmd.AddCommand(configCmd)
