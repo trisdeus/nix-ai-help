@@ -3646,6 +3646,12 @@ func initializeCommands() {
 	// Add version control commands
 	AddVersioningCommands(rootCmd, logger.NewLogger())
 
+	// Add collaboration commands
+	AddCollaborationCommands(rootCmd, logger.NewLogger())
+
+	// Add web interface commands
+	AddWebInterfaceCommands(rootCmd, logger.NewLogger())
+
 	// Add fleet management commands
 	cfg, err := config.LoadUserConfig()
 	if err == nil {
