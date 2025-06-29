@@ -51,13 +51,24 @@ func (a *MigrateAgent) Query(ctx context.Context, prompt string) (string, error)
 		return "", err
 	}
 
+	// Build migration prompt with context
+	migrationPrompt := a.buildMigrationPrompt(prompt, a.getMigrationContextFromData())
+
 	if p, ok := a.provider.(interface {
 		QueryWithContext(context.Context, string) (string, error)
 	}); ok {
-		return p.QueryWithContext(ctx, prompt)
+		response, err := p.QueryWithContext(ctx, migrationPrompt)
+		if err != nil {
+			return "", err
+		}
+		return a.formatMigrationResponse(response), nil
 	}
 	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
-		return p.Query(prompt)
+		response, err := p.Query(migrationPrompt)
+		if err != nil {
+			return "", err
+		}
+		return a.formatMigrationResponse(response), nil
 	}
 	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }

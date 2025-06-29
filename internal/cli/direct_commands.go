@@ -1728,6 +1728,13 @@ func runAskCmdWithStreaming(args []string, out io.Writer, providerParam, modelPa
 		return
 	}
 
+	// Ensure config has proper provider definitions
+	cfg, err = EnsureConfigHasProviders(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to ensure config providers: "+err.Error()))
+		return
+	}
+
 	// Create AI provider manager
 	manager := ai.NewProviderManager(cfg, logger.NewLogger())
 
@@ -1814,6 +1821,13 @@ func runAskCmdWithConciseMode(args []string, out io.Writer, providerParam, model
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to load configuration: "+err.Error()))
+		return
+	}
+
+	// Ensure config has proper provider definitions
+	cfg, err = EnsureConfigHasProviders(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to ensure config providers: "+err.Error()))
 		return
 	}
 
@@ -2100,6 +2114,13 @@ func runAskCmdWithOptionsQuiet(args []string, out io.Writer, providerParam, mode
 		return
 	}
 
+	// Ensure config has proper provider definitions
+	cfg, err = EnsureConfigHasProviders(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to ensure config providers: "+err.Error()))
+		return
+	}
+
 	// Initialize context detector and get NixOS context (silent)
 	contextDetector := nixos.NewContextDetector(logger.NewLogger())
 	nixosCtx, _ := contextDetector.GetContext(cfg)
@@ -2307,6 +2328,13 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to load config: "+err.Error()))
+		return
+	}
+
+	// Ensure config has proper provider definitions
+	cfg, err = EnsureConfigHasProviders(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to ensure config providers: "+err.Error()))
 		return
 	}
 

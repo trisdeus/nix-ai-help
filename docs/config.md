@@ -46,7 +46,51 @@ Examples:
   # Opens the YAML config in your default editor
   ```
 - **View all current configuration values:**
-  ```sh
+
+  ```bash
   nixai config get
   # Prints all current config settings
   ```
+
+---
+
+## Configuration Troubleshooting
+
+### AI Provider Configuration Issues
+
+If you encounter errors like:
+
+```text
+❌ Failed to initialize AI provider: provider 'ollama' is not configured
+```
+
+This indicates your configuration file has empty or missing AI provider definitions. This can happen after:
+
+- Initial installation
+- Configuration reset
+- Manual editing
+- Version upgrades
+
+**Quick Fix:**
+
+```bash
+nixai config reset
+```
+
+**Manual Check:**
+
+```bash
+cat ~/.config/nixai/config.yaml | grep -A 5 "providers:"
+```
+
+If you see `providers: {}` (empty), the configuration needs to be reset.
+
+**For detailed troubleshooting:** See [AI Provider Configuration Troubleshooting Guide](TROUBLESHOOTING_AI_PROVIDER_CONFIGURATION.md)
+
+### Configuration File Location
+
+- **User Config**: `~/.config/nixai/config.yaml`
+- **System Config**: `/etc/nixai/config.yaml` (NixOS module)
+- **Embedded Default**: Built into the binary
+
+The system automatically falls back through these locations to ensure configuration is always available.

@@ -17,10 +17,12 @@ type MockProviderForHomeOptions struct {
 }
 
 func (m *MockProviderForHomeOptions) Query(prompt string) (string, error) {
+	m.LastQuery = prompt
 	return m.response, m.err
 }
 
 func (m *MockProviderForHomeOptions) QueryWithContext(ctx context.Context, prompt string) (string, error) {
+	m.LastQuery = prompt
 	return m.response, m.err
 }
 

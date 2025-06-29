@@ -141,3 +141,11 @@ The current nixai flake provides:
 - NixOS Module: `nixosModules.default`
 - Home Manager Module: `homeManagerModules.default`
 - Apps: `apps.x86_64-linux.nixai`
+
+---
+
+## See Also
+
+- [AI Provider Configuration Issues](TROUBLESHOOTING_AI_PROVIDER_CONFIGURATION.md) - For "provider not configured" errors
+- [Installation Guide](INSTALLATION.md) - Complete installation instructions
+- [Configuration Guide](config.md) - Configuration setup and management

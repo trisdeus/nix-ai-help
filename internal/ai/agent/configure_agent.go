@@ -62,15 +62,25 @@ func (a *ConfigureAgent) Query(ctx context.Context, prompt string) (string, erro
 		return "", err
 	}
 
+	var response string
+	var err error
+
 	if p, ok := a.provider.(interface {
 		QueryWithContext(context.Context, string) (string, error)
 	}); ok {
-		return p.QueryWithContext(ctx, prompt)
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 	}
-	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
-		return p.Query(prompt)
+
+	if err != nil {
+		return "", err
 	}
-	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+
+	// Format the response with configuration-specific enhancements
+	return a.formatConfigurationResponse(response), nil
 }
 
 // GenerateResponse generates responses for configuration tasks.

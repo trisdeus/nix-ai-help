@@ -24,6 +24,14 @@ Welcome to the nixai Command Manual. Each command has its own dedicated document
 - [**Agent Architecture**](agents.md) - AI agent system with 26+ specialized agents
 - [**Role System**](roles.md) - Role-based AI behavior and prompt templates
 
+## 🔧 Troubleshooting & Configuration
+
+- [**AI Provider Configuration Troubleshooting**](TROUBLESHOOTING_AI_PROVIDER_CONFIGURATION.md) - Fix "provider not configured" errors
+- [**Developer Guidelines**](DEVELOPER_GUIDELINES.md) - Development best practices and configuration patterns
+- [**Doctor Health Checks**](DOCTOR_HEALTH_CHECKS.md) - System health validation and diagnostics
+- [**Configuration Guide**](config.md) - Complete configuration reference and troubleshooting
+- [**Build Troubleshooting**](TROUBLESHOOTING_BUILD.md) - Build issues and solutions
+
 ## 🛠️ Command Index
 
 - [ask](ask.md)

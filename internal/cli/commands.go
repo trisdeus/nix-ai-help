@@ -18,6 +18,7 @@ import (
 	"nix-ai-help/internal/ai/agent"
 	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/ai/roles"
+	"nix-ai-help/internal/codegen"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/neovim"
@@ -1205,25 +1206,36 @@ Examples:
 }
 var configureCmd = &cobra.Command{
 	Use:   "configure",
-	Short: "Configure NixOS interactively",
-	Long: `Interactively generate or edit your NixOS configuration using AI-powered guidance and documentation lookup.
+	Short: "Generate NixOS configurations using AI-powered natural language processing",
+	Long: `Generate complete NixOS configurations from natural language descriptions using advanced AI parsing, validation, and optimization.
+
+This command uses revolutionary natural language processing to understand your requirements and generate production-ready NixOS configurations with:
+- Intelligent intent parsing with confidence scoring
+- Template-based and AI-powered generation
+- Comprehensive validation and security checking  
+- Automatic optimization for performance and best practices
+- Support for both NixOS system and Home Manager configurations
 
 Examples:
-  nixai configure
-  nixai configure --search "web server nginx"
-  nixai configure --output my-config.nix
-  nixai configure --advanced --home --output home-config.nix
-  nixai configure --search "desktop" --advanced --output desktop-config.nix
+  nixai configure --description "web server with nginx and SSL"
+  nixai configure --description "gaming desktop with Steam" --advanced
+  nixai configure --description "development environment for Python and Docker" --home
+  nixai configure --template server --output my-server.nix
+  nixai configure --description "secure workstation" --validate --optimize
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("🛠️  Interactive NixOS Configuration"))
+		fmt.Println(utils.FormatHeader("🚀 AI-Powered Configuration Generation"))
 		fmt.Println()
 
 		// Get flag values
-		searchQuery, _ := cmd.Flags().GetString("search")
+		description, _ := cmd.Flags().GetString("description")
+		template, _ := cmd.Flags().GetString("template")
 		outputFile, _ := cmd.Flags().GetString("output")
 		isAdvanced, _ := cmd.Flags().GetBool("advanced")
 		isHome, _ := cmd.Flags().GetBool("home")
+		shouldValidate, _ := cmd.Flags().GetBool("validate")
+		shouldOptimize, _ := cmd.Flags().GetBool("optimize")
+		interactive, _ := cmd.Flags().GetBool("interactive")
 
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
@@ -1231,8 +1243,18 @@ Examples:
 			os.Exit(1)
 		}
 
+		log := logger.NewLoggerWithLevel(cfg.LogLevel)
+
+		// Initialize AI provider for codegen
+		manager := ai.NewProviderManager(cfg, log)
+		provider, err := manager.GetProvider(cfg.AIModels.SelectionPreferences.DefaultProvider)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+			os.Exit(1)
+		}
+
 		// Initialize context detector and get NixOS context
-		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		contextDetector := nixos.NewContextDetector(log)
 		nixosCtx, err := contextDetector.GetContext(cfg)
 		if err != nil {
 			fmt.Println(utils.FormatWarning("Failed to detect NixOS context: " + err.Error()))
@@ -1247,167 +1269,260 @@ Examples:
 			fmt.Println()
 		}
 
-		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Get provider name for context
-		providerName := cfg.AIProvider
-		if providerName == "" {
-			providerName = "ollama"
-		}
-
-		var input string
-		if searchQuery != "" {
-			input = searchQuery
-			fmt.Println(utils.FormatInfo("Using search query: " + searchQuery))
-		} else {
-			configType := "NixOS"
-			if isHome {
-				configType = "Home Manager"
+		// Get user input if not provided
+		if description == "" && template == "" {
+			if interactive {
+				description = promptForDescription(isHome)
+			} else {
+				configType := "NixOS system"
+				if isHome {
+					configType = "Home Manager"
+				}
+				fmt.Printf(utils.FormatInfo("Describe what you want to configure for %s:\n"), configType)
+				fmt.Print("> ")
+				_, _ = fmt.Scanln(&description)
 			}
-			fmt.Printf(utils.FormatInfo("Describe what you want to configure for %s (e.g. desktop, web server, development environment):\n"), configType)
-			fmt.Print("> ")
-			_, _ = fmt.Scanln(&input)
-			if input == "" {
-				fmt.Println(utils.FormatWarning("No input provided. Exiting."))
+
+			if description == "" && template == "" {
+				fmt.Println(utils.FormatWarning("No description or template provided. Exiting."))
 				return
 			}
 		}
 
-		// Build the prompt based on configuration type and advanced options
-		prompt := buildConfigurePrompt(input, isHome, isAdvanced)
+		// Initialize codegen components
+		parser := codegen.NewParser(provider, *log)
+		generator := codegen.NewGenerator(provider, *log)
+		var validator *codegen.Validator
+		var optimizer *codegen.Optimizer
 
-		// Enhance prompt with context-aware information
-		if nixosCtx != nil && nixosCtx.CacheValid {
-			contextBuilder := nixoscontext.NewNixOSContextBuilder()
-			contextualPrompt := contextBuilder.BuildContextualPrompt(prompt, nixosCtx)
-			prompt = contextualPrompt
+		if shouldValidate {
+			validator = codegen.NewValidator(*log)
+		}
+		if shouldOptimize {
+			optimizer = codegen.NewOptimizer(*log)
 		}
 
-		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		resp, err := aiProvider.Query(prompt)
-		fmt.Println(utils.FormatSuccess("done"))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
-			os.Exit(1)
-		}
+		// Step 1: Parse natural language input
+		if description != "" {
+			fmt.Print(utils.FormatProgress("🧠 Parsing natural language request... "))
 
-		// Display or save the output
-		if outputFile != "" {
-			err := saveConfigurationToFile(resp, outputFile)
+			parseReq := &codegen.ParseRequest{
+				Input:   description,
+				Context: nixosCtx,
+				Preferences: map[string]interface{}{
+					"home_manager": isHome,
+					"advanced":     isAdvanced,
+				},
+			}
+
+			parseResp, err := parser.Parse(context.Background(), parseReq)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to save to file: "+err.Error()))
+				fmt.Println(utils.FormatError("failed"))
+				fmt.Fprintln(os.Stderr, utils.FormatError("Parse error: "+err.Error()))
 				os.Exit(1)
 			}
-			fmt.Println(utils.FormatSuccess("✅ Configuration saved to: " + outputFile))
-			fmt.Println(utils.FormatTip("Review the generated configuration and customize as needed"))
-		} else {
-			fmt.Println(utils.RenderMarkdown(resp))
+
+			fmt.Println(utils.FormatSuccess("done"))
+
+			// Display parse results
+			fmt.Println(utils.FormatKeyValue("Intent Type", parseResp.Intent.Type))
+			fmt.Println(utils.FormatKeyValue("Components", strings.Join(parseResp.Intent.Components, ", ")))
+			fmt.Println(utils.FormatKeyValue("Environment", parseResp.Intent.Environment))
+			fmt.Println(utils.FormatKeyValue("Complexity", parseResp.Intent.Complexity))
+			fmt.Println(utils.FormatKeyValue("Confidence", fmt.Sprintf("%.1f%%", parseResp.Confidence*100)))
+
+			if len(parseResp.Warnings) > 0 {
+				fmt.Println(utils.FormatWarning("Warnings: " + strings.Join(parseResp.Warnings, ", ")))
+			}
+			if len(parseResp.Suggestions) > 0 {
+				fmt.Println(utils.FormatTip("Suggestions: " + strings.Join(parseResp.Suggestions, ", ")))
+			}
+			fmt.Println()
+
+			// Step 2: Generate configuration
+			fmt.Print(utils.FormatProgress("⚙️  Generating configuration... "))
+
+			genReq := &codegen.GenerationRequest{
+				Intent:     parseResp.Intent,
+				Context:    nixosCtx,
+				Template:   template,
+				OutputPath: outputFile,
+				Preferences: map[string]interface{}{
+					"advanced": isAdvanced,
+				},
+			}
+
+			genResp, err := generator.Generate(context.Background(), genReq)
+			if err != nil {
+				fmt.Println(utils.FormatError("failed"))
+				fmt.Fprintln(os.Stderr, utils.FormatError("Generation error: "+err.Error()))
+				os.Exit(1)
+			}
+
+			fmt.Println(utils.FormatSuccess("done"))
+
+			// Step 3: Validate configuration (if requested)
+			if shouldValidate && validator != nil {
+				fmt.Print(utils.FormatProgress("🔍 Validating configuration... "))
+
+				validateResp := validator.Validate(genResp.Configuration)
+				fmt.Println(utils.FormatSuccess("done"))
+				fmt.Println(utils.FormatKeyValue("Validation Score", fmt.Sprintf("%d/100", validateResp.Score)))
+
+				var errorMessages []string
+				for _, err := range validateResp.Errors {
+					errorMessages = append(errorMessages, err.Message)
+				}
+				var warningMessages []string
+				for _, warn := range validateResp.Warnings {
+					warningMessages = append(warningMessages, warn.Message)
+				}
+
+				if len(errorMessages) > 0 {
+					fmt.Println(utils.FormatError("Errors: " + strings.Join(errorMessages, ", ")))
+				}
+				if len(warningMessages) > 0 {
+					fmt.Println(utils.FormatWarning("Warnings: " + strings.Join(warningMessages, ", ")))
+				}
+				if len(validateResp.Suggestions) > 0 {
+					fmt.Println(utils.FormatTip("Suggestions: " + strings.Join(validateResp.Suggestions, ", ")))
+				}
+				fmt.Println()
+			}
+
+			// Step 4: Optimize configuration (if requested)
+			if shouldOptimize && optimizer != nil {
+				fmt.Print(utils.FormatProgress("⚡ Optimizing configuration... "))
+
+				optimizeReq := &codegen.OptimizationRequest{
+					Config:  genResp.Configuration,
+					Context: nixosCtx,
+				}
+
+				optimizeResp := optimizer.Optimize(optimizeReq)
+				fmt.Println(utils.FormatSuccess("done"))
+				fmt.Println(utils.FormatKeyValue("Optimizations Applied", fmt.Sprintf("%d", optimizeResp.Summary.Applied)))
+
+				// Use optimized configuration
+				genResp.Configuration = optimizeResp.OptimizedConfig
+
+				var appliedOptimizations []string
+				for _, applied := range optimizeResp.Applied {
+					if applied.Applied {
+						appliedOptimizations = append(appliedOptimizations, applied.Changes...)
+					}
+				}
+
+				var recommendations []string
+				for _, suggestion := range optimizeResp.Suggestions {
+					recommendations = append(recommendations, suggestion.Description)
+				}
+
+				if len(appliedOptimizations) > 0 {
+					fmt.Println(utils.FormatNote("Applied: " + strings.Join(appliedOptimizations, ", ")))
+				}
+				if len(recommendations) > 0 {
+					fmt.Println(utils.FormatTip("Recommendations: " + strings.Join(recommendations, ", ")))
+				}
+				fmt.Println()
+			}
+
+			// Display or save the output
+			if outputFile != "" {
+				err := saveGeneratedConfiguration(genResp.Configuration, outputFile)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, utils.FormatError("Failed to save to file: "+err.Error()))
+					os.Exit(1)
+				}
+				fmt.Println(utils.FormatSuccess("✅ Configuration saved to: " + outputFile))
+
+				// Display metadata
+				fmt.Println()
+				fmt.Println(utils.FormatSubsection("Generation Metadata", ""))
+				fmt.Println(utils.FormatKeyValue("Type", genResp.Metadata.Type))
+				fmt.Println(utils.FormatKeyValue("Template", genResp.Metadata.Template))
+				fmt.Println(utils.FormatKeyValue("Components", strings.Join(genResp.Metadata.Components, ", ")))
+				fmt.Println(utils.FormatKeyValue("Generated At", genResp.Metadata.GeneratedAt))
+
+				if len(genResp.Dependencies) > 0 {
+					fmt.Println(utils.FormatKeyValue("Dependencies", strings.Join(genResp.Dependencies, ", ")))
+				}
+
+				fmt.Println()
+				fmt.Println(utils.FormatTip("Review the generated configuration and customize as needed"))
+				fmt.Println(utils.FormatTip("Apply with: sudo nixos-rebuild switch"))
+			} else {
+				fmt.Println(utils.FormatDivider())
+				fmt.Println(utils.RenderMarkdown("```nix\n" + genResp.Configuration + "\n```"))
+				fmt.Println(utils.FormatDivider())
+
+				if len(genResp.Warnings) > 0 {
+					fmt.Println(utils.FormatWarning("Warnings: " + strings.Join(genResp.Warnings, ", ")))
+				}
+				if len(genResp.Suggestions) > 0 {
+					fmt.Println(utils.FormatTip("Suggestions: " + strings.Join(genResp.Suggestions, ", ")))
+				}
+			}
+
+		} else if template != "" {
+			// Template-based generation without parsing
+			fmt.Print(utils.FormatProgress("📄 Generating from template... "))
+
+			// Create a basic intent for template-based generation
+			intent := codegen.Intent{
+				Type:        template,
+				Environment: "unknown",
+				Complexity:  "basic",
+				HomeManager: isHome,
+				Options:     make(map[string]string),
+			}
+
+			genReq := &codegen.GenerationRequest{
+				Intent:     intent,
+				Template:   template,
+				Context:    nixosCtx,
+				OutputPath: outputFile,
+				Preferences: map[string]interface{}{
+					"home_manager": isHome,
+					"advanced":     isAdvanced,
+				},
+			}
+
+			genResp, err := generator.Generate(context.Background(), genReq)
+			if err != nil {
+				fmt.Println(utils.FormatError("failed"))
+				fmt.Fprintln(os.Stderr, utils.FormatError("Generation error: "+err.Error()))
+				os.Exit(1)
+			}
+
+			fmt.Println(utils.FormatSuccess("done"))
+
+			// Save or display output
+			if outputFile != "" {
+				err := saveGeneratedConfiguration(genResp.Configuration, outputFile)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, utils.FormatError("Failed to save to file: "+err.Error()))
+					os.Exit(1)
+				}
+				fmt.Println(utils.FormatSuccess("✅ Configuration generated from template: " + template))
+				fmt.Println(utils.FormatSuccess("✅ Saved to: " + outputFile))
+			} else {
+				fmt.Println(utils.RenderMarkdown("```nix\n" + genResp.Configuration + "\n```"))
+			}
 		}
 	},
 }
 
-// buildConfigurePrompt builds an AI prompt for configuration generation
-func buildConfigurePrompt(input string, isHome bool, isAdvanced bool) string {
-	configType := "NixOS"
-	if isHome {
-		configType = "Home Manager"
-	}
-
-	var prompt strings.Builder
-
-	prompt.WriteString(fmt.Sprintf("You are an expert %s configuration assistant. ", configType))
-	prompt.WriteString(fmt.Sprintf("Generate a complete, production-ready %s configuration based on the following request:\n\n", configType))
-	prompt.WriteString(fmt.Sprintf("Request: %s\n\n", input))
-
-	if isHome {
-		prompt.WriteString("Generate Home Manager configuration that includes:\n")
-		prompt.WriteString("- Appropriate program configurations\n")
-		prompt.WriteString("- Service configurations if needed\n")
-		prompt.WriteString("- Package installations\n")
-		prompt.WriteString("- Dotfile management where relevant\n\n")
-	} else {
-		prompt.WriteString("Generate NixOS configuration that includes:\n")
-		prompt.WriteString("- System-level service configurations\n")
-		prompt.WriteString("- Hardware enablement where needed\n")
-		prompt.WriteString("- Security and networking settings\n")
-		prompt.WriteString("- Package installations\n")
-		prompt.WriteString("- User and group configurations where relevant\n\n")
-	}
-
-	if isAdvanced {
-		prompt.WriteString("Use advanced configuration options including:\n")
-		prompt.WriteString("- Detailed service configurations with all relevant options\n")
-		prompt.WriteString("- Security hardening configurations\n")
-		prompt.WriteString("- Performance optimizations\n")
-		prompt.WriteString("- Advanced networking and hardware configurations\n")
-		prompt.WriteString("- Modular configuration structure\n")
-		prompt.WriteString("- Comprehensive documentation and comments\n\n")
-	}
-
-	prompt.WriteString("Requirements:\n")
-	prompt.WriteString("- Provide complete, syntactically correct Nix configuration\n")
-	prompt.WriteString("- Include helpful comments explaining each section\n")
-	prompt.WriteString("- Use best practices and idiomatic Nix expressions\n")
-	prompt.WriteString("- Ensure compatibility with current NixOS/Home Manager versions\n")
-	prompt.WriteString("- Include error handling and fallbacks where appropriate\n")
-
-	if isAdvanced {
-		prompt.WriteString("- Provide detailed explanations for advanced configurations\n")
-		prompt.WriteString("- Include alternative configuration options as comments\n")
-		prompt.WriteString("- Add troubleshooting notes where relevant\n")
-	}
-
-	return prompt.String()
-}
-
-// saveConfigurationToFile saves the generated configuration to a file
-func saveConfigurationToFile(content, filename string) error {
-	// Clean the content to extract just the configuration
-	lines := strings.Split(content, "\n")
-	var configLines []string
-	inCodeBlock := false
-
-	for _, line := range lines {
-		// Look for code blocks
-		if strings.HasPrefix(line, "```nix") || strings.HasPrefix(line, "```") {
-			inCodeBlock = !inCodeBlock
-			continue
-		}
-
-		// Include lines that are inside code blocks or look like Nix configuration
-		if inCodeBlock || strings.Contains(line, "{") || strings.Contains(line, "}") ||
-			strings.Contains(line, "=") || strings.HasPrefix(strings.TrimSpace(line), "#") ||
-			strings.Contains(line, "enable") || strings.Contains(line, "programs.") ||
-			strings.Contains(line, "services.") || strings.Contains(line, "environment.") {
-			configLines = append(configLines, line)
-		}
-	}
-
-	// If we didn't find a proper code block, save the original content
-	if len(configLines) == 0 {
-		configLines = lines
-	}
-
-	finalContent := strings.Join(configLines, "\n")
-
-	// Ensure the file has a .nix extension
-	if !strings.HasSuffix(filename, ".nix") {
-		filename += ".nix"
-	}
-
-	return os.WriteFile(filename, []byte(finalContent), 0644)
-}
-
 func init() {
 	// Add flags for the configure command
-	configureCmd.Flags().StringP("search", "s", "", "Search query for configuration type (e.g., 'web server nginx', 'desktop')")
+	configureCmd.Flags().StringP("description", "d", "", "Natural language description of desired configuration")
+	configureCmd.Flags().StringP("template", "t", "", "Template name for configuration generation")
 	configureCmd.Flags().StringP("output", "o", "", "Output file path for generated configuration (will add .nix extension)")
 	configureCmd.Flags().Bool("advanced", false, "Generate advanced configuration with detailed options and optimizations")
 	configureCmd.Flags().Bool("home", false, "Generate Home Manager configuration instead of NixOS system configuration")
+	configureCmd.Flags().Bool("validate", false, "Validate generated configuration for syntax and best practices")
+	configureCmd.Flags().Bool("optimize", false, "Optimize generated configuration for performance and security")
+	configureCmd.Flags().Bool("interactive", false, "Enable interactive mode for configuration generation")
 }
 
 var diagnoseCmd = &cobra.Command{
@@ -3569,4 +3684,102 @@ func Execute() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// promptForDescription prompts the user for a configuration description interactively
+func promptForDescription(isHome bool) string {
+	configType := "NixOS system"
+	if isHome {
+		configType = "Home Manager"
+	}
+
+	fmt.Printf(utils.FormatInfo("Let's configure your %s! I'll ask you a few questions to understand what you need.\n\n"), configType)
+
+	var description strings.Builder
+
+	// Ask about the main purpose
+	fmt.Print(utils.FormatInfo("What is the main purpose of this configuration?\n"))
+	fmt.Print("(e.g., desktop, server, development, gaming): ")
+	var purpose string
+	_, _ = fmt.Scanln(&purpose)
+	if purpose != "" {
+		description.WriteString(purpose)
+	}
+
+	// Ask about specific components
+	fmt.Print(utils.FormatInfo("\nAny specific software or services you need?\n"))
+	fmt.Print("(e.g., nginx, docker, steam, vscode): ")
+	var components string
+	reader := bufio.NewReader(os.Stdin)
+	components, _ = reader.ReadString('\n')
+	components = strings.TrimSpace(components)
+	if components != "" {
+		if description.Len() > 0 {
+			description.WriteString(" with ")
+		}
+		description.WriteString(components)
+	}
+
+	// Ask about environment
+	if !isHome {
+		fmt.Print(utils.FormatInfo("\nWhat type of environment is this for?\n"))
+		fmt.Print("(desktop, server, laptop, workstation): ")
+		var environment string
+		_, _ = fmt.Scanln(&environment)
+		if environment != "" {
+			description.WriteString(" for " + environment)
+		}
+	}
+
+	fmt.Println()
+	result := description.String()
+	if result == "" {
+		return "basic configuration"
+	}
+	return result
+}
+
+// saveGeneratedConfiguration saves the generated configuration to a file
+func saveGeneratedConfiguration(content, filename string) error {
+	// Clean the content to extract just the configuration
+	lines := strings.Split(content, "\n")
+	var configLines []string
+	inCodeBlock := false
+
+	for _, line := range lines {
+		// Look for code blocks
+		if strings.HasPrefix(line, "```nix") || strings.HasPrefix(line, "```") {
+			inCodeBlock = !inCodeBlock
+			continue
+		}
+
+		// Include lines that are inside code blocks or look like Nix configuration
+		if inCodeBlock || strings.Contains(line, "{") || strings.Contains(line, "}") ||
+			strings.Contains(line, "=") || strings.HasPrefix(strings.TrimSpace(line), "#") ||
+			strings.Contains(line, "enable") || strings.Contains(line, "programs.") ||
+			strings.Contains(line, "services.") || strings.Contains(line, "environment.") {
+			configLines = append(configLines, line)
+		}
+	}
+
+	// If we didn't find a proper code block, save the original content
+	if len(configLines) == 0 {
+		configLines = lines
+	}
+
+	finalContent := strings.Join(configLines, "\n")
+
+	// Ensure the file has a .nix extension
+	if !strings.HasSuffix(filename, ".nix") {
+		filename += ".nix"
+	}
+
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(filename)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %v", err)
+	}
+
+	// Write to file
+	return os.WriteFile(filename, []byte(finalContent), 0644)
 }

@@ -22,10 +22,12 @@ func (m *MockDoctorProvider) GenerateResponse(ctx context.Context, prompt string
 }
 
 func (m *MockDoctorProvider) Query(prompt string) (string, error) {
+	m.LastQuery = prompt
 	return m.response, m.err
 }
 
 func (m *MockDoctorProvider) QueryWithContext(ctx context.Context, prompt string) (string, error) {
+	m.LastQuery = prompt
 	return m.response, m.err
 }
 

@@ -47,10 +47,18 @@ func (a *HelpAgent) Query(ctx context.Context, question string) (string, error) 
 	if p, ok := a.provider.(interface {
 		QueryWithContext(context.Context, string) (string, error)
 	}); ok {
-		return p.QueryWithContext(ctx, prompt)
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", err
+		}
+		return a.enhanceResponseWithHelpGuidance(response), nil
 	}
 	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
-		return p.Query(prompt)
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", err
+		}
+		return a.enhanceResponseWithHelpGuidance(response), nil
 	}
 	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }

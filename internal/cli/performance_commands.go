@@ -293,10 +293,10 @@ func generatePerformanceReport(cfg *config.UserConfig, format string) string {
 	report.WriteString("## Configuration\n\n")
 	report.WriteString(fmt.Sprintf("- Cache Enabled: %t\n", cfg.Cache.Enabled))
 	if cfg.Cache.Enabled {
-		report.WriteString(fmt.Sprintf("- Memory Cache: %d entries, %s TTL\n",
+		report.WriteString(fmt.Sprintf("- Memory Cache: %d entries, %d seconds TTL\n",
 			cfg.Cache.MemoryMaxSize, cfg.Cache.MemoryTTL))
 		if cfg.Cache.DiskEnabled {
-			report.WriteString(fmt.Sprintf("- Disk Cache: %d MB, %s TTL\n",
+			report.WriteString(fmt.Sprintf("- Disk Cache: %d MB, %d seconds TTL\n",
 				cfg.Cache.DiskMaxSize, cfg.Cache.DiskTTL))
 		}
 	}

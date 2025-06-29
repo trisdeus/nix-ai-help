@@ -303,6 +303,21 @@ Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.
 - **Real-Time Context**: Context system keeps configuration information current with automatic refresh
 - **Editor Integration**: Context available in VS Code and Neovim through MCP protocol
 
+### 🚀 AI-Powered Configuration Generation ✨ NEW
+
+- **Revolutionary Natural Language Processing**: `nixai configure` transforms plain English descriptions into complete NixOS configurations
+  - **Intelligent Intent Parsing**: Advanced AI parsing with confidence scoring and suggestions for natural language requests
+  - **Multi-Modal Generation**: Choose between template-based generation for common scenarios or AI-powered generation for custom requirements
+  - **Comprehensive Validation**: Built-in syntax checking, security validation, and best practices enforcement with 0-100 quality scoring
+  - **Automatic Optimization**: Performance, security, maintenance, and compatibility optimizations with environment-specific tuning
+  - **Template System**: 15+ built-in templates for desktop environments, web servers, development setups, gaming, and security hardening
+- **Advanced Configuration Pipeline**: Complete workflow from natural language to production-ready configurations
+  - **Context-Aware Generation**: Uses your existing NixOS system information for personalized configurations
+  - **Home Manager Support**: Generate both NixOS system and Home Manager user configurations
+  - **Interactive Mode**: Guided configuration creation with smart questioning and option selection
+  - **Validation & Optimization**: Optional validation and optimization steps with detailed feedback and recommendations
+  - **Metadata Generation**: Complete generation metadata including dependencies, templates used, and best practices applied
+
 ### 🔗 Editor Integrations ✨ NEW
 
 - **VS Code Integration**: Model Context Protocol (MCP) server for seamless AI assistance:
@@ -1104,6 +1119,24 @@ nix build --rebuild
 - **Interactive mode problems**: Try `nixai interactive --classic` for compatibility with older terminals
 - **Context detection problems**: Use `nixai context status` to check system health, or `nixai context reset` to force refresh
 - **Outdated context information**: Run `nixai context detect` after major system configuration changes
+
+### AI Provider Configuration Issues
+
+If you encounter errors like:
+
+```text
+❌ Failed to initialize AI provider: provider 'ollama' is not configured
+```
+
+This indicates your configuration file has empty or missing AI provider definitions. 
+
+**Quick Fix:**
+
+```zsh
+nixai config reset
+```
+
+**For detailed troubleshooting:** See [AI Provider Configuration Troubleshooting Guide](docs/TROUBLESHOOTING_AI_PROVIDER_CONFIGURATION.md)
 
 ### Getting Help
 

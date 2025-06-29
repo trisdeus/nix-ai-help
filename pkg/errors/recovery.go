@@ -156,35 +156,33 @@ func (prh *PanicRecoveryHandler) getGoroutineInfo() string {
 }
 
 // SafeExecute executes a function with panic recovery
-func SafeExecute(fn func() error, recoveryPoint string) error {
+func SafeExecute(fn func() error, recoveryPoint string) (finalErr error) {
 	handler := NewPanicRecoveryHandler(nil)
 
 	defer func() {
 		if nixaiErr := handler.Recover(recoveryPoint); nixaiErr != nil {
-			// Convert panic to error but don't return it here since we're in defer
+			finalErr = nixaiErr
 		}
 	}()
 
-	return fn()
+	finalErr = fn()
+	return finalErr
 }
 
 // SafeExecuteWithResult executes a function with panic recovery and returns result
-func SafeExecuteWithResult[T any](fn func() (T, error), recoveryPoint string) (T, error) {
-	var result T
-	var err error
-
+func SafeExecuteWithResult[T any](fn func() (T, error), recoveryPoint string) (result T, finalErr error) {
 	handler := NewPanicRecoveryHandler(nil)
 
 	defer func() {
 		if nixaiErr := handler.Recover(recoveryPoint); nixaiErr != nil {
 			var zero T
 			result = zero
-			err = nixaiErr
+			finalErr = nixaiErr
 		}
 	}()
 
-	result, err = fn()
-	return result, err
+	result, finalErr = fn()
+	return result, finalErr
 }
 
 // SafeExecuteWithCallback executes a function with panic recovery and callback
