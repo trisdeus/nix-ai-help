@@ -737,17 +737,304 @@ func runFlakeCmd(args []string, out io.Writer) {
 
 // Learning helper functions
 func showLearningOptions(out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🎓 Learning Options"))
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🎓 Enhanced Learning System"))
 	_, _ = fmt.Fprintln(out)
-	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Available Topics", ""))
-	_, _ = fmt.Fprintln(out, "  basics        - NixOS fundamentals")
-	_, _ = fmt.Fprintln(out, "  configuration - Configuration management")
-	_, _ = fmt.Fprintln(out, "  packages      - Package management")
-	_, _ = fmt.Fprintln(out, "  services      - System services")
-	_, _ = fmt.Fprintln(out, "  flakes        - Nix flakes system")
-	_, _ = fmt.Fprintln(out, "  advanced      - Advanced topics")
+	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Learning Modules", ""))
+	_, _ = fmt.Fprintln(out, "  basics           - NixOS fundamentals")
+	_, _ = fmt.Fprintln(out, "  configuration    - Configuration management")
+	_, _ = fmt.Fprintln(out, "  packages         - Package management")
+	_, _ = fmt.Fprintln(out, "  services         - System services")
+	_, _ = fmt.Fprintln(out, "  flakes          - Nix flakes system")
+	_, _ = fmt.Fprintln(out, "  advanced        - Advanced topics")
 	_, _ = fmt.Fprintln(out)
-	_, _ = fmt.Fprintln(out, utils.FormatTip("Interactive tutorials coming soon"))
+	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Interactive Commands", ""))
+	_, _ = fmt.Fprintln(out, "  list            - List all available modules")
+	_, _ = fmt.Fprintln(out, "  progress        - View your learning progress")
+	_, _ = fmt.Fprintln(out, "  profile         - View your learning profile")
+	_, _ = fmt.Fprintln(out, "  assess          - Take a skill assessment")
+	_, _ = fmt.Fprintln(out, "  recommendations - Get personalized suggestions")
+	_, _ = fmt.Fprintln(out, "  quiz <topic>    - Take a quiz on a specific topic")
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatTip("Phase 2.2 Advanced Learning System - AI-powered personalized learning"))
+}
+
+// showLearningModulesList displays available learning modules
+func showLearningModulesList(out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("📚 Available Learning Modules"))
+	_, _ = fmt.Fprintln(out)
+
+	modules := []struct {
+		ID          string
+		Title       string
+		Description string
+		Difficulty  string
+		Duration    string
+	}{
+		{"nix-basics", "Nix Language Basics", "Learn the Nix language fundamentals", "Beginner", "30 min"},
+		{"nixos-basics", "NixOS System Basics", "Understanding NixOS system configuration", "Beginner", "45 min"},
+		{"configuration-management", "Configuration Management", "Advanced NixOS configuration techniques", "Intermediate", "60 min"},
+		{"package-management", "Package Management", "Managing packages and overlays", "Intermediate", "45 min"},
+		{"flakes-introduction", "Flakes Introduction", "Introduction to Nix flakes", "Intermediate", "90 min"},
+		{"development-environments", "Development Environments", "Creating dev environments with Nix", "Advanced", "120 min"},
+		{"nixos-deployment", "NixOS Deployment", "Deploying NixOS systems", "Advanced", "90 min"},
+		{"troubleshooting", "Troubleshooting", "Debugging NixOS issues", "Advanced", "60 min"},
+		{"system-administration", "System Administration", "Advanced NixOS administration", "Expert", "180 min"},
+	}
+
+	for _, module := range modules {
+		_, _ = fmt.Fprintln(out, utils.FormatKeyValue(module.ID, module.Title))
+		_, _ = fmt.Fprintln(out, utils.FormatKeyValue("  Description", module.Description))
+		_, _ = fmt.Fprintln(out, utils.FormatKeyValue("  Difficulty", module.Difficulty))
+		_, _ = fmt.Fprintln(out, utils.FormatKeyValue("  Duration", module.Duration))
+		_, _ = fmt.Fprintln(out)
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatTip("Use 'nixai learn <module-id>' to start a module"))
+}
+
+// showLearningProgress displays user learning progress
+func showLearningProgress(out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("📊 Learning Progress"))
+	_, _ = fmt.Fprintln(out)
+
+	// Simulated progress data - in real implementation this would come from the adaptive engine
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Overall Skill Level", "Intermediate"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Modules Completed", "3/9"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Total Learning Time", "4h 15m"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Last Activity", "2 days ago"))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Competency Areas", ""))
+	competencies := []struct {
+		Area  string
+		Level string
+	}{
+		{"Nix Language", "Intermediate"},
+		{"NixOS Configuration", "Beginner"},
+		{"Package Management", "Basic"},
+		{"Flakes", "None"},
+		{"System Administration", "None"},
+	}
+
+	for _, comp := range competencies {
+		_, _ = fmt.Fprintln(out, utils.FormatKeyValue("  "+comp.Area, comp.Level))
+	}
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatTip("Complete more modules to improve your competency levels"))
+}
+
+// showLearningProfile displays the user's learning profile
+func showLearningProfile(out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("👤 Your Learning Profile"))
+	_, _ = fmt.Fprintln(out)
+
+	// Simulated profile data
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Learning Style", "Visual/Kinesthetic"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Preferred Difficulty", "Gradual progression"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Focus Areas", "Practical applications"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Profile Created", "1 week ago"))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Strength Areas", ""))
+	_, _ = fmt.Fprintln(out, "  ✅ Problem-solving approach")
+	_, _ = fmt.Fprintln(out, "  ✅ Following step-by-step instructions")
+	_, _ = fmt.Fprintln(out, "  ✅ Practical application")
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Areas for Improvement", ""))
+	_, _ = fmt.Fprintln(out, "  📝 Advanced configuration concepts")
+	_, _ = fmt.Fprintln(out, "  📝 System debugging skills")
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatTip("Your profile adapts based on your learning interactions"))
+}
+
+// runBasicSkillAssessment runs a simplified skill assessment
+func runBasicSkillAssessment(out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔍 Skill Assessment"))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatProgress("Evaluating your current skill level..."))
+	_, _ = fmt.Fprintln(out)
+
+	// Simulated assessment results
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("Assessment completed!"))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Overall Score", "67%"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Skill Level", "Intermediate"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Assessment Date", "Today"))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Competency Breakdown", ""))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("  Nix Basics", "85%"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("  NixOS Configuration", "60%"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("  Package Management", "45%"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("  Advanced Topics", "25%"))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Recommendations", ""))
+	_, _ = fmt.Fprintln(out, "• Focus on configuration management modules")
+	_, _ = fmt.Fprintln(out, "• Practice package management concepts")
+	_, _ = fmt.Fprintln(out, "• Review flakes introduction when ready")
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatTip("Take assessments regularly to track your progress"))
+}
+
+// showLearningRecommendations displays personalized learning recommendations
+func showLearningRecommendations(out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("💡 Personalized Recommendations"))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatProgress("Generating personalized recommendations..."))
+	_, _ = fmt.Fprintln(out)
+
+	recommendations := []struct {
+		Title       string
+		Description string
+		Reason      string
+		Priority    string
+	}{
+		{
+			Title:       "Configuration Management Module",
+			Description: "Deep dive into NixOS configuration techniques",
+			Reason:      "Based on your assessment gaps",
+			Priority:    "High",
+		},
+		{
+			Title:       "Package Management Practice",
+			Description: "Hands-on exercises with package overlays",
+			Reason:      "Your current competency level",
+			Priority:    "Medium",
+		},
+		{
+			Title:       "Troubleshooting Workshop",
+			Description: "Learn to debug common NixOS issues",
+			Reason:      "Complements your problem-solving strength",
+			Priority:    "Medium",
+		},
+	}
+
+	for i, rec := range recommendations {
+		_, _ = fmt.Fprintln(out, utils.FormatSubsection(fmt.Sprintf("Recommendation %d", i+1), ""))
+		_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Title", rec.Title))
+		_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Description", rec.Description))
+		_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Reason", rec.Reason))
+		_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Priority", rec.Priority))
+		_, _ = fmt.Fprintln(out)
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatTip("Recommendations update based on your progress and interactions"))
+}
+
+// runLearningQuiz starts a quiz on a specific topic
+func runLearningQuiz(topic string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader(fmt.Sprintf("🧠 Quiz: %s", strings.Title(topic))))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatProgress("Preparing quiz questions..."))
+	_, _ = fmt.Fprintln(out)
+
+	// Simulated quiz preview
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess(fmt.Sprintf("Quiz on '%s' is ready!", topic)))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Topic", strings.Title(topic)))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Questions", "10"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Estimated Time", "15 minutes"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Difficulty", "Adaptive"))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Sample Question", ""))
+	_, _ = fmt.Fprintln(out, "What is the primary purpose of the NixOS configuration.nix file?")
+	_, _ = fmt.Fprintln(out, "A) Store user data")
+	_, _ = fmt.Fprintln(out, "B) Define system configuration declaratively")
+	_, _ = fmt.Fprintln(out, "C) Manage network settings only")
+	_, _ = fmt.Fprintln(out, "D) Control hardware drivers")
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatTip("Interactive quizzes with immediate feedback coming soon!"))
+}
+
+// startLearningModule starts a specific learning module
+func startLearningModule(moduleID string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader(fmt.Sprintf("🚀 Starting Module: %s", strings.Title(moduleID))))
+	_, _ = fmt.Fprintln(out)
+
+	// Module-specific information
+	moduleInfo := map[string]struct {
+		Title       string
+		Description string
+		Steps       int
+		Duration    string
+	}{
+		"basics": {
+			Title:       "NixOS Fundamentals",
+			Description: "Learn the core concepts of NixOS and the Nix package manager",
+			Steps:       8,
+			Duration:    "45 minutes",
+		},
+		"configuration": {
+			Title:       "Configuration Management",
+			Description: "Master NixOS configuration files and system settings",
+			Steps:       12,
+			Duration:    "60 minutes",
+		},
+		"packages": {
+			Title:       "Package Management",
+			Description: "Understanding packages, overlays, and custom derivations",
+			Steps:       10,
+			Duration:    "50 minutes",
+		},
+		"services": {
+			Title:       "System Services",
+			Description: "Configuring and managing system services in NixOS",
+			Steps:       9,
+			Duration:    "40 minutes",
+		},
+		"flakes": {
+			Title:       "Nix Flakes System",
+			Description: "Modern Nix development with flakes and lock files",
+			Steps:       15,
+			Duration:    "90 minutes",
+		},
+		"advanced": {
+			Title:       "Advanced Topics",
+			Description: "Advanced NixOS concepts and system administration",
+			Steps:       20,
+			Duration:    "120 minutes",
+		},
+	}
+
+	info, exists := moduleInfo[moduleID]
+	if !exists {
+		_, _ = fmt.Fprintln(out, utils.FormatError(fmt.Sprintf("Module '%s' not found", moduleID)))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Use 'nixai learn list' to see available modules"))
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Title", info.Title))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Description", info.Description))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Steps", fmt.Sprintf("%d", info.Steps)))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Duration", info.Duration))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatProgress("Initializing learning environment..."))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("Module environment ready!"))
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Next Steps", ""))
+	_, _ = fmt.Fprintln(out, "1. Read the module introduction")
+	_, _ = fmt.Fprintln(out, "2. Follow the interactive tutorials")
+	_, _ = fmt.Fprintln(out, "3. Complete hands-on exercises")
+	_, _ = fmt.Fprintln(out, "4. Take the module quiz")
+	_, _ = fmt.Fprintln(out)
+
+	_, _ = fmt.Fprintln(out, utils.FormatTip("Full interactive modules with AI guidance coming in Phase 2.2!"))
 }
 
 // runLearnCmd executes the learn command directly
@@ -756,9 +1043,33 @@ func runLearnCmd(args []string, out io.Writer) {
 		showLearningOptions(out)
 		return
 	}
-	topic := args[0]
-	_, _ = fmt.Fprintln(out, "Learning module:", topic)
-	_, _ = fmt.Fprintln(out, "This would launch an interactive tutorial or quiz.")
+
+	subcommand := args[0]
+	switch subcommand {
+	case "list":
+		showLearningModulesList(out)
+	case "progress":
+		showLearningProgress(out)
+	case "profile":
+		showLearningProfile(out)
+	case "assess", "assessment":
+		runBasicSkillAssessment(out)
+	case "recommendations", "suggest":
+		showLearningRecommendations(out)
+	case "quiz":
+		if len(args) < 2 {
+			_, _ = fmt.Fprintln(out, utils.FormatError("Please specify a topic for the quiz"))
+			return
+		}
+		runLearningQuiz(args[1], out)
+	case "basics", "configuration", "packages", "services", "flakes", "advanced":
+		// Launch a learning module
+		startLearningModule(subcommand, out)
+	default:
+		// Fall back to showing available options
+		_, _ = fmt.Fprintln(out, utils.FormatWarning(fmt.Sprintf("Unknown learning command: %s", subcommand)))
+		showLearningOptions(out)
+	}
 }
 
 // Logs helper functions

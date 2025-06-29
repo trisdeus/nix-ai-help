@@ -1,0 +1,945 @@
+package cli
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/learning"
+	"nix-ai-help/pkg/logger"
+	"nix-ai-help/pkg/utils"
+
+	"github.com/spf13/cobra"
+)
+
+// LearningCLIManager manages the enhanced learning CLI integration
+type LearningCLIManager struct {
+	adaptiveEngine     *learning.AdaptiveLearningEngine
+	interactiveModules *learning.InteractiveLearningModule
+	assessmentEngine   *learning.SkillAssessmentEngine
+	analyticsEngine    *learning.LearningAnalytics
+	aiProvider         ai.Provider
+	logger             logger.Logger
+	currentUserProfile *learning.UserProfile
+}
+
+// NewLearningCLIManager creates a new enhanced learning CLI manager
+func NewLearningCLIManager(cfg *config.UserConfig, logger logger.Logger) (*LearningCLIManager, error) {
+	// Initialize AI provider using the modern interface
+	aiProvider := initializeModernAIProvider(cfg)
+
+	// Initialize learning engines
+	adaptiveEngine, err := learning.NewAdaptiveLearningEngine(aiProvider, cfg, &logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize adaptive engine: %w", err)
+	}
+
+	interactiveModules, err := learning.NewInteractiveLearningModule(adaptiveEngine, aiProvider, cfg, &logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize interactive modules: %w", err)
+	}
+
+	assessmentEngine := learning.NewSkillAssessmentEngine(aiProvider, logger)
+	analyticsEngine := learning.NewLearningAnalytics(aiProvider, logger)
+
+	return &LearningCLIManager{
+		adaptiveEngine:     adaptiveEngine,
+		interactiveModules: interactiveModules,
+		assessmentEngine:   assessmentEngine,
+		analyticsEngine:    analyticsEngine,
+		aiProvider:         aiProvider,
+		logger:             logger,
+	}, nil
+}
+
+// handleEnhancedLearnCommand is the enhanced learn command handler
+func handleEnhancedLearnCommand(cmd *cobra.Command, args []string) {
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+		os.Exit(1)
+	}
+
+	manager, err := NewLearningCLIManager(cfg, logger.NewLogger())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize learning system: "+err.Error()))
+		os.Exit(1)
+	}
+
+	// Load or create user profile
+	err = manager.loadUserProfile()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load user profile: "+err.Error()))
+		os.Exit(1)
+	}
+
+	// Route to appropriate subcommand
+	if len(args) == 0 {
+		manager.showLearningDashboard(cmd.OutOrStdout())
+		return
+	}
+
+	subcommand := args[0]
+	subArgs := args[1:]
+
+	switch subcommand {
+	case "start", "module":
+		manager.startLearningModule(subArgs, cmd.OutOrStdout())
+	case "assess", "assessment":
+		manager.startAssessment(subArgs, cmd.OutOrStdout())
+	case "progress":
+		manager.showProgress(cmd.OutOrStdout())
+	case "analytics":
+		manager.showAnalytics(subArgs, cmd.OutOrStdout())
+	case "recommend", "recommendations":
+		manager.showRecommendations(cmd.OutOrStdout())
+	case "profile":
+		manager.manageProfile(subArgs, cmd.OutOrStdout())
+	case "goals":
+		manager.manageGoals(subArgs, cmd.OutOrStdout())
+	case "achievements":
+		manager.showAchievements(cmd.OutOrStdout())
+	case "path", "learning-path":
+		manager.generateLearningPath(subArgs, cmd.OutOrStdout())
+	case "insights":
+		manager.showLearningInsights(cmd.OutOrStdout())
+	case "reset":
+		manager.resetProgress(subArgs, cmd.OutOrStdout())
+	default:
+		// Fall back to legacy implementation for backwards compatibility
+		runLearnCmd(args, cmd.OutOrStdout())
+	}
+}
+
+// loadUserProfile loads or creates a user profile
+func (m *LearningCLIManager) loadUserProfile() error {
+	userID := "default" // In a real implementation, this would be based on system user
+
+	profile, err := m.adaptiveEngine.GetUserProfile(userID)
+	if err != nil {
+		// Create new profile
+		profile = &learning.UserProfile{
+			UserID:             userID,
+			SkillLevel:         learning.SkillLevelBeginner,
+			LearningStyle:      learning.LearningStyleVisual,
+			CompetencyMap:      make(map[learning.CompetencyArea]learning.SkillLevel),
+			PreferredTopics:    []string{},
+			LearningGoals:      []learning.LearningGoal{},
+			Achievements:       []learning.Achievement{},
+			PersonalSettings:   learning.PersonalSettings{},
+			InteractionHistory: []learning.UserInteraction{},
+			PerformanceMetrics: []learning.PerformanceMetric{},
+			CreatedAt:          time.Now(),
+			LastActiveAt:       time.Now(),
+		}
+
+		// Initialize with basic competency areas
+		profile.CompetencyMap[learning.CompetencyNixLanguage] = learning.SkillLevelBeginner
+		profile.CompetencyMap[learning.CompetencyNixOS] = learning.SkillLevelBeginner
+		profile.CompetencyMap[learning.CompetencyConfiguration] = learning.SkillLevelBeginner
+
+		err = m.adaptiveEngine.CreateUserProfile(profile)
+		if err != nil {
+			return fmt.Errorf("failed to create user profile: %w", err)
+		}
+	}
+
+	m.currentUserProfile = profile
+	return nil
+}
+
+// showLearningDashboard displays the main learning dashboard
+func (m *LearningCLIManager) showLearningDashboard(out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("🎓 NixOS Learning Dashboard"))
+	fmt.Fprintln(out)
+
+	// Show user profile summary
+	fmt.Fprintln(out, utils.FormatSubsection("👤 Your Learning Profile", ""))
+	fmt.Fprintln(out, utils.FormatKeyValue("Skill Level", m.currentUserProfile.SkillLevel.String()))
+	fmt.Fprintln(out, utils.FormatKeyValue("Learning Style", string(m.currentUserProfile.LearningStyle)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Active Goals", fmt.Sprintf("%d", len(m.currentUserProfile.LearningGoals))))
+	fmt.Fprintln(out, utils.FormatKeyValue("Achievements", fmt.Sprintf("%d", len(m.currentUserProfile.Achievements))))
+	fmt.Fprintln(out)
+
+	// Show competency overview
+	fmt.Fprintln(out, utils.FormatSubsection("📊 Competency Overview", ""))
+	for area, level := range m.currentUserProfile.CompetencyMap {
+		levelIcon := m.getSkillLevelIcon(level)
+		fmt.Fprintln(out, fmt.Sprintf("  %s %s: %s", levelIcon, area, level))
+	}
+	fmt.Fprintln(out)
+
+	// Show recent achievements
+	if len(m.currentUserProfile.Achievements) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("🏆 Recent Achievements", ""))
+		recentCount := 3
+		if len(m.currentUserProfile.Achievements) < recentCount {
+			recentCount = len(m.currentUserProfile.Achievements)
+		}
+		for i := len(m.currentUserProfile.Achievements) - recentCount; i < len(m.currentUserProfile.Achievements); i++ {
+			achievement := m.currentUserProfile.Achievements[i]
+			fmt.Fprintln(out, fmt.Sprintf("  🏅 %s", achievement.Title))
+		}
+		fmt.Fprintln(out)
+	}
+
+	// Show available commands
+	fmt.Fprintln(out, utils.FormatSubsection("🚀 Available Commands", ""))
+	fmt.Fprintln(out, "  nixai learn start <module>     - Start an interactive learning module")
+	fmt.Fprintln(out, "  nixai learn assess             - Take a skill assessment")
+	fmt.Fprintln(out, "  nixai learn progress           - View your learning progress")
+	fmt.Fprintln(out, "  nixai learn recommend          - Get personalized recommendations")
+	fmt.Fprintln(out, "  nixai learn path <topic>       - Generate a learning path")
+	fmt.Fprintln(out, "  nixai learn analytics          - View detailed learning analytics")
+	fmt.Fprintln(out, "  nixai learn goals              - Manage your learning goals")
+	fmt.Fprintln(out, "  nixai learn achievements       - View all achievements")
+	fmt.Fprintln(out, "  nixai learn insights           - Get AI-powered learning insights")
+	fmt.Fprintln(out)
+
+	// Show quick recommendations
+	ctx := context.Background()
+	recommendations, err := m.adaptiveEngine.GenerateRecommendations(ctx, m.currentUserProfile)
+	if err == nil && len(recommendations) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("💡 Quick Recommendations", ""))
+		for i, rec := range recommendations {
+			if i >= 3 { // Show top 3
+				break
+			}
+			priority := "🔥"
+			if rec.Priority == learning.RecommendationPriorityMedium {
+				priority = "⚡"
+			} else if rec.Priority == learning.RecommendationPriorityLow {
+				priority = "📝"
+			}
+			fmt.Fprintln(out, fmt.Sprintf("  %s %s", priority, rec.Title))
+		}
+		fmt.Fprintln(out)
+	}
+
+	fmt.Fprintln(out, utils.FormatTip("Use 'nixai learn <command> --help' for detailed help on each command"))
+}
+
+// startLearningModule starts an interactive learning module
+func (m *LearningCLIManager) startLearningModule(args []string, out io.Writer) {
+	if len(args) == 0 {
+		m.showAvailableModules(out)
+		return
+	}
+
+	moduleID := args[0]
+
+	fmt.Fprintln(out, utils.FormatHeader("📚 Starting Learning Module: "+moduleID))
+	fmt.Fprintln(out)
+
+	// Get or create module
+	module, err := m.interactiveModules.GetModule(moduleID)
+	if err != nil {
+		// Try to create a custom module based on the topic
+		ctx := context.Background()
+		module, err = m.interactiveModules.CreateModule(ctx, moduleID, m.currentUserProfile)
+		if err != nil {
+			fmt.Fprintln(out, utils.FormatError("Failed to create module: "+err.Error()))
+			return
+		}
+	}
+
+	// Start module session
+	ctx := context.Background()
+	sessionID, err := m.interactiveModules.StartSession(ctx, m.currentUserProfile.UserID, moduleID)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to start session: "+err.Error()))
+		return
+	}
+
+	// Start analytics session
+	analyticsSession, err := m.analyticsEngine.StartSession(m.currentUserProfile.UserID, learning.SessionTypeModule)
+	if err != nil {
+		m.logger.Warn("Failed to start analytics session", "error", err)
+	}
+
+	fmt.Fprintln(out, utils.FormatSuccess("🎯 Module session started"))
+	fmt.Fprintln(out, utils.FormatKeyValue("Module", module.Title))
+	fmt.Fprintln(out, utils.FormatKeyValue("Description", module.Description))
+	fmt.Fprintln(out, utils.FormatKeyValue("Estimated Time", fmt.Sprintf("%d minutes", module.EstimatedDuration)))
+	fmt.Fprintln(out)
+
+	// Interactive learning loop
+	for {
+		step, err := m.interactiveModules.GetNextStep(ctx, sessionID)
+		if err != nil {
+			fmt.Fprintln(out, utils.FormatError("Failed to get next step: "+err.Error()))
+			break
+		}
+
+		if step == nil {
+			// Module completed
+			fmt.Fprintln(out, utils.FormatSuccess("🎉 Module completed!"))
+
+			// Complete session and update progress
+			_, err = m.interactiveModules.CompleteStep(ctx, sessionID, "", true, 1.0, time.Minute)
+			if err != nil {
+				m.logger.Warn("Failed to complete session", "error", err)
+			}
+
+			// End analytics session
+			if analyticsSession != nil {
+				err = m.analyticsEngine.EndSession(analyticsSession.SessionID)
+				if err != nil {
+					m.logger.Warn("Failed to end analytics session", "error", err)
+				}
+			}
+
+			// Show completion summary
+			m.showModuleCompletion(moduleID, out)
+			break
+		}
+
+		// Display step
+		fmt.Fprintln(out, utils.FormatSubsection("📖 "+step.Title, ""))
+		fmt.Fprintln(out, step.Content)
+		fmt.Fprintln(out)
+
+		if len(step.InteractiveElements) > 0 {
+			fmt.Fprintln(out, utils.FormatSubsection("🔧 Interactive Elements", ""))
+			for _, element := range step.InteractiveElements {
+				fmt.Fprintln(out, "  "+element.Type+": "+element.Content)
+			}
+			fmt.Fprintln(out)
+		}
+
+		// Track interaction
+		if analyticsSession != nil {
+			err = m.analyticsEngine.TrackInteraction(analyticsSession.SessionID,
+				learning.InteractionEventView, step.ID, time.Minute, true, nil)
+			if err != nil {
+				m.logger.Warn("Failed to track interaction", "error", err)
+			}
+		}
+
+		// Handle user input
+		fmt.Print("Continue to next step? (y/n/q): ")
+		var input string
+		fmt.Scanln(&input)
+
+		if strings.ToLower(input) == "q" {
+			fmt.Fprintln(out, utils.FormatInfo("Module session paused. Use 'nixai learn start "+moduleID+"' to resume."))
+			break
+		} else if strings.ToLower(input) == "n" {
+			fmt.Fprintln(out, utils.FormatInfo("Skipping step..."))
+			// Mark step as skipped
+			_, err = m.interactiveModules.CompleteStep(ctx, sessionID, step.ID, false, 0.0, time.Second)
+			if err != nil {
+				m.logger.Warn("Failed to mark step as skipped", "error", err)
+			}
+		} else {
+			// Mark step as completed
+			_, err = m.interactiveModules.CompleteStep(ctx, sessionID, step.ID, true, 1.0, time.Minute)
+			if err != nil {
+				m.logger.Warn("Failed to complete step", "error", err)
+			}
+		}
+
+		fmt.Fprintln(out)
+	}
+}
+
+// startAssessment starts a skill assessment
+func (m *LearningCLIManager) startAssessment(args []string, out io.Writer) {
+	assessmentType := learning.AssessmentTypeInitial
+	if len(args) > 0 {
+		switch args[0] {
+		case "progressive":
+			assessmentType = learning.AssessmentTypeProgressive
+		case "competency":
+			assessmentType = learning.AssessmentTypeCompetency
+		case "diagnostic":
+			assessmentType = learning.AssessmentTypeDiagnostic
+		case "placement":
+			assessmentType = learning.AssessmentTypePlacement
+		}
+	}
+
+	fmt.Fprintln(out, utils.FormatHeader("📝 Skill Assessment: "+string(assessmentType)))
+	fmt.Fprintln(out)
+
+	ctx := context.Background()
+	session, err := m.assessmentEngine.StartAssessment(ctx, m.currentUserProfile.UserID, assessmentType)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to start assessment: "+err.Error()))
+		return
+	}
+
+	fmt.Fprintln(out, utils.FormatInfo("🎯 Assessment started - Answer each question to the best of your ability"))
+	fmt.Fprintln(out)
+
+	questionCount := 0
+	startTime := time.Now()
+
+	// Assessment loop
+	for {
+		question, err := m.assessmentEngine.GetNextQuestion(session.ID)
+		if err != nil {
+			fmt.Fprintln(out, utils.FormatError("Assessment completed or error: "+err.Error()))
+			break
+		}
+
+		questionCount++
+		questionStartTime := time.Now()
+
+		// Display question
+		fmt.Fprintln(out, utils.FormatSubsection(fmt.Sprintf("Question %d", questionCount), ""))
+		fmt.Fprintln(out, "**Area:** "+string(question.CompetencyArea))
+		fmt.Fprintln(out, "**Difficulty:** "+question.Difficulty.String())
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, question.Question)
+		fmt.Fprintln(out)
+
+		var userAnswer interface{}
+		var confidence int
+
+		switch question.QuestionType {
+		case learning.QuestionTypeMultipleChoice:
+			fmt.Fprintln(out, "**Options:**")
+			for i, option := range question.Options {
+				fmt.Fprintln(out, fmt.Sprintf("  %d. %s", i+1, option))
+			}
+			fmt.Print("Your answer (1-" + strconv.Itoa(len(question.Options)) + "): ")
+			var choice int
+			fmt.Scanln(&choice)
+			if choice > 0 && choice <= len(question.Options) {
+				userAnswer = question.Options[choice-1]
+			}
+
+		case learning.QuestionTypeTrueFalse:
+			fmt.Print("Your answer (true/false): ")
+			var answer string
+			fmt.Scanln(&answer)
+			userAnswer = strings.ToLower(answer) == "true"
+
+		case learning.QuestionTypeShortAnswer:
+			fmt.Print("Your answer: ")
+			var answer string
+			fmt.Scanln(&answer)
+			userAnswer = answer
+
+		case learning.QuestionTypeCodeCompletion:
+			fmt.Fprintln(out, "Complete the code:")
+			fmt.Print("Your answer: ")
+			var answer string
+			fmt.Scanln(&answer)
+			userAnswer = answer
+		}
+
+		// Get confidence level
+		fmt.Print("How confident are you in this answer? (1-5): ")
+		fmt.Scanln(&confidence)
+		if confidence < 1 || confidence > 5 {
+			confidence = 3 // Default
+		}
+
+		// Submit response
+		response := learning.AssessmentResponse{
+			QuestionID: question.ID,
+			UserAnswer: userAnswer,
+			TimeSpent:  time.Since(questionStartTime),
+			Confidence: confidence,
+		}
+
+		err = m.assessmentEngine.SubmitResponse(ctx, session.ID, response)
+		if err != nil {
+			fmt.Fprintln(out, utils.FormatError("Failed to submit response: "+err.Error()))
+			continue
+		}
+
+		fmt.Fprintln(out)
+	}
+
+	// Show assessment results
+	results, err := m.assessmentEngine.GetAssessmentResults(session.ID)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to get results: "+err.Error()))
+		return
+	}
+
+	fmt.Fprintln(out, utils.FormatHeader("📊 Assessment Results"))
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, utils.FormatKeyValue("Overall Level", results.OverallLevel.String()))
+	fmt.Fprintln(out, utils.FormatKeyValue("Score", fmt.Sprintf("%.1f%%", results.Score*100)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Duration", time.Since(startTime).String()))
+	fmt.Fprintln(out)
+
+	// Show competency breakdown
+	fmt.Fprintln(out, utils.FormatSubsection("📈 Competency Breakdown", ""))
+	for area, level := range results.CompetencyMap {
+		icon := m.getSkillLevelIcon(level)
+		fmt.Fprintln(out, fmt.Sprintf("  %s %s: %s", icon, area, level))
+	}
+	fmt.Fprintln(out)
+
+	// Show recommendations
+	if len(results.Recommendations) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("💡 Recommendations", ""))
+		for _, rec := range results.Recommendations {
+			priority := m.getPriorityIcon(rec.Priority)
+			fmt.Fprintln(out, fmt.Sprintf("  %s %s", priority, rec.Title))
+			if rec.Description != "" {
+				fmt.Fprintln(out, fmt.Sprintf("    %s", rec.Description))
+			}
+		}
+		fmt.Fprintln(out)
+	}
+}
+
+// showProgress displays detailed learning progress
+func (m *LearningCLIManager) showProgress(out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("📈 Learning Progress"))
+	fmt.Fprintln(out)
+
+	ctx := context.Background()
+	progress, err := m.analyticsEngine.GetProgressAnalytics(m.currentUserProfile.UserID)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to get progress data: "+err.Error()))
+		return
+	}
+
+	// Overall progress
+	fmt.Fprintln(out, utils.FormatSubsection("🎯 Overall Progress", ""))
+	if progress.OverallProgress != nil {
+		fmt.Fprintln(out, utils.FormatKeyValue("Completed Modules",
+			fmt.Sprintf("%d / %d", progress.OverallProgress.CompletedModules, progress.OverallProgress.TotalModules)))
+		fmt.Fprintln(out, utils.FormatKeyValue("Completed Steps",
+			fmt.Sprintf("%d / %d", progress.OverallProgress.CompletedSteps, progress.OverallProgress.TotalSteps)))
+		fmt.Fprintln(out, utils.FormatKeyValue("Average Score",
+			fmt.Sprintf("%.1f%%", progress.OverallProgress.AverageScore*100)))
+		fmt.Fprintln(out, utils.FormatKeyValue("Time Spent", progress.OverallProgress.TimeSpent.String()))
+		fmt.Fprintln(out, utils.FormatKeyValue("Learning Streak",
+			fmt.Sprintf("%d days", progress.OverallProgress.StreakDays)))
+	}
+	fmt.Fprintln(out)
+
+	// Module progress
+	if len(progress.ModuleProgress) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("📚 Module Progress", ""))
+		for moduleID, moduleProgress := range progress.ModuleProgress {
+			completionRate := float64(moduleProgress.CompletedSteps) / float64(moduleProgress.TotalSteps) * 100
+			status := "🔄"
+			if moduleProgress.IsCompleted {
+				status = "✅"
+			}
+			fmt.Fprintln(out, fmt.Sprintf("  %s %s: %.1f%% (%d/%d steps)",
+				status, moduleProgress.Title, completionRate,
+				moduleProgress.CompletedSteps, moduleProgress.TotalSteps))
+		}
+		fmt.Fprintln(out)
+	}
+
+	// Competency progress
+	if len(progress.CompetencyProgress) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("🏆 Competency Progress", ""))
+		for area, compProgress := range progress.CompetencyProgress {
+			icon := m.getSkillLevelIcon(compProgress.CurrentLevel)
+			fmt.Fprintln(out, fmt.Sprintf("  %s %s: %s → %s (%.1f%%)",
+				icon, area, compProgress.CurrentLevel, compProgress.TargetLevel,
+				compProgress.Progress*100))
+		}
+		fmt.Fprintln(out)
+	}
+
+	// Milestones
+	if len(progress.Milestones) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("🎖️  Milestones", ""))
+		for _, milestone := range progress.Milestones {
+			status := "🔄"
+			if milestone.IsAchieved {
+				status = "🏅"
+			}
+			fmt.Fprintln(out, fmt.Sprintf("  %s %s: %s", status, milestone.Title, milestone.Description))
+		}
+		fmt.Fprintln(out)
+	}
+}
+
+// showAnalytics displays detailed learning analytics
+func (m *LearningCLIManager) showAnalytics(args []string, out io.Writer) {
+	analyticsType := "overview"
+	if len(args) > 0 {
+		analyticsType = args[0]
+	}
+
+	fmt.Fprintln(out, utils.FormatHeader("📊 Learning Analytics: "+analyticsType))
+	fmt.Fprintln(out)
+
+	switch analyticsType {
+	case "engagement":
+		m.showEngagementAnalytics(out)
+	case "effectiveness":
+		m.showEffectivenessAnalytics(out)
+	case "trends":
+		m.showTrendAnalytics(out)
+	default:
+		m.showAnalyticsOverview(out)
+	}
+}
+
+// showEngagementAnalytics displays engagement analytics
+func (m *LearningCLIManager) showEngagementAnalytics(out io.Writer) {
+	engagement, err := m.analyticsEngine.GetEngagementAnalytics(m.currentUserProfile.UserID)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to get engagement data: "+err.Error()))
+		return
+	}
+
+	fmt.Fprintln(out, utils.FormatSubsection("🔥 Engagement Metrics", ""))
+	fmt.Fprintln(out, utils.FormatKeyValue("Engagement Score", fmt.Sprintf("%.1f/10", engagement.EngagementScore*10)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Activity Level", string(engagement.ActivityLevel)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Avg Session Duration", engagement.AverageSessionDuration.String()))
+	fmt.Fprintln(out, utils.FormatKeyValue("Last Active", engagement.LastActive.Format("2006-01-02 15:04")))
+	fmt.Fprintln(out)
+
+	if len(engagement.InteractionPatterns) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("🎯 Interaction Patterns", ""))
+		for _, pattern := range engagement.InteractionPatterns {
+			fmt.Fprintln(out, fmt.Sprintf("  📊 %s: %.1f%% - %s", pattern.Pattern,
+				pattern.Frequency*100, pattern.Description))
+		}
+		fmt.Fprintln(out)
+	}
+}
+
+// showEffectivenessAnalytics displays effectiveness analytics
+func (m *LearningCLIManager) showEffectivenessAnalytics(out io.Writer) {
+	effectiveness, err := m.analyticsEngine.GetEffectivenessAnalytics(m.currentUserProfile.UserID)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to get effectiveness data: "+err.Error()))
+		return
+	}
+
+	fmt.Fprintln(out, utils.FormatSubsection("⚡ Learning Effectiveness", ""))
+	fmt.Fprintln(out, utils.FormatKeyValue("Learning Efficiency", fmt.Sprintf("%.2f concepts/hour", effectiveness.LearningEfficiency)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Retention Rate", fmt.Sprintf("%.1f%%", effectiveness.RetentionRate*100)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Knowledge Gain Rate", fmt.Sprintf("%.2f/hour", effectiveness.KnowledgeGainRate)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Personalization Score", fmt.Sprintf("%.1f/10", effectiveness.PersonalizationScore*10)))
+	fmt.Fprintln(out)
+
+	if effectiveness.LearningVelocity != nil {
+		fmt.Fprintln(out, utils.FormatSubsection("🚀 Learning Velocity", ""))
+		fmt.Fprintln(out, utils.FormatKeyValue("Concepts per Hour", fmt.Sprintf("%.1f", effectiveness.LearningVelocity.ConceptsPerHour)))
+		fmt.Fprintln(out, utils.FormatKeyValue("Steps per Session", fmt.Sprintf("%.1f", effectiveness.LearningVelocity.StepsPerSession)))
+		fmt.Fprintln(out, utils.FormatKeyValue("Velocity Trend", effectiveness.LearningVelocity.VelocityTrend))
+		fmt.Fprintln(out)
+	}
+}
+
+// showTrendAnalytics displays trend analytics
+func (m *LearningCLIManager) showTrendAnalytics(out io.Writer) {
+	trends, err := m.assessmentEngine.AnalyzePerformanceTrends(m.currentUserProfile.UserID)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to get trend data: "+err.Error()))
+		return
+	}
+
+	fmt.Fprintln(out, utils.FormatSubsection("📈 Performance Trends", ""))
+	if trends.OverallTrend != nil {
+		fmt.Fprintln(out, utils.FormatKeyValue("Overall Direction", trends.OverallTrend.TrendDirection))
+		fmt.Fprintln(out, utils.FormatKeyValue("Start Level", trends.OverallTrend.StartLevel.String()))
+		fmt.Fprintln(out, utils.FormatKeyValue("Current Level", trends.OverallTrend.CurrentLevel.String()))
+		fmt.Fprintln(out, utils.FormatKeyValue("Improvement Rate", fmt.Sprintf("%.2f levels/assessment", trends.OverallTrend.ImprovementRate)))
+	}
+	fmt.Fprintln(out)
+
+	if len(trends.CompetencyTrends) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("🏆 Competency Trends", ""))
+		for area, trend := range trends.CompetencyTrends {
+			direction := "➡️"
+			if trend.TrendDirection == "improving" {
+				direction = "📈"
+			} else if trend.TrendDirection == "declining" {
+				direction = "📉"
+			}
+			fmt.Fprintln(out, fmt.Sprintf("  %s %s: %s → %s (%s)", direction, area,
+				trend.StartLevel, trend.CurrentLevel, trend.TrendDirection))
+		}
+		fmt.Fprintln(out)
+	}
+
+	if len(trends.Insights) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("💡 Key Insights", ""))
+		for _, insight := range trends.Insights {
+			fmt.Fprintln(out, fmt.Sprintf("  💭 %s", insight))
+		}
+		fmt.Fprintln(out)
+	}
+}
+
+// showAnalyticsOverview displays general analytics overview
+func (m *LearningCLIManager) showAnalyticsOverview(out io.Writer) {
+	fmt.Fprintln(out, utils.FormatSubsection("📊 Analytics Overview", ""))
+	fmt.Fprintln(out, "Available analytics types:")
+	fmt.Fprintln(out, "  engagement    - Engagement metrics and interaction patterns")
+	fmt.Fprintln(out, "  effectiveness - Learning efficiency and velocity metrics")
+	fmt.Fprintln(out, "  trends        - Performance trends and progress analysis")
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, utils.FormatTip("Use 'nixai learn analytics <type>' to view specific analytics"))
+}
+
+// showRecommendations displays personalized learning recommendations
+func (m *LearningCLIManager) showRecommendations(out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("💡 Personalized Learning Recommendations"))
+	fmt.Fprintln(out)
+
+	ctx := context.Background()
+	recommendations, err := m.adaptiveEngine.GenerateRecommendations(ctx, m.currentUserProfile)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to generate recommendations: "+err.Error()))
+		return
+	}
+
+	if len(recommendations) == 0 {
+		fmt.Fprintln(out, utils.FormatInfo("No specific recommendations at this time. Keep learning!"))
+		return
+	}
+
+	// Group by priority
+	highPriority := []learning.LearningRecommendation{}
+	mediumPriority := []learning.LearningRecommendation{}
+	lowPriority := []learning.LearningRecommendation{}
+
+	for _, rec := range recommendations {
+		switch rec.Priority {
+		case learning.RecommendationPriorityHigh:
+			highPriority = append(highPriority, rec)
+		case learning.RecommendationPriorityMedium:
+			mediumPriority = append(mediumPriority, rec)
+		case learning.RecommendationPriorityLow:
+			lowPriority = append(lowPriority, rec)
+		}
+	}
+
+	// Display by priority
+	if len(highPriority) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("🔥 High Priority", ""))
+		for _, rec := range highPriority {
+			fmt.Fprintln(out, fmt.Sprintf("  📌 %s", rec.Title))
+			if rec.Description != "" {
+				fmt.Fprintln(out, fmt.Sprintf("     %s", rec.Description))
+			}
+			if rec.ModuleID != "" {
+				fmt.Fprintln(out, fmt.Sprintf("     💡 Try: nixai learn start %s", rec.ModuleID))
+			}
+		}
+		fmt.Fprintln(out)
+	}
+
+	if len(mediumPriority) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("⚡ Medium Priority", ""))
+		for _, rec := range mediumPriority {
+			fmt.Fprintln(out, fmt.Sprintf("  📌 %s", rec.Title))
+			if rec.Description != "" {
+				fmt.Fprintln(out, fmt.Sprintf("     %s", rec.Description))
+			}
+		}
+		fmt.Fprintln(out)
+	}
+
+	if len(lowPriority) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("📝 Low Priority", ""))
+		for _, rec := range lowPriority {
+			fmt.Fprintln(out, fmt.Sprintf("  📌 %s", rec.Title))
+		}
+		fmt.Fprintln(out)
+	}
+}
+
+// generateLearningPath generates a personalized learning path
+func (m *LearningCLIManager) generateLearningPath(args []string, out io.Writer) {
+	if len(args) == 0 {
+		fmt.Fprintln(out, utils.FormatError("Please specify a topic for the learning path"))
+		fmt.Fprintln(out, utils.FormatTip("Example: nixai learn path 'nix flakes'"))
+		return
+	}
+
+	topic := strings.Join(args, " ")
+
+	fmt.Fprintln(out, utils.FormatHeader("🗺️  Generating Learning Path: "+topic))
+	fmt.Fprintln(out)
+
+	ctx := context.Background()
+	fmt.Print(utils.FormatInfo("Analyzing your profile and generating personalized path... "))
+
+	learningPath, err := m.adaptiveEngine.GeneratePersonalizedContent(ctx, m.currentUserProfile, topic)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to generate learning path: "+err.Error()))
+		return
+	}
+
+	fmt.Println(utils.FormatSuccess("done"))
+	fmt.Fprintln(out)
+
+	// Display the learning path
+	fmt.Fprintln(out, utils.RenderMarkdown(learningPath.Content))
+	fmt.Fprintln(out)
+
+	// Show metadata
+	fmt.Fprintln(out, utils.FormatSubsection("📋 Path Details", ""))
+	fmt.Fprintln(out, utils.FormatKeyValue("Estimated Duration", fmt.Sprintf("%d minutes", learningPath.EstimatedDuration)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Difficulty Level", learningPath.DifficultyLevel.String()))
+	fmt.Fprintln(out, utils.FormatKeyValue("Personalization Score", fmt.Sprintf("%.1f/10", learningPath.PersonalizationScore*10)))
+
+	if len(learningPath.Prerequisites) > 0 {
+		fmt.Fprintln(out, utils.FormatKeyValue("Prerequisites", strings.Join(learningPath.Prerequisites, ", ")))
+	}
+
+	if len(learningPath.NextSteps) > 0 {
+		fmt.Fprintln(out, utils.FormatKeyValue("Next Steps", strings.Join(learningPath.NextSteps, ", ")))
+	}
+	fmt.Fprintln(out)
+}
+
+// showLearningInsights displays AI-powered learning insights
+func (m *LearningCLIManager) showLearningInsights(out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("🧠 AI-Powered Learning Insights"))
+	fmt.Fprintln(out)
+
+	ctx := context.Background()
+	fmt.Print(utils.FormatInfo("Analyzing your learning data and generating insights... "))
+
+	insights, err := m.analyticsEngine.GenerateInsights(ctx, m.currentUserProfile.UserID)
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("Failed to generate insights: "+err.Error()))
+		return
+	}
+
+	fmt.Println(utils.FormatSuccess("done"))
+	fmt.Fprintln(out)
+
+	// Display insights
+	fmt.Fprintln(out, utils.RenderMarkdown(insights.Insights))
+	fmt.Fprintln(out)
+
+	// Display structured insights if available
+	if len(insights.KeyPatterns) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("🔍 Key Patterns", ""))
+		for _, pattern := range insights.KeyPatterns {
+			fmt.Fprintln(out, fmt.Sprintf("  📊 %s", pattern))
+		}
+		fmt.Fprintln(out)
+	}
+
+	if len(insights.Strengths) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("💪 Your Strengths", ""))
+		for _, strength := range insights.Strengths {
+			fmt.Fprintln(out, fmt.Sprintf("  ✅ %s", strength))
+		}
+		fmt.Fprintln(out)
+	}
+
+	if len(insights.ImprovementAreas) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("🎯 Areas for Improvement", ""))
+		for _, area := range insights.ImprovementAreas {
+			fmt.Fprintln(out, fmt.Sprintf("  📈 %s", area))
+		}
+		fmt.Fprintln(out)
+	}
+
+	if len(insights.Recommendations) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("💡 AI Recommendations", ""))
+		for _, rec := range insights.Recommendations {
+			priority := m.getPriorityIcon(learning.RecommendationPriority(rec.Priority))
+			fmt.Fprintln(out, fmt.Sprintf("  %s %s", priority, rec.Description))
+			if rec.Action != "" {
+				fmt.Fprintln(out, fmt.Sprintf("     🔧 Action: %s", rec.Action))
+			}
+		}
+		fmt.Fprintln(out)
+	}
+}
+
+// Helper methods
+func (m *LearningCLIManager) getSkillLevelIcon(level learning.SkillLevel) string {
+	switch level {
+	case learning.SkillLevelBeginner:
+		return "🌱"
+	case learning.SkillLevelNovice:
+		return "🌿"
+	case learning.SkillLevelIntermediate:
+		return "🌳"
+	case learning.SkillLevelAdvanced:
+		return "🚀"
+	case learning.SkillLevelExpert:
+		return "⭐"
+	default:
+		return "❓"
+	}
+}
+
+func (m *LearningCLIManager) getPriorityIcon(priority learning.RecommendationPriority) string {
+	switch priority {
+	case learning.RecommendationPriorityHigh:
+		return "🔥"
+	case learning.RecommendationPriorityMedium:
+		return "⚡"
+	case learning.RecommendationPriorityLow:
+		return "📝"
+	default:
+		return "📌"
+	}
+}
+
+func (m *LearningCLIManager) showAvailableModules(out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("📚 Available Learning Modules"))
+	fmt.Fprintln(out)
+
+	modules := m.interactiveModules.GetAvailableModules()
+
+	if len(modules) == 0 {
+		fmt.Fprintln(out, utils.FormatInfo("No modules available. Creating basic modules..."))
+		// In a real implementation, this would initialize default modules
+		return
+	}
+
+	for _, module := range modules {
+		fmt.Fprintln(out, utils.FormatSubsection("📖 "+module.Title, ""))
+		fmt.Fprintln(out, "  "+module.Description)
+		fmt.Fprintln(out, utils.FormatKeyValue("  Level", module.TargetSkillLevel.String()))
+		fmt.Fprintln(out, utils.FormatKeyValue("  Duration", fmt.Sprintf("%d minutes", module.EstimatedDuration)))
+		fmt.Fprintln(out, utils.FormatKeyValue("  Command", "nixai learn start "+module.ID))
+		fmt.Fprintln(out)
+	}
+}
+
+func (m *LearningCLIManager) showModuleCompletion(moduleID string, out io.Writer) {
+	fmt.Fprintln(out, utils.FormatSubsection("🎉 Module Completion Summary", ""))
+	fmt.Fprintln(out, "Congratulations on completing the learning module!")
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, utils.FormatTip("Check your progress: nixai learn progress"))
+	fmt.Fprintln(out, utils.FormatTip("Get recommendations: nixai learn recommend"))
+	fmt.Fprintln(out, utils.FormatTip("Take an assessment: nixai learn assess"))
+}
+
+// Additional stub methods for completeness
+func (m *LearningCLIManager) manageProfile(args []string, out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("👤 Profile Management"))
+	fmt.Fprintln(out, utils.FormatInfo("Profile management feature coming soon!"))
+}
+
+func (m *LearningCLIManager) manageGoals(args []string, out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("🎯 Learning Goals"))
+	fmt.Fprintln(out, utils.FormatInfo("Goal management feature coming soon!"))
+}
+
+func (m *LearningCLIManager) showAchievements(out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("🏆 Achievements"))
+	fmt.Fprintln(out, utils.FormatInfo("Achievement system feature coming soon!"))
+}
+
+func (m *LearningCLIManager) resetProgress(args []string, out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("🔄 Reset Progress"))
+	fmt.Fprintln(out, utils.FormatWarning("This feature requires confirmation to prevent accidental data loss."))
+	fmt.Fprintln(out, utils.FormatInfo("Reset functionality coming soon!"))
+}

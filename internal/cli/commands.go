@@ -2737,7 +2737,6 @@ func handleFlakeCommand(cmd *cobra.Command, args []string) {
 
 // handleLearnCommand handles the learn command
 func handleLearnCommand(cmd *cobra.Command, args []string) {
-
 	// Use the proper implementation from direct_commands.go
 	runLearnCmd(args, cmd.OutOrStdout())
 }
