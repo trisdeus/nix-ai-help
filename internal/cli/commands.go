@@ -20,6 +20,7 @@ import (
 	"nix-ai-help/internal/ai/roles"
 	"nix-ai-help/internal/codegen"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/fleet"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/neovim"
 	"nix-ai-help/internal/nixos"
@@ -3641,8 +3642,28 @@ func initializeCommands() {
 	rootCmd.AddCommand(createIntelligenceCommand())
 	rootCmd.AddCommand(CreateWorkflowCommand())
 
-	// Plugin system
+	// Revolutionary features from Phase 3.3
+	// Add version control commands
+	AddVersioningCommands(rootCmd, logger.NewLogger())
+
+	// Add fleet management commands
 	cfg, err := config.LoadUserConfig()
+	if err == nil {
+		log := logger.NewLoggerWithLevel(cfg.LogLevel)
+
+		// Initialize fleet manager
+		fleetManager := fleet.NewFleetManager(log)
+		fleetCommands := NewFleetCommands(fleetManager, log)
+		rootCmd.AddCommand(fleetCommands.CreateCommand())
+
+		// Initialize integration service and commands
+		// Note: In a real implementation, these would be properly initialized with all dependencies
+		integrationCommands := NewIntegrationCommands(nil, log) // TODO: Initialize with proper service
+		rootCmd.AddCommand(integrationCommands.CreateCommand())
+	}
+
+	// Plugin system
+	cfg, err = config.LoadUserConfig()
 	if err == nil {
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		pluginManager := NewPluginCLIManager(cfg, log)

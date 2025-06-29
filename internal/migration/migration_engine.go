@@ -1,0 +1,524 @@
+package migration
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/migration/converter"
+	"nix-ai-help/internal/migration/detector"
+	"nix-ai-help/pkg/logger"
+)
+
+// MigrationEngine orchestrates the complete migration process
+type MigrationEngine struct {
+	logger           logger.Logger
+	aiProvider       ai.Provider
+	systemDetector   *detector.SystemDetector
+	serviceMapper    *detector.ServiceMapper
+	packageMapper    *detector.PackageMapper
+	configExtractor  *detector.ConfigExtractor
+	systemdConverter *converter.SystemdConverter
+}
+
+// MigrationPlan represents a complete migration plan
+type MigrationPlan struct {
+	SourceSystem       *detector.SystemInfo               `json:"source_system"`
+	ServiceMappings    map[string]detector.ServiceMapping `json:"service_mappings"`
+	PackageMappings    map[string]detector.PackageMapping `json:"package_mappings"`
+	ConfigExtractions  []detector.ConfigExtraction        `json:"config_extractions"`
+	SystemdConversions []converter.ConversionResult       `json:"systemd_conversions"`
+	GeneratedConfig    string                             `json:"generated_config"`
+	Warnings           []string                           `json:"warnings"`
+	ManualSteps        []string                           `json:"manual_steps"`
+	EstimatedTime      time.Duration                      `json:"estimated_time"`
+	Complexity         string                             `json:"complexity"`
+	BackupRequired     []string                           `json:"backup_required"`
+	RollbackPlan       string                             `json:"rollback_plan"`
+}
+
+// MigrationOptions configures the migration process
+type MigrationOptions struct {
+	BackupDirectory  string `json:"backup_directory"`
+	DryRun           bool   `json:"dry_run"`
+	IncludeUserData  bool   `json:"include_user_data"`
+	PreserveServices bool   `json:"preserve_services"`
+	GenerateFlake    bool   `json:"generate_flake"`
+	AIAssisted       bool   `json:"ai_assisted"`
+	ValidationLevel  string `json:"validation_level"` // basic, thorough, expert
+}
+
+// NewMigrationEngine creates a new migration engine
+func NewMigrationEngine(logger logger.Logger, aiProvider ai.Provider) *MigrationEngine {
+	return &MigrationEngine{
+		logger:           logger,
+		aiProvider:       aiProvider,
+		systemDetector:   detector.NewSystemDetector(logger),
+		serviceMapper:    detector.NewServiceMapper(logger),
+		packageMapper:    detector.NewPackageMapper(logger),
+		configExtractor:  detector.NewConfigExtractor(logger),
+		systemdConverter: converter.NewSystemdConverter(logger),
+	}
+}
+
+// AnalyzeSystem performs comprehensive system analysis for migration planning
+func (me *MigrationEngine) AnalyzeSystem(ctx context.Context) (*MigrationPlan, error) {
+	me.logger.Info("Starting comprehensive system analysis for migration")
+
+	plan := &MigrationPlan{
+		Warnings:       []string{},
+		ManualSteps:    []string{},
+		BackupRequired: []string{},
+	}
+
+	// Step 1: Detect current system
+	systemInfo, err := me.systemDetector.DetectSystem(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect system: %v", err)
+	}
+	plan.SourceSystem = systemInfo
+	me.logger.Info(fmt.Sprintf("Detected system: %s %s", systemInfo.Type, systemInfo.Version))
+
+	// Check if already NixOS
+	if systemInfo.Type == detector.SystemNixOS {
+		return nil, fmt.Errorf("system is already running NixOS")
+	}
+
+	// Step 2: Map services
+	plan.ServiceMappings = me.serviceMapper.MapServices(systemInfo.Services)
+	me.logger.Info(fmt.Sprintf("Mapped %d services", len(plan.ServiceMappings)))
+
+	// Step 3: Map packages
+	plan.PackageMappings = me.packageMapper.MapPackages(systemInfo.InstalledPkgs)
+	me.logger.Info(fmt.Sprintf("Mapped %d packages", len(plan.PackageMappings)))
+
+	// Step 4: Extract configurations
+	configExtractions, err := me.configExtractor.ExtractConfigurations(systemInfo.ConfigFiles)
+	if err != nil {
+		me.logger.Warn(fmt.Sprintf("Failed to extract some configurations: %v", err))
+	}
+	plan.ConfigExtractions = configExtractions
+
+	// Step 5: Convert systemd services
+	systemdConversions, err := me.systemdConverter.ConvertSystemdServices(systemInfo.Services)
+	if err != nil {
+		me.logger.Warn(fmt.Sprintf("Failed to convert some systemd services: %v", err))
+	}
+	plan.SystemdConversions = systemdConversions
+
+	// Step 6: Analyze complexity and generate warnings
+	me.analyzeComplexity(plan)
+
+	// Step 7: Estimate migration time
+	plan.EstimatedTime = me.estimateMigrationTime(plan)
+
+	// Step 8: Generate backup requirements
+	me.generateBackupRequirements(plan)
+
+	me.logger.Info("System analysis completed")
+	return plan, nil
+}
+
+// GenerateNixOSConfiguration generates complete NixOS configuration
+func (me *MigrationEngine) GenerateNixOSConfiguration(ctx context.Context, plan *MigrationPlan, options MigrationOptions) error {
+	me.logger.Info("Generating NixOS configuration")
+
+	var config strings.Builder
+
+	// Header
+	config.WriteString("# NixOS Configuration - Generated by nixai migration\n")
+	config.WriteString(fmt.Sprintf("# Source system: %s %s\n", plan.SourceSystem.Type, plan.SourceSystem.Version))
+	config.WriteString(fmt.Sprintf("# Generated: %s\n", time.Now().Format(time.RFC3339)))
+	config.WriteString("# WARNING: Review this configuration before applying!\n\n")
+
+	config.WriteString("{ config, pkgs, ... }:\n\n")
+	config.WriteString("{\n")
+
+	// Imports
+	config.WriteString("  imports = [\n")
+	config.WriteString("    ./hardware-configuration.nix\n")
+	config.WriteString("  ];\n\n")
+
+	// Boot configuration
+	me.generateBootConfig(&config, plan)
+
+	// Networking configuration
+	me.generateNetworkingConfig(&config, plan)
+
+	// Package configuration
+	me.generatePackageConfig(&config, plan)
+
+	// Service configuration
+	me.generateServiceConfig(&config, plan)
+
+	// User configuration
+	me.generateUserConfig(&config, plan)
+
+	// System configuration
+	me.generateSystemConfig(&config, plan)
+
+	// Security configuration
+	me.generateSecurityConfig(&config, plan)
+
+	// Close configuration
+	config.WriteString("}\n")
+
+	// AI-assisted enhancement if requested
+	if options.AIAssisted && me.aiProvider != nil {
+		enhancedConfig, err := me.enhanceConfigurationWithAI(ctx, config.String(), plan)
+		if err != nil {
+			me.logger.Warn(fmt.Sprintf("AI enhancement failed: %v", err))
+		} else {
+			config.Reset()
+			config.WriteString(enhancedConfig)
+		}
+	}
+
+	plan.GeneratedConfig = config.String()
+
+	// Generate flake if requested
+	if options.GenerateFlake {
+		flakeContent := me.generateFlakeConfiguration(plan)
+		plan.GeneratedConfig += "\n\n# Flake configuration (flake.nix):\n# " + strings.ReplaceAll(flakeContent, "\n", "\n# ")
+	}
+
+	me.logger.Info("NixOS configuration generated successfully")
+	return nil
+}
+
+// ExecuteMigration performs the actual migration
+func (me *MigrationEngine) ExecuteMigration(ctx context.Context, plan *MigrationPlan, options MigrationOptions) error {
+	if options.DryRun {
+		me.logger.Info("Performing dry run migration")
+		return me.performDryRun(plan, options)
+	}
+
+	me.logger.Info("Starting migration execution")
+
+	// Step 1: Create backup
+	if err := me.createBackup(plan, options); err != nil {
+		return fmt.Errorf("backup failed: %v", err)
+	}
+
+	// Step 2: Write NixOS configuration
+	if err := me.writeNixOSConfiguration(plan); err != nil {
+		return fmt.Errorf("failed to write NixOS configuration: %v", err)
+	}
+
+	// Step 3: Install NixOS (this would be a complex process)
+	// In a real implementation, this would involve:
+	// - Partitioning and formatting drives
+	// - Installing NixOS
+	// - Copying configuration
+	// - Rebuilding system
+
+	me.logger.Info("Migration execution completed (implementation placeholder)")
+	return nil
+}
+
+// Configuration generation methods
+func (me *MigrationEngine) generateBootConfig(config *strings.Builder, plan *MigrationPlan) {
+	config.WriteString("  # Boot configuration\n")
+	config.WriteString("  boot.loader.systemd-boot.enable = true;\n")
+	config.WriteString("  boot.loader.efi.canTouchEfiVariables = true;\n\n")
+}
+
+func (me *MigrationEngine) generateNetworkingConfig(config *strings.Builder, plan *MigrationPlan) {
+	config.WriteString("  # Networking configuration\n")
+	config.WriteString("  networking.hostName = \"nixos\"; # Define your hostname\n")
+	config.WriteString("  networking.networkmanager.enable = true;\n")
+
+	// Extract hostname from system if available
+	if hostname := os.Getenv("HOSTNAME"); hostname != "" {
+		config.WriteString(fmt.Sprintf("  # Original hostname: %s\n", hostname))
+	}
+
+	// Add firewall configuration based on detected services
+	config.WriteString("\n  # Firewall configuration\n")
+	config.WriteString("  networking.firewall.enable = true;\n")
+
+	var openPorts []int
+	for _, mapping := range plan.ServiceMappings {
+		for _, port := range mapping.PortMapping {
+			openPorts = append(openPorts, port)
+		}
+	}
+
+	if len(openPorts) > 0 {
+		config.WriteString("  networking.firewall.allowedTCPPorts = [ ")
+		for i, port := range openPorts {
+			if i > 0 {
+				config.WriteString(" ")
+			}
+			config.WriteString(fmt.Sprintf("%d", port))
+		}
+		config.WriteString(" ];\n")
+	}
+
+	config.WriteString("\n")
+}
+
+func (me *MigrationEngine) generatePackageConfig(config *strings.Builder, plan *MigrationPlan) {
+	config.WriteString("  # System packages\n")
+	config.WriteString(me.packageMapper.GenerateNixOSPackageConfig(plan.SourceSystem.InstalledPkgs))
+}
+
+func (me *MigrationEngine) generateServiceConfig(config *strings.Builder, plan *MigrationPlan) {
+	config.WriteString("  # Service configuration\n")
+
+	// Enable SSH by default
+	config.WriteString("  services.openssh.enable = true;\n")
+
+	// Add mapped services
+	for serviceName, mapping := range plan.ServiceMappings {
+		if mapping.NixOSOption != "" {
+			config.WriteString(fmt.Sprintf("  %s = true; # Migrated from %s\n", mapping.NixOSOption, serviceName))
+		}
+	}
+
+	// Add systemd conversions
+	for _, conversion := range plan.SystemdConversions {
+		if conversion.NixOSConfig != "" {
+			config.WriteString("\n  # Converted systemd service:\n")
+			config.WriteString(conversion.NixOSConfig)
+		}
+	}
+
+	config.WriteString("\n")
+}
+
+func (me *MigrationEngine) generateUserConfig(config *strings.Builder, plan *MigrationPlan) {
+	config.WriteString("  # User configuration\n")
+	config.WriteString("  users.users.nixos = {\n")
+	config.WriteString("    isNormalUser = true;\n")
+	config.WriteString("    extraGroups = [ \"wheel\" \"networkmanager\" ];\n")
+	config.WriteString("    # packages = with pkgs; [];\n")
+	config.WriteString("  };\n\n")
+
+	// Add notes about other users
+	nonSystemUsers := 0
+	for _, user := range plan.SourceSystem.Users {
+		if !user.SystemUser && user.Name != "root" && user.Name != "nixos" {
+			nonSystemUsers++
+		}
+	}
+
+	if nonSystemUsers > 0 {
+		config.WriteString(fmt.Sprintf("  # NOTE: %d additional user accounts detected - manual migration required\n", nonSystemUsers))
+		for _, user := range plan.SourceSystem.Users {
+			if !user.SystemUser && user.Name != "root" && user.Name != "nixos" {
+				config.WriteString(fmt.Sprintf("  # User: %s (home: %s, shell: %s)\n", user.Name, user.Home, user.Shell))
+			}
+		}
+		config.WriteString("\n")
+	}
+}
+
+func (me *MigrationEngine) generateSystemConfig(config *strings.Builder, plan *MigrationPlan) {
+	config.WriteString("  # System configuration\n")
+	config.WriteString("  system.stateVersion = \"24.05\";\n")
+	config.WriteString("  nix.settings.experimental-features = [ \"nix-command\" \"flakes\" ];\n\n")
+}
+
+func (me *MigrationEngine) generateSecurityConfig(config *strings.Builder, plan *MigrationPlan) {
+	config.WriteString("  # Security configuration\n")
+	config.WriteString("  security.sudo.wheelNeedsPassword = false;\n")
+
+	// Add security recommendations based on detected services
+	if len(plan.ServiceMappings) > 0 {
+		config.WriteString("  # Consider enabling additional security measures:\n")
+		config.WriteString("  # security.auditd.enable = true;\n")
+		config.WriteString("  # security.apparmor.enable = true;\n")
+	}
+
+	config.WriteString("\n")
+}
+
+// Analysis and utility methods
+func (me *MigrationEngine) analyzeComplexity(plan *MigrationPlan) {
+	// Set complexity based on source system analysis
+	plan.Complexity = string(plan.SourceSystem.Complexity)
+
+	// Add warnings based on complexity
+	switch plan.SourceSystem.Complexity {
+	case detector.ComplexityExpert:
+		plan.Warnings = append(plan.Warnings, "Expert-level migration complexity detected")
+		plan.Warnings = append(plan.Warnings, "Multiple custom services and complex configurations found")
+		plan.ManualSteps = append(plan.ManualSteps, "Detailed review of all service configurations required")
+		plan.ManualSteps = append(plan.ManualSteps, "Consider phased migration approach")
+	case detector.ComplexityComplex:
+		plan.Warnings = append(plan.Warnings, "Complex migration detected")
+		plan.Warnings = append(plan.Warnings, "Multiple services and custom configurations found")
+		plan.ManualSteps = append(plan.ManualSteps, "Review service configurations before migration")
+	case detector.ComplexityIntermediate:
+		plan.Warnings = append(plan.Warnings, "Intermediate migration complexity")
+		plan.ManualSteps = append(plan.ManualSteps, "Review generated configuration before applying")
+	}
+
+	// Add specific warnings
+	unavailablePackages := me.packageMapper.GetUnavailablePackages(plan.SourceSystem.InstalledPkgs)
+	if len(unavailablePackages) > 0 {
+		plan.Warnings = append(plan.Warnings, fmt.Sprintf("%d packages not available in nixpkgs", len(unavailablePackages)))
+		plan.ManualSteps = append(plan.ManualSteps, "Find alternatives for unavailable packages")
+	}
+
+	// Check for systemd conversions
+	customServices := 0
+	for _, conversion := range plan.SystemdConversions {
+		if conversion.ServiceMapping.NixOSService == "" {
+			customServices++
+		}
+	}
+
+	if customServices > 0 {
+		plan.Warnings = append(plan.Warnings, fmt.Sprintf("%d custom systemd services require manual review", customServices))
+	}
+}
+
+func (me *MigrationEngine) estimateMigrationTime(plan *MigrationPlan) time.Duration {
+	baseTime := 30 * time.Minute // Base migration time
+
+	// Add time based on complexity
+	switch plan.SourceSystem.Complexity {
+	case detector.ComplexitySimple:
+		baseTime += 15 * time.Minute
+	case detector.ComplexityIntermediate:
+		baseTime += 45 * time.Minute
+	case detector.ComplexityComplex:
+		baseTime += 2 * time.Hour
+	case detector.ComplexityExpert:
+		baseTime += 4 * time.Hour
+	}
+
+	// Add time for services
+	baseTime += time.Duration(len(plan.ServiceMappings)) * 5 * time.Minute
+
+	// Add time for custom configurations
+	baseTime += time.Duration(len(plan.ConfigExtractions)) * 10 * time.Minute
+
+	return baseTime
+}
+
+func (me *MigrationEngine) generateBackupRequirements(plan *MigrationPlan) {
+	// Add critical configuration files
+	for _, config := range plan.ConfigExtractions {
+		if config.Importance == "critical" {
+			plan.BackupRequired = append(plan.BackupRequired, config.FilePath)
+		}
+	}
+
+	// Add user home directories
+	for _, user := range plan.SourceSystem.Users {
+		if !user.SystemUser && user.Home != "" {
+			plan.BackupRequired = append(plan.BackupRequired, user.Home)
+		}
+	}
+
+	// Add system directories
+	plan.BackupRequired = append(plan.BackupRequired, "/etc", "/var/lib", "/var/log")
+}
+
+// AI enhancement
+func (me *MigrationEngine) enhanceConfigurationWithAI(ctx context.Context, config string, plan *MigrationPlan) (string, error) {
+	prompt := fmt.Sprintf(`Please review and enhance this NixOS configuration generated from a %s %s system migration:
+
+%s
+
+Please:
+1. Optimize the configuration for best practices
+2. Add security hardening appropriate for the detected services
+3. Suggest additional packages that might be needed
+4. Fix any syntax issues
+5. Add helpful comments
+
+Return the enhanced configuration:`, plan.SourceSystem.Type, plan.SourceSystem.Version, config)
+
+	response, err := me.aiProvider.Query(ctx, prompt)
+	if err != nil {
+		return "", err
+	}
+
+	return response, nil
+}
+
+// Utility methods
+func (me *MigrationEngine) generateFlakeConfiguration(plan *MigrationPlan) string {
+	return fmt.Sprintf(`{
+  description = "NixOS configuration migrated from %s %s";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  };
+
+  outputs = { self, nixpkgs }: {
+    nixosConfigurations.default = nixpkgs.lib.nixosSystem {
+      system = "%s";
+      modules = [
+        ./configuration.nix
+      ];
+    };
+  };
+}`, plan.SourceSystem.Type, plan.SourceSystem.Version, plan.SourceSystem.Architecture)
+}
+
+func (me *MigrationEngine) performDryRun(plan *MigrationPlan, options MigrationOptions) error {
+	me.logger.Info("Performing migration dry run")
+
+	// Output generated configuration
+	me.logger.Info("Generated NixOS configuration:")
+	me.logger.Info(plan.GeneratedConfig)
+
+	// Output warnings and manual steps
+	if len(plan.Warnings) > 0 {
+		me.logger.Info("Warnings:")
+		for _, warning := range plan.Warnings {
+			me.logger.Warn(warning)
+		}
+	}
+
+	if len(plan.ManualSteps) > 0 {
+		me.logger.Info("Manual steps required:")
+		for _, step := range plan.ManualSteps {
+			me.logger.Info(fmt.Sprintf("- %s", step))
+		}
+	}
+
+	return nil
+}
+
+func (me *MigrationEngine) createBackup(plan *MigrationPlan, options MigrationOptions) error {
+	if options.BackupDirectory == "" {
+		return fmt.Errorf("backup directory not specified")
+	}
+
+	me.logger.Info(fmt.Sprintf("Creating backup in %s", options.BackupDirectory))
+
+	// Create backup directory
+	if err := os.MkdirAll(options.BackupDirectory, 0755); err != nil {
+		return fmt.Errorf("failed to create backup directory: %v", err)
+	}
+
+	// Backup configuration files
+	return me.configExtractor.BackupConfiguration(plan.SourceSystem.ConfigFiles, options.BackupDirectory)
+}
+
+func (me *MigrationEngine) writeNixOSConfiguration(plan *MigrationPlan) error {
+	configPath := "/etc/nixos/configuration.nix"
+
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+		return fmt.Errorf("failed to create NixOS config directory: %v", err)
+	}
+
+	// Write configuration
+	if err := os.WriteFile(configPath, []byte(plan.GeneratedConfig), 0644); err != nil {
+		return fmt.Errorf("failed to write configuration: %v", err)
+	}
+
+	me.logger.Info(fmt.Sprintf("NixOS configuration written to %s", configPath))
+	return nil
+}
