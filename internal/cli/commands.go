@@ -3525,6 +3525,15 @@ func initializeCommands() {
 	rootCmd.AddCommand(NewErrorCommand())
 	rootCmd.AddCommand(createIntelligenceCommand())
 	rootCmd.AddCommand(CreateWorkflowCommand())
+
+	// Plugin system
+	cfg, err := config.LoadUserConfig()
+	if err == nil {
+		log := logger.NewLoggerWithLevel(cfg.LogLevel)
+		pluginManager := NewPluginCLIManager(cfg, log)
+		rootCmd.AddCommand(pluginManager.CreatePluginCommands())
+	}
+
 	// Register stub commands for missing features
 	rootCmd.AddCommand(communityCmd)
 	rootCmd.AddCommand(configCmd)

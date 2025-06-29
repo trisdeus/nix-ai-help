@@ -395,6 +395,86 @@ Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.
 - **Modular Architecture**: Clean separation of concerns with testable, maintainable components
 - **Production Ready**: Comprehensive error handling, validation, and robust operation
 
+### 🔌 Advanced Plugin & Extension System ✨ NEW
+
+nixai features a comprehensive plugin system that allows extending functionality through secure, dynamically loadable plugins:
+
+#### 🚀 **Core Plugin Features**
+
+- **🔌 Dynamic Loading**: Hot-loading of plugins without restart, runtime plugin discovery and management
+- **🛡️ Security Sandbox**: Isolated execution environment with configurable resource limits and permission-based access control
+- **📦 Package Manager**: Plugin distribution and update system with automatic dependency resolution and signature verification
+- **🤝 Community Marketplace**: Community-contributed plugin ecosystem with search, ratings, and featured plugins
+- **⚡ Native Performance**: High-performance plugin execution with efficient resource utilization and event-driven architecture
+
+#### 🛠️ **Plugin Management Commands**
+
+Complete plugin lifecycle management through 14 specialized CLI commands:
+
+```bash
+# Plugin Operations
+nixai plugin list                    # List installed plugins
+nixai plugin search <query>          # Search for available plugins
+nixai plugin install <plugin-name>   # Install a plugin from repository
+nixai plugin uninstall <plugin-name> # Remove an installed plugin
+nixai plugin enable <plugin-name>    # Enable a disabled plugin
+nixai plugin disable <plugin-name>   # Disable a running plugin
+
+# Plugin Information & Status
+nixai plugin info <plugin-name>      # Get detailed plugin information
+nixai plugin status <plugin-name>    # Check plugin health and status
+nixai plugin metrics [plugin-name]   # View plugin performance metrics
+nixai plugin events [--filter=...]   # Monitor plugin events and logs
+
+# Plugin Development
+nixai plugin create <template> <dir>  # Create new plugin from template
+nixai plugin validate <plugin-path>  # Validate plugin before installation
+nixai plugin execute <plugin> <op>   # Execute plugin operations
+nixai plugin discover               # Discover available plugins
+```
+
+#### 🏗️ **Plugin Development**
+
+Create powerful plugins with nixai's comprehensive development framework:
+
+**Available Templates:**
+- `basic-go`: Basic Go plugin template with essential functionality
+- `advanced-go`: Advanced Go plugin with full feature set and examples
+- `nixos-integration`: NixOS-specific plugin template with system integration
+- `ai-provider`: AI provider integration plugin for extending AI capabilities
+- `tool-integration`: External tool integration plugin for workflow automation
+
+**Quick Start:**
+```bash
+# Create a new plugin from template
+nixai plugin create basic-go my-awesome-plugin
+cd my-awesome-plugin
+
+# Implement your plugin logic
+# Build and install
+make build
+nixai plugin install ./my-awesome-plugin.so
+```
+
+#### 🔐 **Security & Sandbox**
+
+- **Process Isolation**: Plugins run in separate, isolated process spaces
+- **Resource Limits**: Configurable CPU, memory, and time constraints
+- **Permission Model**: Fine-grained capability-based security system
+- **Network Controls**: Configurable network access with domain allowlists
+- **Filesystem Security**: Controlled filesystem access with read/write permissions
+- **System Call Filtering**: Blocked dangerous system calls and capabilities
+
+#### 📦 **Repository & Marketplace**
+
+- **Multiple Repositories**: Official, community, and local plugin repositories
+- **Automatic Updates**: Configurable plugin update checking and installation
+- **Signature Verification**: Cryptographic verification of plugin integrity
+- **Community Features**: Plugin ratings, reviews, and featured recommendations
+- **Search & Discovery**: Advanced plugin search with filtering and categorization
+
+For detailed plugin development guides, see [Plugin Documentation](docs/plugins.md).
+
 ---
 
 ## 🧠 AI Provider Management

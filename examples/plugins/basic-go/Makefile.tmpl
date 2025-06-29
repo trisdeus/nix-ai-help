@@ -1,0 +1,22 @@
+.PHONY: build test clean install
+
+PLUGIN_NAME = {{.PluginName}}
+PLUGIN_FILE = $(PLUGIN_NAME).so
+
+build:
+	go build -buildmode=plugin -o $(PLUGIN_FILE) main.go
+
+test:
+	go test -v ./...
+
+clean:
+	rm -f $(PLUGIN_FILE)
+
+install: build
+	nixai plugin install ./$(PLUGIN_FILE)
+
+uninstall:
+	nixai plugin uninstall $(PLUGIN_NAME)
+
+dev: build install
+	nixai plugin status $(PLUGIN_NAME)

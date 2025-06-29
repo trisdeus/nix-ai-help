@@ -1,0 +1,60 @@
+# {{.PluginName}}
+
+{{.Description}}
+
+## Features
+
+- Basic operation processing
+- Information querying
+- Health monitoring
+- Metrics collection
+
+## Installation
+
+```bash
+# Build the plugin
+go build -buildmode=plugin -o {{.PluginName}}.so main.go
+
+# Install the plugin
+nixai plugin install ./{{.PluginName}}.so
+```
+
+## Usage
+
+```bash
+# Execute basic operation
+nixai plugin execute {{.PluginName}} basic-operation --input "test data"
+
+# Query plugin information
+nixai plugin execute {{.PluginName}} info-query
+
+# Check plugin status
+nixai plugin status {{.PluginName}}
+```
+
+## Configuration
+
+```yaml
+plugins:
+  {{.PluginName}}:
+    enabled: true
+    configuration:
+      # Add your configuration options here
+```
+
+## Development
+
+```bash
+# Build plugin
+make build
+
+# Test plugin
+make test
+
+# Clean build artifacts
+make clean
+```
+
+## License
+
+{{.License}}

@@ -258,6 +258,63 @@ type CacheConfig struct {
 	CompactInterval int    `yaml:"compact_interval" json:"compact_interval"` // Compaction interval in minutes
 }
 
+// PluginConfig represents the plugin system configuration
+type PluginConfig struct {
+	Enabled         bool                     `yaml:"enabled" json:"enabled"`
+	Directory       string                   `yaml:"directory" json:"directory"`
+	CacheDirectory  string                   `yaml:"cache_directory" json:"cache_directory"`
+	ConfigDirectory string                   `yaml:"config_directory" json:"config_directory"`
+	AutoDiscover    bool                     `yaml:"auto_discover" json:"auto_discover"`
+	AutoUpdate      bool                     `yaml:"auto_update" json:"auto_update"`
+	SandboxEnabled  bool                     `yaml:"sandbox_enabled" json:"sandbox_enabled"`
+	MaxConcurrent   int                      `yaml:"max_concurrent" json:"max_concurrent"`
+	Timeout         int                      `yaml:"timeout" json:"timeout"`
+	Repositories    []PluginRepositoryConfig `yaml:"repositories" json:"repositories"`
+	Marketplace     PluginMarketplaceConfig  `yaml:"marketplace" json:"marketplace"`
+	Security        PluginSecurityConfig     `yaml:"security" json:"security"`
+	PackageManager  PluginPackageConfig      `yaml:"package_manager" json:"package_manager"`
+}
+
+// PluginRepositoryConfig represents a plugin repository configuration
+type PluginRepositoryConfig struct {
+	Name     string `yaml:"name" json:"name"`
+	URL      string `yaml:"url" json:"url"`
+	Type     string `yaml:"type" json:"type"`
+	Enabled  bool   `yaml:"enabled" json:"enabled"`
+	Priority int    `yaml:"priority" json:"priority"`
+	Verified bool   `yaml:"verified" json:"verified"`
+}
+
+// PluginMarketplaceConfig represents marketplace configuration
+type PluginMarketplaceConfig struct {
+	Enabled         bool   `yaml:"enabled" json:"enabled"`
+	BaseURL         string `yaml:"base_url" json:"base_url"`
+	CacheDuration   int    `yaml:"cache_duration" json:"cache_duration"`
+	FeaturedPlugins int    `yaml:"featured_plugins" json:"featured_plugins"`
+	SearchTimeout   int    `yaml:"search_timeout" json:"search_timeout"`
+}
+
+// PluginSecurityConfig represents security configuration for plugins
+type PluginSecurityConfig struct {
+	SandboxEnabled       bool     `yaml:"sandbox_enabled" json:"sandbox_enabled"`
+	AllowNetwork         bool     `yaml:"allow_network" json:"allow_network"`
+	AllowFilesystemWrite bool     `yaml:"allow_filesystem_write" json:"allow_filesystem_write"`
+	AllowSystemCalls     bool     `yaml:"allow_system_calls" json:"allow_system_calls"`
+	MaxMemoryMB          int      `yaml:"max_memory_mb" json:"max_memory_mb"`
+	MaxCPUPercent        int      `yaml:"max_cpu_percent" json:"max_cpu_percent"`
+	AllowedDomains       []string `yaml:"allowed_domains" json:"allowed_domains"`
+	BlockedCapabilities  []string `yaml:"blocked_capabilities" json:"blocked_capabilities"`
+}
+
+// PluginPackageConfig represents package manager configuration
+type PluginPackageConfig struct {
+	VerifySignatures    bool `yaml:"verify_signatures" json:"verify_signatures"`
+	AllowUnsigned       bool `yaml:"allow_unsigned" json:"allow_unsigned"`
+	UpdateCheckInterval int  `yaml:"update_check_interval" json:"update_check_interval"`
+	DownloadTimeout     int  `yaml:"download_timeout" json:"download_timeout"`
+	MaxDownloadSizeMB   int  `yaml:"max_download_size_mb" json:"max_download_size_mb"`
+}
+
 // AI Models Configuration Structures
 
 // AIModelConfig represents a single AI model configuration
@@ -329,6 +386,7 @@ type YAMLConfig struct {
 	CustomAI    CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
 	Discourse   DiscourseConfig   `yaml:"discourse" json:"discourse"`
 	Cache       CacheConfig       `yaml:"cache" json:"cache"`
+	Plugin      PluginConfig      `yaml:"plugin" json:"plugin"`
 }
 
 type UserConfig struct {
@@ -347,6 +405,7 @@ type UserConfig struct {
 	Discourse    DiscourseConfig   `yaml:"discourse" json:"discourse"`
 	NixOSContext NixOSContext      `yaml:"nixos_context" json:"nixos_context"`
 	Cache        CacheConfig       `yaml:"cache" json:"cache"`
+	Plugin       PluginConfig      `yaml:"plugin" json:"plugin"`
 }
 
 // GetAITimeout returns the timeout for a specific AI provider
@@ -654,6 +713,51 @@ func DefaultUserConfig() *UserConfig {
 			DiskTTL:         24,   // 24 hours for disk cache
 			CleanupInterval: 5,    // Cleanup every 5 minutes
 			CompactInterval: 60,   // Compact every hour
+		},
+		Plugin: PluginConfig{
+			Enabled:         true,
+			Directory:       "~/nixai-plugins",
+			CacheDirectory:  "~/nixai-plugins/cache",
+			ConfigDirectory: "~/nixai-plugins/config",
+			AutoDiscover:    true,
+			AutoUpdate:      true,
+			SandboxEnabled:  true,
+			MaxConcurrent:   5,
+			Timeout:         60,
+			Repositories: []PluginRepositoryConfig{
+				{
+					Name:     "default",
+					URL:      "https://plugins.nixai.org",
+					Type:     "remote",
+					Enabled:  true,
+					Priority: 1,
+					Verified: true,
+				},
+			},
+			Marketplace: PluginMarketplaceConfig{
+				Enabled:         true,
+				BaseURL:         "https://marketplace.nixai.org",
+				CacheDuration:   3600,
+				FeaturedPlugins: 10,
+				SearchTimeout:   30,
+			},
+			Security: PluginSecurityConfig{
+				SandboxEnabled:       true,
+				AllowNetwork:         false,
+				AllowFilesystemWrite: false,
+				AllowSystemCalls:     false,
+				MaxMemoryMB:          512,
+				MaxCPUPercent:        50,
+				AllowedDomains:       []string{"nixai.org"},
+				BlockedCapabilities:  []string{"exec", "fork"},
+			},
+			PackageManager: PluginPackageConfig{
+				VerifySignatures:    true,
+				AllowUnsigned:       false,
+				UpdateCheckInterval: 1440,
+				DownloadTimeout:     60,
+				MaxDownloadSizeMB:   100,
+			},
 		},
 	}
 }

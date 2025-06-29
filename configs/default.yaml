@@ -406,3 +406,56 @@ default:
             golang:
                 enabled: true
                 default_version: "1.21"
+    web_ui:
+        enabled: false
+        host: localhost
+        port: 8082
+        tls_enabled: false
+        auth_enabled: false
+        asset_path: web/assets
+        template_path: web/templates
+    # Plugin System Configuration
+    plugins:
+        enabled: true
+        directory: ~/.config/nixai/plugins
+        cache_directory: ~/.cache/nixai/plugins
+        config_directory: ~/.config/nixai/plugins/config
+        auto_discover: true
+        auto_update: false
+        sandbox_enabled: true
+        max_concurrent: 5
+        timeout: 30
+        repositories:
+            - name: "official"
+              url: "https://plugins.nixai.dev"
+              type: "official"
+              enabled: true
+              priority: 1
+              verified: true
+            - name: "community"
+              url: "https://community.nixai.dev/plugins"
+              type: "community"
+              enabled: true
+              priority: 2
+              verified: false
+        marketplace:
+            enabled: true
+            base_url: "https://marketplace.nixai.dev"
+            cache_duration: 3600
+            featured_plugins: 10
+            search_timeout: 15
+        security:
+            sandbox_enabled: true
+            allow_network: false
+            allow_filesystem_write: false
+            allow_system_calls: false
+            max_memory_mb: 512
+            max_cpu_percent: 50
+            allowed_domains: []
+            blocked_capabilities: ["CAP_SYS_ADMIN", "CAP_NET_ADMIN"]
+        package_manager:
+            verify_signatures: true
+            allow_unsigned: false
+            update_check_interval: 86400
+            download_timeout: 300
+            max_download_size_mb: 100

@@ -1,0 +1,224 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"nix-ai-help/internal/plugins"
+)
+
+// {{.PluginName}} is a basic nixai plugin
+type {{.PluginName}} struct {
+	config  plugins.PluginConfig
+	running bool
+	mutex   sync.RWMutex
+}
+
+// Metadata methods
+func (p *{{.PluginName}}) Name() string        { return "{{.PluginName}}" }
+func (p *{{.PluginName}}) Version() string     { return "{{.Version}}" }
+func (p *{{.PluginName}}) Description() string { return "{{.Description}}" }
+func (p *{{.PluginName}}) Author() string      { return "{{.Author}}" }
+func (p *{{.PluginName}}) Repository() string  { return "{{.Repository}}" }
+func (p *{{.PluginName}}) License() string     { return "{{.License}}" }
+
+func (p *{{.PluginName}}) Dependencies() []string {
+	return []string{} // Add plugin dependencies here
+}
+
+func (p *{{.PluginName}}) Capabilities() []string {
+	return []string{
+		"basic-operation",
+		"info-query",
+	}
+}
+
+// Lifecycle methods
+func (p *{{.PluginName}}) Initialize(ctx context.Context, config plugins.PluginConfig) error {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	
+	p.config = config
+	
+	// Initialize plugin resources here
+	
+	return nil
+}
+
+func (p *{{.PluginName}}) Start(ctx context.Context) error {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	
+	if p.running {
+		return fmt.Errorf("plugin is already running")
+	}
+	
+	// Start plugin services here
+	
+	p.running = true
+	return nil
+}
+
+func (p *{{.PluginName}}) Stop(ctx context.Context) error {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	
+	if !p.running {
+		return fmt.Errorf("plugin is not running")
+	}
+	
+	// Stop plugin services here
+	
+	p.running = false
+	return nil
+}
+
+func (p *{{.PluginName}}) Cleanup(ctx context.Context) error {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	
+	// Clean up plugin resources here
+	
+	return nil
+}
+
+func (p *{{.PluginName}}) IsRunning() bool {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	return p.running
+}
+
+// Execution methods
+func (p *{{.PluginName}}) Execute(ctx context.Context, operation string, params map[string]interface{}) (interface{}, error) {
+	switch operation {
+	case "basic-operation":
+		return p.basicOperation(ctx, params)
+	case "info-query":
+		return p.infoQuery(ctx, params)
+	default:
+		return nil, fmt.Errorf("unknown operation: %s", operation)
+	}
+}
+
+func (p *{{.PluginName}}) GetOperations() []plugins.PluginOperation {
+	return []plugins.PluginOperation{
+		{
+			Name:        "basic-operation",
+			Description: "Performs a basic operation",
+			Parameters: []plugins.PluginParameter{
+				{
+					Name:        "input",
+					Type:        "string",
+					Description: "Input parameter",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "info-query",
+			Description: "Queries plugin information",
+			Parameters:  []plugins.PluginParameter{},
+		},
+	}
+}
+
+func (p *{{.PluginName}}) GetSchema(operation string) (*plugins.PluginSchema, error) {
+	switch operation {
+	case "basic-operation":
+		return &plugins.PluginSchema{
+			Type: "object",
+			Properties: map[string]plugins.PluginSchema{
+				"input": {
+					Type:        "string",
+					Description: "Input parameter",
+				},
+			},
+			Required: []string{"input"},
+		}, nil
+	case "info-query":
+		return &plugins.PluginSchema{
+			Type:       "object",
+			Properties: map[string]plugins.PluginSchema{},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown operation: %s", operation)
+	}
+}
+
+// Health and Status methods
+func (p *{{.PluginName}}) HealthCheck(ctx context.Context) plugins.PluginHealth {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	
+	status := "healthy"
+	message := "Plugin is running normally"
+	
+	if !p.running {
+		status = "stopped"
+		message = "Plugin is not running"
+	}
+	
+	return plugins.PluginHealth{
+		Status:    status,
+		Message:   message,
+		Timestamp: plugins.Now(),
+	}
+}
+
+func (p *{{.PluginName}}) GetMetrics() plugins.PluginMetrics {
+	return plugins.PluginMetrics{
+		ExecutionCount: 0, // Track execution count
+		ErrorCount:     0, // Track error count
+		LastExecution:  plugins.Now(),
+		AverageTime:    0, // Track average execution time
+	}
+}
+
+func (p *{{.PluginName}}) GetStatus() plugins.PluginStatus {
+	p.mutex.RLock()
+	defer p.mutex.RUnlock()
+	
+	return plugins.PluginStatus{
+		Name:    p.Name(),
+		Version: p.Version(),
+		Running: p.running,
+		Health:  p.HealthCheck(context.Background()),
+		Metrics: p.GetMetrics(),
+	}
+}
+
+// Operation implementations
+func (p *{{.PluginName}}) basicOperation(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+	input, ok := params["input"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid input parameter")
+	}
+	
+	// Implement your basic operation logic here
+	result := fmt.Sprintf("Processed: %s", input)
+	
+	return map[string]interface{}{
+		"result": result,
+		"status": "success",
+	}, nil
+}
+
+func (p *{{.PluginName}}) infoQuery(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+	return map[string]interface{}{
+		"name":         p.Name(),
+		"version":      p.Version(),
+		"description":  p.Description(),
+		"author":       p.Author(),
+		"capabilities": p.Capabilities(),
+		"running":      p.IsRunning(),
+	}, nil
+}
+
+// Plugin entry point - required for Go plugins
+var Plugin {{.PluginName}}
+
+func init() {
+	// Initialize plugin instance
+	Plugin = {{.PluginName}}{}
+}
