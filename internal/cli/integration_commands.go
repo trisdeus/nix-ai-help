@@ -234,7 +234,7 @@ Team members can work together in real-time on configuration files.`,
 			utils.FormatKeyValue("Status", session.Status)
 			utils.FormatKeyValue("Participants", fmt.Sprintf("%d", len(session.Participants)))
 
-			fmt.Printf("\nWeb interface: http://localhost:8080/collaborate/%s\n", session.ID)
+			fmt.Printf("\nWeb interface: http://localhost:34567/collaborate/%s\n", session.ID)
 			utils.FormatDivider()
 
 			return nil

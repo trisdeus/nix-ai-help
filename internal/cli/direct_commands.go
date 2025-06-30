@@ -1370,6 +1370,11 @@ func runMigrateCmd(args []string, out io.Writer) {
 	runCobraCommand(NewMigrateCmd(), args, out)
 }
 
+// Import command
+func runImportCmd(args []string, out io.Writer) {
+	runCobraCommand(NewImportCommand(), args, out)
+}
+
 // Snippets command
 func runSnippetsCmd(args []string, out io.Writer) {
 	runCobraCommand(NewSnippetsCmd(), args, out)
@@ -2713,12 +2718,15 @@ func RunDirectCommand(cmdName string, args []string, out io.Writer) (bool, error
 	case "templates":
 		runTemplatesCmd(args, out)
 		return true, nil
+	case "import":
+		runImportCmd(args, out)
+		return true, nil
 	case "ask":
 		runAskCmd(args, out)
 		return true, nil
 	case "help":
 		_, _ = fmt.Fprintln(out, utils.FormatHeader("❓ Help: Available Commands"))
-		_, _ = fmt.Fprintln(out, `🤖 ask <question>: Ask any NixOS question\n🛠️ build: Enhanced build troubleshooting and optimization\n🌐 community: Community resources and support\n🔄 completion: Generate the autocompletion script for the specified shell\n⚙️ config: Manage nixai configuration\n🧑‍💻 configure: Configure NixOS interactively\n🔗 deps: Analyze NixOS configuration dependencies and imports\n🧪 devenv: Create and manage development environments with devenv\n🩺 diagnose: Diagnose NixOS issues\n🩻 doctor: Run NixOS health checks\n🖥️ explain-option <option>: Explain a NixOS option\n🧊 flake: Nix flake utilities\n🧹 gc: AI-powered garbage collection analysis and cleanup\n💻 hardware: AI-powered hardware configuration optimizer\n❓ help: Help about any command\n💬 interactive: Launch interactive AI-powered NixOS assistant shell\n📚 learn: NixOS learning and training commands\n📝 logs: Analyze and parse NixOS logs\n🖧 machines: Manage and synchronize NixOS configurations across multiple machines\n🛰️ mcp-server: Start or manage the MCP server\n🔀 migrate: AI-powered migration assistant for channels and flakes\n📝 neovim-setup: Neovim integration setup\n📦 package-repo <url>: Analyze Git repos and generate Nix derivations\n🔍 search <package>: Search for NixOS packages/services and get config/AI tips\n🔖 snippets: Manage NixOS configuration snippets\n💾 store: Manage, backup, and analyze the Nix store\n📄 templates: Manage NixOS configuration templates and snippets\n❌ exit: Exit interactive mode`)
+		_, _ = fmt.Fprintln(out, `🤖 ask <question>: Ask any NixOS question\n🛠️ build: Enhanced build troubleshooting and optimization\n🌐 community: Community resources and support\n🔄 completion: Generate the autocompletion script for the specified shell\n⚙️ config: Manage nixai configuration\n🧑‍💻 configure: Configure NixOS interactively\n🔗 deps: Analyze NixOS configuration dependencies and imports\n🧪 devenv: Create and manage development environments with devenv\n🩺 diagnose: Diagnose NixOS issues\n🩻 doctor: Run NixOS health checks\n🖥️ explain-option <option>: Explain a NixOS option\n🧊 flake: Nix flake utilities\n🧹 gc: AI-powered garbage collection analysis and cleanup\n💻 hardware: AI-powered hardware configuration optimizer\n❓ help: Help about any command\n📥 import: Import configurations and templates from various sources\n💬 interactive: Launch interactive AI-powered NixOS assistant shell\n📚 learn: NixOS learning and training commands\n📝 logs: Analyze and parse NixOS logs\n🖧 machines: Manage and synchronize NixOS configurations across multiple machines\n🛰️ mcp-server: Start or manage the MCP server\n🔀 migrate: AI-powered migration assistant for channels and flakes\n📝 neovim-setup: Neovim integration setup\n📦 package-repo <url>: Analyze Git repos and generate Nix derivations\n🔍 search <package>: Search for NixOS packages/services and get config/AI tips\n🔖 snippets: Manage NixOS configuration snippets\n💾 store: Manage, backup, and analyze the Nix store\n📄 templates: Manage NixOS configuration templates and snippets\n❌ exit: Exit interactive mode`)
 		return true, nil
 	case "exit":
 		_, _ = fmt.Fprintln(out, utils.FormatTip("Type Ctrl+D or 'exit' to leave interactive mode."))

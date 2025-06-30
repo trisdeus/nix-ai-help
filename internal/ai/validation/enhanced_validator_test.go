@@ -192,7 +192,7 @@ func TestEnhancedValidatorWithAutomatedScoring(t *testing.T) {
 	testLogger := logger.NewLogger()
 
 	// Create enhanced validator
-	validator := NewEnhancedValidator("localhost", 8080, "", testLogger)
+	validator := NewEnhancedValidator("localhost", 34567, "", testLogger)
 
 	// Test question and answer
 	question := "How do I install Firefox on NixOS?"
@@ -327,7 +327,7 @@ sudo nixos-rebuild switch`
 
 func TestQualityLevelDeterminationWithAutomatedScore(t *testing.T) {
 	testLogger := logger.NewLogger()
-	validator := NewEnhancedValidator("localhost", 8080, "", testLogger)
+	validator := NewEnhancedValidator("localhost", 34567, "", testLogger)
 
 	tests := []struct {
 		name           string

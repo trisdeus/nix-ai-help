@@ -3631,8 +3631,8 @@ func initializeCommands() {
 	rootCmd.AddCommand(createMachinesCommand())
 	rootCmd.AddCommand(migrateCmd)
 	rootCmd.AddCommand(storeCmd)
-	rootCmd.AddCommand(templatesCmd)
-	rootCmd.AddCommand(snippetsCmd)
+	rootCmd.AddCommand(NewTemplatesCmd())
+	rootCmd.AddCommand(NewSnippetsCmd())
 	rootCmd.AddCommand(enhancedBuildCmd)
 	rootCmd.AddCommand(devenvCmd)
 	rootCmd.AddCommand(NewDepsCommand())
@@ -3641,6 +3641,7 @@ func initializeCommands() {
 	rootCmd.AddCommand(NewErrorCommand())
 	rootCmd.AddCommand(createIntelligenceCommand())
 	rootCmd.AddCommand(CreateWorkflowCommand())
+	rootCmd.AddCommand(importCmd) // Add import functionality
 
 	// Revolutionary features from Phase 3.3
 	// Add version control commands

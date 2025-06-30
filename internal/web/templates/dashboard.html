@@ -1,0 +1,420 @@
+{{define "dashboard"}}
+<div class="dashboard-container">
+    <!-- Dashboard Overview Stats -->
+    <div class="nixai-dashboard-grid">
+        <div class="nixai-stat-card">
+            <div class="nixai-stat-value" id="total-machines">{{.Stats.TotalMachines}}</div>
+            <div class="nixai-stat-label">Total Machines</div>
+        </div>
+        
+        <div class="nixai-stat-card">
+            <div class="nixai-stat-value" id="healthy-machines">{{.Stats.HealthyMachines}}</div>
+            <div class="nixai-stat-label">Healthy Machines</div>
+        </div>
+        
+        <div class="nixai-stat-card">
+            <div class="nixai-stat-value" id="total-configs">{{.Stats.TotalConfigs}}</div>
+            <div class="nixai-stat-label">Configurations</div>
+        </div>
+        
+        <div class="nixai-stat-card">
+            <div class="nixai-stat-value" id="active-teams">{{.Stats.ActiveTeams}}</div>
+            <div class="nixai-stat-label">Active Teams</div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Content -->
+    <div class="dashboard-main-grid">
+        <!-- Activity Feed -->
+        <div class="nixai-card">
+            <div class="nixai-card-header">
+                <h3 class="nixai-card-title">Recent Activity</h3>
+                <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" data-action="refresh-activity">
+                    🔄 Refresh
+                </button>
+            </div>
+            
+            <div id="activity-feed" class="activity-feed">
+                {{range .Activities}}
+                <div class="activity-item fade-in">
+                    <div class="activity-icon">{{.Icon}}</div>
+                    <div class="activity-content">
+                        <div class="activity-message">{{.Message}}</div>
+                        <div class="activity-time">{{.FormattedTime}}</div>
+                    </div>
+                </div>
+                {{else}}
+                <div class="activity-placeholder text-center text-secondary">
+                    No recent activity
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- Fleet Status -->
+        <div class="nixai-card">
+            <div class="nixai-card-header">
+                <h3 class="nixai-card-title">Fleet Status</h3>
+                <a href="/fleet" class="nixai-btn nixai-btn-sm nixai-btn-primary">View All</a>
+            </div>
+            
+            <div class="fleet-overview">
+                {{range .FleetStatus}}
+                <div class="fleet-item">
+                    <div class="fleet-item-info">
+                        <div class="fleet-item-name">{{.Name}}</div>
+                        <div class="fleet-item-details">{{.Type}} • {{.Version}}</div>
+                    </div>
+                    <div class="nixai-status nixai-status-{{.StatusClass}}">
+                        {{.Status}}
+                    </div>
+                </div>
+                {{else}}
+                <div class="fleet-placeholder text-center text-secondary">
+                    No machines configured
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- Alerts -->
+        <div class="nixai-card">
+            <div class="nixai-card-header">
+                <h3 class="nixai-card-title">System Alerts</h3>
+                <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" data-action="clear-alerts">
+                    🗑️ Clear
+                </button>
+            </div>
+            
+            <div id="alerts-list" class="alerts-container">
+                {{range .Alerts}}
+                <div class="nixai-alert nixai-alert-{{.Level}} fade-in">
+                    <strong>{{.Title}}</strong>
+                    <p>{{.Message}}</p>
+                    <small>{{.FormattedTime}}</small>
+                </div>
+                {{else}}
+                <div class="alerts-placeholder text-center text-secondary">
+                    No active alerts
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- Configuration Status -->
+        <div class="nixai-card">
+            <div class="nixai-card-header">
+                <h3 class="nixai-card-title">Configuration Status</h3>
+                <a href="/builder" class="nixai-btn nixai-btn-sm nixai-btn-primary">Open Builder</a>
+            </div>
+            
+            <div class="config-overview">
+                {{range .ConfigStatus}}
+                <div class="config-item">
+                    <div class="config-item-info">
+                        <div class="config-item-name">{{.Name}}</div>
+                        <div class="config-item-details">
+                            <span class="config-item-branch">{{.Branch}}</span>
+                            <span class="config-item-modified">{{.LastModified}}</span>
+                        </div>
+                    </div>
+                    <div class="config-item-actions">
+                        <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" data-action="validate-config" data-config="{{.Name}}">
+                            ✅ Validate
+                        </button>
+                        <button class="nixai-btn nixai-btn-sm nixai-btn-primary" data-action="edit-config" data-config="{{.Name}}">
+                            ✏️ Edit
+                        </button>
+                    </div>
+                </div>
+                {{else}}
+                <div class="config-placeholder text-center text-secondary">
+                    No configurations found
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- Team Activity -->
+        <div class="nixai-card">
+            <div class="nixai-card-header">
+                <h3 class="nixai-card-title">Team Activity</h3>
+                <a href="/teams" class="nixai-btn nixai-btn-sm nixai-btn-primary">Manage Teams</a>
+            </div>
+            
+            <div class="team-activity">
+                {{range .TeamActivity}}
+                <div class="team-activity-item">
+                    <div class="team-avatar">{{.Avatar}}</div>
+                    <div class="team-activity-content">
+                        <div class="team-activity-user">{{.User}}</div>
+                        <div class="team-activity-action">{{.Action}}</div>
+                        <div class="team-activity-time">{{.FormattedTime}}</div>
+                    </div>
+                </div>
+                {{else}}
+                <div class="team-placeholder text-center text-secondary">
+                    No team activity
+                </div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- AI Suggestions -->
+        <div class="nixai-card">
+            <div class="nixai-card-header">
+                <h3 class="nixai-card-title">AI Suggestions</h3>
+                <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" data-action="refresh-suggestions">
+                    🤖 Refresh
+                </button>
+            </div>
+            
+            <div class="ai-suggestions">
+                {{range .AISuggestions}}
+                <div class="ai-suggestion-item">
+                    <div class="ai-suggestion-icon">{{.Icon}}</div>
+                    <div class="ai-suggestion-content">
+                        <div class="ai-suggestion-title">{{.Title}}</div>
+                        <div class="ai-suggestion-description">{{.Description}}</div>
+                        <div class="ai-suggestion-actions">
+                            <button class="nixai-btn nixai-btn-sm nixai-btn-primary" data-action="apply-suggestion" data-suggestion="{{.ID}}">
+                                Apply
+                            </button>
+                            <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" data-action="dismiss-suggestion" data-suggestion="{{.ID}}">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {{else}}
+                <div class="ai-placeholder text-center text-secondary">
+                    No AI suggestions available
+                </div>
+                {{end}}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.dashboard-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xl);
+}
+
+.dashboard-main-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: var(--spacing-lg);
+}
+
+/* Activity Feed Styles */
+.activity-feed {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Fleet Overview Styles */
+.fleet-overview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.fleet-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+}
+
+.fleet-item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.fleet-item-details {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.fleet-placeholder,
+.alerts-placeholder,
+.config-placeholder,
+.team-placeholder,
+.ai-placeholder {
+    padding: var(--spacing-xl);
+    font-style: italic;
+}
+
+/* Alerts Container */
+.alerts-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Configuration Overview */
+.config-overview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.config-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+}
+
+.config-item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.config-item-details {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-top: var(--spacing-xs);
+}
+
+.config-item-branch {
+    background: var(--primary-color);
+    color: var(--text-light);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    margin-right: var(--spacing-sm);
+}
+
+.config-item-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* Team Activity */
+.team-activity {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.team-activity-item {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.team-activity-item:last-child {
+    border-bottom: none;
+}
+
+.team-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-light);
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.team-activity-user {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.team-activity-action {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.team-activity-time {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* AI Suggestions */
+.ai-suggestions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.ai-suggestion-item {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+}
+
+.ai-suggestion-icon {
+    font-size: 1.5rem;
+    width: 32px;
+    text-align: center;
+}
+
+.ai-suggestion-content {
+    flex: 1;
+}
+
+.ai-suggestion-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.ai-suggestion-description {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: var(--spacing-sm);
+}
+
+.ai-suggestion-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-main-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .config-item,
+    .fleet-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-sm);
+    }
+    
+    .config-item-actions {
+        align-self: stretch;
+    }
+    
+    .config-item-actions .nixai-btn {
+        flex: 1;
+    }
+}
+</style>
+{{end}}

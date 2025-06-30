@@ -12,13 +12,9 @@ import (
 	"strings"
 	"time"
 
-	nixoscontext "nix-ai-help/internal/ai/context"
-	"nix-ai-help/internal/config"
-	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
-	"github.com/spf13/cobra"
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -143,6 +139,300 @@ func (tm *TemplateManager) GetTemplate(name string) (*Template, error) {
 	}
 
 	return nil, fmt.Errorf("template not found: %s", name)
+}
+
+// LoadBuiltinTemplates loads the built-in templates
+func (tm *TemplateManager) LoadBuiltinTemplates() []Template {
+	return []Template{
+		{
+			Name:        "desktop",
+			Description: "Basic desktop environment configuration",
+			Category:    "Desktop",
+			Tags:        []string{"desktop", "gnome", "basic"},
+			Source:      "builtin",
+			Content: `{ config, pkgs, ... }:
+
+{
+  # Enable the X11 windowing system
+  services.xserver.enable = true;
+
+  # Enable the GNOME Desktop Environment
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
+
+  # Configure keymap in X11
+  services.xserver.xkb = {
+    layout = "us";
+    variant = "";
+  };
+
+  # Enable CUPS to print documents
+  services.printing.enable = true;
+
+  # Enable sound with pipewire
+  sound.enable = true;
+  hardware.pulseaudio.enable = false;
+  security.rtkit.enable = true;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+  };
+
+  # Enable touchpad support (enabled by default in most desktopManager)
+  # services.xserver.libinput.enable = true;
+
+  # Define a user account
+  users.users.alice = {
+    isNormalUser = true;
+    description = "Alice";
+    extraGroups = [ "networkmanager" "wheel" ];
+    packages = with pkgs; [
+      firefox
+      tree
+    ];
+  };
+
+  # Install firefox
+  programs.firefox.enable = true;
+
+  # Allow unfree packages
+  nixpkgs.config.allowUnfree = true;
+
+  # List packages installed in system profile
+  environment.systemPackages = with pkgs; [
+    vim
+    wget
+    git
+  ];
+
+  # Some programs need SUID wrappers, can be configured further or are
+  # started in user sessions.
+  # programs.mtr.enable = true;
+  # programs.gnupg.agent = {
+  #   enable = true;
+  #   enableSSHSupport = true;
+  # };
+
+  # List services that you want to enable:
+
+  # Enable the OpenSSH daemon.
+  # services.openssh.enable = true;
+
+  # Open ports in the firewall.
+  # networking.firewall.allowedTCPPorts = [ ... ];
+  # networking.firewall.allowedUDPPorts = [ ... ];
+  # Or disable the firewall altogether.
+  # networking.firewall.enable = false;
+
+  # This value determines the NixOS release from which the default
+  # settings for stateful data, like file locations and database versions
+  # on your system were taken. It's perfectly fine and recommended to leave
+  # this value at the release version of the first install of this system.
+  # Before changing this value read the documentation for this option
+  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
+  system.stateVersion = "23.11"; # Did you read the comment?
+}`,
+			Metadata: map[string]string{
+				"type":        "desktop",
+				"complexity":  "basic",
+				"environment": "gnome",
+			},
+		},
+		{
+			Name:        "server",
+			Description: "Basic server configuration",
+			Category:    "Server",
+			Tags:        []string{"server", "headless", "basic"},
+			Source:      "builtin",
+			Content: `{ config, pkgs, ... }:
+
+{
+  # Boot loader
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
+  # Networking
+  networking.hostName = "nixos-server"; # Define your hostname
+  networking.networkmanager.enable = true;
+
+  # Set your time zone
+  time.timeZone = "Europe/London";
+
+  # Internationalization properties
+  i18n.defaultLocale = "en_GB.UTF-8";
+
+  # Configure console keymap
+  console.keyMap = "uk";
+
+  # Enable SSH
+  services.openssh = {
+    enable = true;
+    settings = {
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
+    };
+  };
+
+  # Enable firewall
+  networking.firewall = {
+    enable = true;
+    allowedTCPPorts = [ 22 80 443 ];
+  };
+
+  # Define a user account
+  users.users.admin = {
+    isNormalUser = true;
+    description = "Admin User";
+    extraGroups = [ "networkmanager" "wheel" ];
+    openssh.authorizedKeys.keys = [
+      # Add your SSH public keys here
+    ];
+  };
+
+  # Install essential packages
+  environment.systemPackages = with pkgs; [
+    vim
+    wget
+    curl
+    git
+    htop
+    tmux
+    rsync
+  ];
+
+  # Automatic garbage collection
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 30d";
+  };
+
+  # Enable automatic system updates (optional)
+  # system.autoUpgrade = {
+  #   enable = true;
+  #   dates = "04:00";
+  # };
+
+  # This value determines the NixOS release from which the default
+  # settings for stateful data were taken
+  system.stateVersion = "23.11";
+}`,
+			Metadata: map[string]string{
+				"type":        "server",
+				"complexity":  "basic",
+				"environment": "headless",
+			},
+		},
+		{
+			Name:        "development",
+			Description: "Development environment with common tools",
+			Category:    "Development",
+			Tags:        []string{"development", "programming", "tools"},
+			Source:      "builtin",
+			Content: `{ config, pkgs, ... }:
+
+{
+  # Enable the X11 windowing system
+  services.xserver.enable = true;
+
+  # Enable the GNOME Desktop Environment
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
+
+  # Enable sound with pipewire
+  sound.enable = true;
+  hardware.pulseaudio.enable = false;
+  security.rtkit.enable = true;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+  };
+
+  # Define a user account
+  users.users.developer = {
+    isNormalUser = true;
+    description = "Developer";
+    extraGroups = [ "networkmanager" "wheel" "docker" ];
+  };
+
+  # Enable Docker
+  virtualisation.docker.enable = true;
+
+  # Allow unfree packages
+  nixpkgs.config.allowUnfree = true;
+
+  # Development tools
+  environment.systemPackages = with pkgs; [
+    # Editors
+    vim
+    neovim
+    vscode
+
+    # Version control
+    git
+    gh
+
+    # Programming languages
+    nodejs
+    python3
+    go
+    rustc
+    cargo
+
+    # Development tools
+    docker
+    docker-compose
+    kubectl
+    terraform
+
+    # System tools
+    wget
+    curl
+    htop
+    tree
+    jq
+    ripgrep
+    fd
+
+    # Network tools
+    netcat
+    nmap
+    wireshark
+  ];
+
+  # Enable common development programs
+  programs = {
+    firefox.enable = true;
+    git = {
+      enable = true;
+      config = {
+        init.defaultBranch = "main";
+      };
+    };
+  };
+
+  # Development-friendly shell
+  programs.zsh.enable = true;
+  users.defaultUserShell = pkgs.zsh;
+
+  # Enable SSH
+  services.openssh.enable = true;
+
+  # This value determines the NixOS release from which the default
+  # settings for stateful data were taken
+  system.stateVersion = "23.11";
+}`,
+			Metadata: map[string]string{
+				"type":        "development",
+				"complexity":  "intermediate",
+				"environment": "desktop",
+			},
+		},
+	}
 }
 
 // LoadCustomTemplates loads templates saved by the user
@@ -545,1125 +835,396 @@ func getCategoryDescription(category string) string {
 	return "Configuration templates"
 }
 
-// Main templates command
-var templatesCmd = &cobra.Command{
-	Use:   "templates",
-	Short: "Manage NixOS configuration templates and snippets",
-	Long: `Manage curated NixOS configuration templates with GitHub code search integration.
-
-Browse and apply templates for common NixOS configurations including desktop environments, 
-servers, development setups, and more. Templates are sourced from curated collections 
-and real-world GitHub repositories.
-
-Commands:
-  list                    - Browse available templates
-  search <query>          - Search templates by keyword or category  
-  github <query>          - Search GitHub for NixOS configurations
-  apply <name>            - Apply template to current configuration
-  show <name>             - Show template details and content
-  save <name> <file>      - Save configuration as template
-  categories              - Show template categories
-
-Examples:
-  nixai templates list
-  nixai templates search gaming
-  nixai templates search desktop kde  
-  nixai templates github "gaming nixos configuration"
-  nixai templates apply desktop-minimal
-  nixai templates show server-basic`,
-	Run: func(cmd *cobra.Command, args []string) {
-		_ = cmd.Help()
-	},
-}
-
-// Templates list command
-var templatesListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List available NixOS configuration templates",
-	Long:  "Browse all available curated NixOS configuration templates organized by category.",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("📚 Available NixOS Configuration Templates"))
-		fmt.Println()
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Initialize context detector and get NixOS context
-		contextDetector := nixos.NewContextDetector(logger.NewLogger())
-		nixosCtx, err := contextDetector.GetContext(cfg)
-		if err != nil {
-			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
-			nixosCtx = nil
-		}
-
-		// Display detected context summary if available
-		if nixosCtx != nil && nixosCtx.CacheValid {
-			contextBuilder := nixoscontext.NewNixOSContextBuilder()
-			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
-			fmt.Println(utils.FormatNote("📋 " + contextSummary))
-			fmt.Println()
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		// Load builtin templates
-		templates := tm.LoadBuiltinTemplates()
-		if len(templates) == 0 {
-			fmt.Println(utils.FormatWarning("No templates available"))
-			return
-		}
-
-		// Group templates by category
-		categories := make(map[string][]Template)
-		for _, template := range templates {
-			category := template.Category
-			if category == "" {
-				category = "General"
-			}
-			categories[category] = append(categories[category], template)
-		}
-
-		// Sort categories
-		var sortedCategories []string
-		for category := range categories {
-			sortedCategories = append(sortedCategories, category)
-		}
-		sort.Strings(sortedCategories)
-
-		// Display templates by category
-		for _, category := range sortedCategories {
-			fmt.Println(utils.FormatSubsection("🏷️ "+category, ""))
-			templates := categories[category]
-
-			// Sort templates by name
-			sort.Slice(templates, func(i, j int) bool {
-				return templates[i].Name < templates[j].Name
-			})
-
-			for _, template := range templates {
-				tagsStr := ""
-				if len(template.Tags) > 0 {
-					tagsStr = " (" + strings.Join(template.Tags, ", ") + ")"
-				}
-				fmt.Printf("  %s%s\n",
-					utils.FormatKeyValue(template.Name, template.Description),
-					utils.FormatNote(tagsStr))
-			}
-			fmt.Println()
-		}
-
-		fmt.Println(utils.FormatTip("Use 'nixai templates show <name>' to view template details"))
-		fmt.Println(utils.FormatTip("Use 'nixai templates search <query>' to find specific templates"))
-		fmt.Println(utils.FormatTip("Use 'nixai templates github <query>' to search GitHub for more configurations"))
-	},
-}
-
-// Templates search command
-var templatesSearchCmd = &cobra.Command{
-	Use:   "search <query>",
-	Short: "Search NixOS templates by keyword or category",
-	Long: `Search available NixOS configuration templates by keyword, tag, or category.
-
-Examples:
-  nixai templates search gaming
-  nixai templates search desktop kde
-  nixai templates search development
-  nixai templates search server nginx`,
-	Args: conditionalArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		query := strings.Join(args, " ")
-		fmt.Println(utils.FormatHeader("🔍 Searching Templates: " + query))
-		fmt.Println()
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		// Search templates
-		templates := tm.SearchTemplates(query)
-		if len(templates) == 0 {
-			fmt.Println(utils.FormatWarning("No templates found matching: " + query))
-			fmt.Println()
-			fmt.Println(utils.FormatTip("Try 'nixai templates github \"" + query + "\"' to search GitHub"))
-			return
-		}
-
-		// Display results
-		fmt.Printf("Found %d template(s):\n\n", len(templates))
-		for i, template := range templates {
-			fmt.Printf("%s. %s\n",
-				utils.FormatNote(fmt.Sprintf("%d", i+1)),
-				utils.FormatKeyValue(template.Name, template.Description))
-
-			if template.Category != "" {
-				fmt.Printf("   %s\n", utils.FormatNote("Category: "+template.Category))
-			}
-
-			if len(template.Tags) > 0 {
-				fmt.Printf("   %s\n", utils.FormatNote("Tags: "+strings.Join(template.Tags, ", ")))
-			}
-			fmt.Println()
-		}
-
-		fmt.Println(utils.FormatTip("Use 'nixai templates show <name>' to view template details"))
-		fmt.Println(utils.FormatTip("Use 'nixai templates apply <name>' to apply a template"))
-	},
-}
-
-// Templates GitHub search command
-var templatesGithubCmd = &cobra.Command{
-	Use:   "github <query>",
-	Short: "Search GitHub for NixOS configurations",
-	Long: `Search GitHub repositories for real-world NixOS configurations using GitHub's code search API.
-
-This command finds working NixOS configurations from the community, including:
-- Desktop environment configurations
-- Server setups and services
-- Gaming optimizations
-- Development environments
-- Hardware-specific configurations
-
-Examples:
-  nixai templates github "gaming nixos configuration"
-  nixai templates github "kde plasma nixos"
-  nixai templates github "server nginx configuration.nix"
-  nixai templates github "thinkpad nixos hardware"`,
-	Args: conditionalArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		query := strings.Join(args, " ")
-		fmt.Println(utils.FormatHeader("🔍 Searching GitHub: " + query))
-		fmt.Println()
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		// Search GitHub
-		fmt.Println(utils.FormatProgress("Searching GitHub repositories..."))
-		results, err := tm.SearchGitHub(query)
-		if err != nil {
-			fmt.Println(utils.FormatError("Error searching GitHub: " + err.Error()))
-			fmt.Println(utils.FormatTip("Check your internet connection and try again"))
-			return
-		}
-
-		if len(results.Items) == 0 {
-			fmt.Println(utils.FormatWarning("No GitHub results found for: " + query))
-			return
-		}
-
-		fmt.Printf("Found %d result(s) from GitHub:\n\n", len(results.Items))
-
-		// Display first 10 results
-		maxResults := 10
-		if len(results.Items) < maxResults {
-			maxResults = len(results.Items)
-		}
-
-		for i := 0; i < maxResults; i++ {
-			result := results.Items[i]
-			fmt.Printf("%s. %s\n",
-				utils.FormatNote(fmt.Sprintf("%d", i+1)),
-				utils.FormatKeyValue(result.Repository.FullName, result.Repository.Description))
-
-			fmt.Printf("   %s\n", utils.FormatNote("File: "+result.Path))
-			fmt.Printf("   %s\n", utils.FormatNote("⭐ "+fmt.Sprintf("%d", result.Repository.StarCount)))
-			fmt.Printf("   %s\n", utils.FormatNote("🔗 "+result.HTMLURL))
-			fmt.Println()
-		}
-
-		if len(results.Items) > maxResults {
-			fmt.Printf(utils.FormatNote("... and %d more results\n"), len(results.Items)-maxResults)
-			fmt.Println()
-		}
-
-		fmt.Println(utils.FormatTip("Click the URLs to view the configurations in your browser"))
-		fmt.Println(utils.FormatTip("Use 'nixai templates save <name> <url>' to save promising configs as templates"))
-	},
-}
-
-// Templates show command
-var templatesShowCmd = &cobra.Command{
-	Use:   "show <name>",
-	Short: "Show template details and content",
-	Long: `Display detailed information about a specific template including its content,
-metadata, category, tags, and usage examples.
-
-Examples:
-  nixai templates show desktop-minimal
-  nixai templates show gaming-config
-  nixai templates show server-basic`,
-	Args: conditionalExactArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		templateName := args[0]
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		// Find template
-		template, err := tm.GetTemplate(templateName)
-		if err != nil {
-			fmt.Println(utils.FormatError("Template not found: " + templateName))
-			fmt.Println(utils.FormatTip("Use 'nixai templates list' to see available templates"))
-			os.Exit(1)
-		}
-
-		// Display template details
-		fmt.Println(utils.FormatHeader("📄 Template: " + template.Name))
-		fmt.Println()
-		fmt.Println(utils.FormatKeyValue("Name", template.Name))
-		fmt.Println(utils.FormatKeyValue("Description", template.Description))
-		fmt.Println(utils.FormatKeyValue("Category", template.Category))
-		fmt.Println(utils.FormatKeyValue("Source", template.Source))
-
-		if len(template.Tags) > 0 {
-			fmt.Println(utils.FormatKeyValue("Tags", strings.Join(template.Tags, ", ")))
-		}
-
-		if template.GitHubRepo != "" {
-			fmt.Println(utils.FormatKeyValue("GitHub Repo", template.GitHubRepo))
-		}
-
-		if template.FilePath != "" {
-			fmt.Println(utils.FormatKeyValue("File Path", template.FilePath))
-		}
-
-		fmt.Println()
-		fmt.Println(utils.FormatSection("Template Content", ""))
-		fmt.Println(utils.FormatCodeBlock(template.Content, "nix"))
-
-		fmt.Println()
-		fmt.Println(utils.FormatTip("Use 'nixai templates apply " + templateName + "' to apply this template"))
-	},
-}
-
-// Templates apply command
-var templatesApplyCmd = &cobra.Command{
-	Use:   "apply <name>",
-	Short: "Apply template to current configuration",
-	Long: `Apply a template to the current NixOS configuration. This will either create
-a new configuration file or help merge the template with your existing configuration.
-
-Examples:
-  nixai templates apply desktop-minimal
-  nixai templates apply gaming-config --merge
-  nixai templates apply server-basic --output /etc/nixos/server.nix`,
-	Args: conditionalExactArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		templateName := args[0]
-		merge, _ := cmd.Flags().GetBool("merge")
-		output, _ := cmd.Flags().GetString("output")
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		// Find template
-		template, err := tm.GetTemplate(templateName)
-		if err != nil {
-			fmt.Println(utils.FormatError("Template not found: " + templateName))
-			os.Exit(1)
-		}
-
-		fmt.Println(utils.FormatHeader("🔧 Applying Template: " + template.Name))
-		fmt.Println()
-
-		// Apply template
-		err = tm.ApplyTemplate(template, output, merge)
-		if err != nil {
-			fmt.Println(utils.FormatError("Error applying template: " + err.Error()))
-			os.Exit(1)
-		}
-
-		fmt.Println(utils.FormatSuccess("✅ Template applied successfully!"))
-		if output != "" {
-			fmt.Println(utils.FormatKeyValue("Output file", output))
-		}
-		fmt.Println()
-		fmt.Println(utils.FormatTip("Review the generated configuration before rebuilding"))
-		fmt.Println(utils.FormatTip("Use 'sudo nixos-rebuild switch' to apply changes"))
-	},
-}
-
-// Templates save command
-var templatesSaveCmd = &cobra.Command{
-	Use:   "save <name> <source>",
-	Short: "Save configuration as template",
-	Long: `Save a NixOS configuration file or URL as a reusable template.
-
-The source can be:
-- Local file path (e.g., /etc/nixos/configuration.nix)
-- GitHub URL (e.g., https://github.com/user/repo/blob/main/configuration.nix)
-- GitHub raw URL
-
-Examples:
-  nixai templates save my-config /etc/nixos/configuration.nix
-  nixai templates save gaming-setup https://github.com/user/nixos-configs/blob/main/gaming.nix
-  nixai templates save server-config ./server-configuration.nix --category Server`,
-	Args: conditionalExactArgsValidator(2),
-	Run: func(cmd *cobra.Command, args []string) {
-		templateName := args[0]
-		source := args[1]
-		category, _ := cmd.Flags().GetString("category")
-		description, _ := cmd.Flags().GetString("description")
-		tags, _ := cmd.Flags().GetStringSlice("tags")
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		fmt.Println(utils.FormatHeader("💾 Saving Template: " + templateName))
-		fmt.Println()
-
-		// Save template
-		err = tm.SaveTemplate(templateName, source, category, description, tags)
-		if err != nil {
-			fmt.Println(utils.FormatError("Error saving template: " + err.Error()))
-			os.Exit(1)
-		}
-
-		fmt.Println(utils.FormatSuccess("✅ Template saved successfully!"))
-		fmt.Println(utils.FormatKeyValue("Name", templateName))
-		fmt.Println(utils.FormatKeyValue("Source", source))
-		if category != "" {
-			fmt.Println(utils.FormatKeyValue("Category", category))
-		}
-		fmt.Println()
-		fmt.Println(utils.FormatTip("Use 'nixai templates show " + templateName + "' to view the saved template"))
-	},
-}
-
-// Templates categories command
-var templatesCategoriesCmd = &cobra.Command{
-	Use:   "categories",
-	Short: "List template categories",
-	Long:  "Show all available template categories with counts and descriptions.",
-	Run: func(cmd *cobra.Command, args []string) {
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		fmt.Println(utils.FormatHeader("📚 Template Categories"))
-		fmt.Println()
-
-		categories := tm.GetCategories()
-		if len(categories) == 0 {
-			fmt.Println(utils.FormatWarning("No categories found"))
-			return
-		}
-
-		for category, count := range categories {
-			description := getCategoryDescription(category)
-			fmt.Printf("  %s (%d template%s)\n",
-				utils.FormatKeyValue(category, description),
-				count,
-				func() string {
-					if count == 1 {
-						return ""
-					} else {
-						return "s"
-					}
-				}())
-		}
-
-		fmt.Println()
-		fmt.Println(utils.FormatTip("Use 'nixai templates search <category>' to find templates in a specific category"))
-	},
-}
-
-// Snippets command
-var snippetsCmd = &cobra.Command{
-	Use:   "snippets",
-	Short: "Manage NixOS configuration snippets",
-	Long: `Save, organize, and reuse NixOS configuration snippets.
-
-Commands:
-  list                    - List saved snippets
-  search <query>          - Search snippets by name or tag
-  add <name>              - Save current config as snippet
-  apply <name>            - Apply snippet to configuration
-  remove <name>           - Remove saved snippet
-  show <name>             - Show snippet content
-
-Examples:
-  nixai snippets list
-  nixai snippets search nvidia
-  nixai snippets add my-nvidia-config
-  nixai snippets apply gaming-setup`,
-	Run: func(cmd *cobra.Command, args []string) {
-		_ = cmd.Help()
-	},
-}
-
-// Snippet subcommands
-var snippetsListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List saved snippets",
-	Long:  "Display all saved configuration snippets organized by category.",
-	Run: func(cmd *cobra.Command, args []string) {
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		fmt.Println(utils.FormatHeader("📝 Saved Snippets"))
-		fmt.Println()
-
-		snippets, err := tm.LoadSnippets()
-		if err != nil {
-			fmt.Println(utils.FormatError("Error loading snippets: " + err.Error()))
-			os.Exit(1)
-		}
-
-		if len(snippets) == 0 {
-			fmt.Println(utils.FormatWarning("No snippets saved"))
-			fmt.Println(utils.FormatTip("Use 'nixai snippets add <name>' to save configuration snippets"))
-			return
-		}
-
-		// Group by tags or display chronologically
-		for i, snippet := range snippets {
-			fmt.Printf("%s. %s\n",
-				utils.FormatNote(fmt.Sprintf("%d", i+1)),
-				utils.FormatKeyValue(snippet.Name, snippet.Description))
-
-			if len(snippet.Tags) > 0 {
-				fmt.Printf("   %s\n", utils.FormatNote("Tags: "+strings.Join(snippet.Tags, ", ")))
-			}
-
-			fmt.Printf("   %s\n", utils.FormatNote("Created: "+snippet.CreatedAt.Format("2006-01-02 15:04")))
-			fmt.Println()
-		}
-
-		fmt.Println(utils.FormatTip("Use 'nixai snippets show <name>' to view snippet content"))
-		fmt.Println(utils.FormatTip("Use 'nixai snippets apply <name>' to apply a snippet"))
-	},
-}
-
-var snippetsSearchCmd = &cobra.Command{
-	Use:   "search <query>",
-	Short: "Search snippets by name or tag",
-	Long:  "Search saved configuration snippets by name, description, or tags.",
-	Args:  conditionalArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		query := strings.Join(args, " ")
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		fmt.Println(utils.FormatHeader("🔍 Searching Snippets: " + query))
-		fmt.Println()
-
-		snippets, err := tm.SearchSnippets(query)
-		if err != nil {
-			fmt.Println(utils.FormatError("Error searching snippets: " + err.Error()))
-			os.Exit(1)
-		}
-
-		if len(snippets) == 0 {
-			fmt.Println(utils.FormatWarning("No snippets found matching: " + query))
-			return
-		}
-
-		fmt.Printf("Found %d snippet(s):\n\n", len(snippets))
-		for i, snippet := range snippets {
-			fmt.Printf("%s. %s\n",
-				utils.FormatNote(fmt.Sprintf("%d", i+1)),
-				utils.FormatKeyValue(snippet.Name, snippet.Description))
-
-			if len(snippet.Tags) > 0 {
-				fmt.Printf("   %s\n", utils.FormatNote("Tags: "+strings.Join(snippet.Tags, ", ")))
-			}
-			fmt.Println()
-		}
-	},
-}
-
-var snippetsAddCmd = &cobra.Command{
-	Use:   "add <name>",
-	Short: "Save configuration as snippet",
-	Long: `Save a configuration file or text as a reusable snippet.
-
-Examples:
-  nixai snippets add my-nvidia-config --file /etc/nixos/nvidia.nix
-  nixai snippets add gaming-setup --file ./gaming.nix --tags gaming,performance
-  echo "services.nginx.enable = true;" | nixai snippets add nginx-basic`,
-	Args: conditionalExactArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		snippetName := args[0]
-		file, _ := cmd.Flags().GetString("file")
-		description, _ := cmd.Flags().GetString("description")
-		tags, _ := cmd.Flags().GetStringSlice("tags")
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		fmt.Println(utils.FormatHeader("💾 Saving Snippet: " + snippetName))
-		fmt.Println()
-
-		// Save snippet
-		err = tm.SaveSnippet(snippetName, file, description, tags)
-		if err != nil {
-			fmt.Println(utils.FormatError("Error saving snippet: " + err.Error()))
-			os.Exit(1)
-		}
-
-		fmt.Println(utils.FormatSuccess("✅ Snippet saved successfully!"))
-		fmt.Println(utils.FormatKeyValue("Name", snippetName))
-		if description != "" {
-			fmt.Println(utils.FormatKeyValue("Description", description))
-		}
-		if len(tags) > 0 {
-			fmt.Println(utils.FormatKeyValue("Tags", strings.Join(tags, ", ")))
-		}
-	},
-}
-
-var snippetsApplyCmd = &cobra.Command{
-	Use:   "apply <name>",
-	Short: "Apply snippet to configuration",
-	Long:  "Apply a saved snippet to the current configuration or output it to a file.",
-	Args:  conditionalExactArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		snippetName := args[0]
-		output, _ := cmd.Flags().GetString("output")
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		// Apply snippet
-		err = tm.ApplySnippet(snippetName, output)
-		if err != nil {
-			fmt.Println(utils.FormatError("Error applying snippet: " + err.Error()))
-			os.Exit(1)
-		}
-
-		fmt.Println(utils.FormatSuccess("✅ Snippet applied successfully!"))
-		if output != "" {
-			fmt.Println(utils.FormatKeyValue("Output", output))
-		}
-	},
-}
-
-var snippetsShowCmd = &cobra.Command{
-	Use:   "show <name>",
-	Short: "Show snippet content",
-	Long:  "Display the content and metadata of a saved snippet.",
-	Args:  conditionalExactArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		snippetName := args[0]
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		// Get snippet
-		snippet, err := tm.GetSnippet(snippetName)
-		if err != nil {
-			fmt.Println(utils.FormatError("Snippet not found: " + snippetName))
-			os.Exit(1)
-		}
-
-		// Display snippet
-		fmt.Println(utils.FormatHeader("📄 Snippet: " + snippet.Name))
-		fmt.Println()
-		fmt.Println(utils.FormatKeyValue("Name", snippet.Name))
-		fmt.Println(utils.FormatKeyValue("Description", snippet.Description))
-		fmt.Println(utils.FormatKeyValue("Created", snippet.CreatedAt.Format("2006-01-02 15:04:05")))
-		fmt.Println(utils.FormatKeyValue("Source", snippet.Source))
-
-		if len(snippet.Tags) > 0 {
-			fmt.Println(utils.FormatKeyValue("Tags", strings.Join(snippet.Tags, ", ")))
-		}
-
-		fmt.Println()
-		fmt.Println(utils.FormatSection("Content", ""))
-		fmt.Println(utils.FormatCodeBlock(snippet.Content, "nix"))
-	},
-}
-
-var snippetsRemoveCmd = &cobra.Command{
-	Use:   "remove <name>",
-	Short: "Remove saved snippet",
-	Long:  "Delete a saved configuration snippet.",
-	Args:  conditionalExactArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		snippetName := args[0]
-
-		// Load configuration
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Create template manager
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		tm := NewTemplateManager("", log)
-
-		// Remove snippet
-		err = tm.RemoveSnippet(snippetName)
-		if err != nil {
-			fmt.Println(utils.FormatError("Error removing snippet: " + err.Error()))
-			os.Exit(1)
-		}
-
-		fmt.Println(utils.FormatSuccess("✅ Snippet removed successfully!"))
-		fmt.Println(utils.FormatKeyValue("Removed", snippetName))
-	},
-}
-
-// Load builtin templates
-func (tm *TemplateManager) LoadBuiltinTemplates() []Template {
-	// For now, return some example builtin templates
-	// In a full implementation, these would be loaded from embedded files or config
-	return []Template{
-		{
-			Name:        "desktop-minimal",
-			Description: "Minimal desktop environment with essential applications",
-			Category:    "Desktop",
-			Tags:        []string{"desktop", "minimal", "gnome"},
-			Source:      "builtin",
-			Content:     getMinimalDesktopTemplate(),
-		},
-		{
-			Name:        "gaming-config",
-			Description: "Gaming-optimized NixOS configuration with Steam and drivers",
-			Category:    "Gaming",
-			Tags:        []string{"gaming", "steam", "nvidia", "performance"},
-			Source:      "builtin",
-			Content:     getGamingTemplate(),
-		},
-		{
-			Name:        "server-basic",
-			Description: "Basic server configuration with SSH and firewall",
-			Category:    "Server",
-			Tags:        []string{"server", "ssh", "firewall", "minimal"},
-			Source:      "builtin",
-			Content:     getServerTemplate(),
-		},
-		{
-			Name:        "development-env",
-			Description: "Development environment with common programming tools",
-			Category:    "Development",
-			Tags:        []string{"development", "programming", "tools", "git"},
-			Source:      "builtin",
-			Content:     getDevelopmentTemplate(),
-		},
-	}
-}
-
-// Search templates by query
-func (tm *TemplateManager) SearchTemplates(query string) []Template {
-	templates := tm.LoadBuiltinTemplates()
-	var matches []Template
-
-	query = strings.ToLower(query)
-
-	for _, template := range templates {
-		// Search in name, description, category, and tags
-		if strings.Contains(strings.ToLower(template.Name), query) ||
-			strings.Contains(strings.ToLower(template.Description), query) ||
-			strings.Contains(strings.ToLower(template.Category), query) {
-			matches = append(matches, template)
-			continue
-		}
-
-		// Search in tags
-		for _, tag := range template.Tags {
-			if strings.Contains(strings.ToLower(tag), query) {
-				matches = append(matches, template)
-				break
-			}
-		}
+// LoadAllTemplates loads templates from all sources (builtin, custom, GitHub cache)
+func (tm *TemplateManager) LoadAllTemplates() ([]Template, error) {
+	var allTemplates []Template
+
+	// Load builtin templates
+	builtinTemplates := tm.LoadBuiltinTemplates()
+	allTemplates = append(allTemplates, builtinTemplates...)
+
+	// Load custom templates
+	customTemplates, err := tm.LoadCustomTemplates()
+	if err != nil {
+		tm.logger.Warn("Failed to load custom templates: " + err.Error())
+	} else {
+		allTemplates = append(allTemplates, customTemplates...)
 	}
 
-	return matches
+	// Load cached GitHub templates
+	githubTemplates, err := tm.LoadGitHubTemplatesCache()
+	if err != nil {
+		tm.logger.Debug("Failed to load GitHub templates cache: " + err.Error())
+	} else {
+		allTemplates = append(allTemplates, githubTemplates...)
+	}
+
+	return allTemplates, nil
 }
 
-// Search GitHub for NixOS configurations
-func (tm *TemplateManager) SearchGitHub(query string) (*GitHubSearchResponse, error) {
-	// Enhance the query to focus on NixOS configurations
-	enhancedQuery := fmt.Sprintf("%s configuration.nix OR flake.nix language:nix", query)
+// LoadGitHubTemplatesCache loads previously cached GitHub templates
+func (tm *TemplateManager) LoadGitHubTemplatesCache() ([]Template, error) {
+	cacheFile := filepath.Join(tm.configDir, "github-templates-cache.yaml")
 
-	// URL encode the query
-	encodedQuery := url.QueryEscape(enhancedQuery)
+	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
+		return []Template{}, nil
+	}
 
-	// GitHub API URL
-	apiURL := fmt.Sprintf("https://api.github.com/search/code?q=%s&sort=stars&order=desc&per_page=20", encodedQuery)
-
-	// Create HTTP client with timeout
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	data, err := os.ReadFile(cacheFile)
 	if err != nil {
 		return nil, err
 	}
 
-	// Set headers
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("User-Agent", "nixai/1.0")
-
-	// Check for GitHub token
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		req.Header.Set("Authorization", "token "+token)
+	var templates []Template
+	if err := yaml.Unmarshal(data, &templates); err != nil {
+		return nil, err
 	}
 
-	// Make request
-	resp, err := client.Do(req)
+	return templates, nil
+}
+
+// SaveGitHubTemplatesCache saves GitHub templates to cache
+func (tm *TemplateManager) SaveGitHubTemplatesCache(templates []Template) error {
+	cacheDir := filepath.Join(tm.configDir, "cache")
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return err
+	}
+
+	cacheFile := filepath.Join(tm.configDir, "github-templates-cache.yaml")
+
+	data, err := yaml.Marshal(templates)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(cacheFile, data, 0644)
+}
+
+// RefreshGitHubTemplatesCache refreshes the GitHub templates cache
+func (tm *TemplateManager) RefreshGitHubTemplatesCache() error {
+	tm.logger.Info("Refreshing GitHub templates cache...")
+
+	// Search for popular NixOS configuration repositories
+	templates, err := tm.searchGitHubTemplates("nixos configuration", 20)
+	if err != nil {
+		return fmt.Errorf("failed to search GitHub templates: %v", err)
+	}
+
+	// Save to cache
+	if err := tm.SaveGitHubTemplatesCache(templates); err != nil {
+		return fmt.Errorf("failed to save cache: %v", err)
+	}
+
+	tm.logger.Info(fmt.Sprintf("Cached %d GitHub templates", len(templates)))
+	return nil
+}
+
+// SearchGitHubTemplates searches for templates on GitHub
+func (tm *TemplateManager) searchGitHubTemplates(query string, limit int) ([]Template, error) {
+	searchURL := fmt.Sprintf("https://api.github.com/search/code?q=%s+filename:configuration.nix&sort=indexed&order=desc&per_page=%d",
+		url.QueryEscape(query), limit)
+
+	resp, err := http.Get(searchURL)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer resp.Body.Close()
 
-	// Check status code
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 
-	// Parse response
 	var searchResponse GitHubSearchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&searchResponse); err != nil {
 		return nil, err
 	}
 
-	return &searchResponse, nil
+	var templates []Template
+	for _, item := range searchResponse.Items {
+		template := Template{
+			Name:        fmt.Sprintf("%s-%s", item.Repository.Owner.Login, item.Repository.Name),
+			Description: item.Repository.Description,
+			Category:    tm.categorizeFromDescription(item.Repository.Description),
+			Tags:        tm.extractTagsFromDescription(item.Repository.Description),
+			Source:      "github",
+			GitHubRepo:  item.Repository.FullName,
+			FilePath:    item.Path,
+			Metadata: map[string]string{
+				"stars":      fmt.Sprintf("%d", item.Repository.StarCount),
+				"language":   item.Repository.Language,
+				"updated_at": item.Repository.UpdatedAt,
+				"github_url": item.HTMLURL,
+			},
+		}
+		templates = append(templates, template)
+	}
+
+	return templates, nil
 }
 
-// Template content generators (these would be improved with actual curated content)
-func getMinimalDesktopTemplate() string {
-	return `# Minimal Desktop Configuration
-{ config, pkgs, ... }:
+// LoadTemplateFromGitHub loads a template directly from GitHub
+func (tm *TemplateManager) LoadTemplateFromGitHub(repo, filePath string) (*Template, error) {
+	contentURL := fmt.Sprintf("https://api.github.com/repos/%s/contents/%s", repo, filePath)
 
-{
-  # Enable the X11 windowing system
-  services.xserver.enable = true;
-  
-  # Enable GNOME Desktop Environment
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
-  
-  # Enable sound
-  sound.enable = true;
-  hardware.pulseaudio.enable = true;
-  
-  # Enable NetworkManager
-  networking.networkmanager.enable = true;
-  
-  # Define user account
-  users.users.USERNAME = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" "networkmanager" ];
-  };
-  
-  # Essential packages
-  environment.systemPackages = with pkgs; [
-    firefox
-    gnome.gnome-terminal
-    gnome.nautilus
-    git
-    vim
-  ];
-  
-  # Enable automatic login (optional)
-  # services.xserver.displayManager.autoLogin.enable = true;
-  # services.xserver.displayManager.autoLogin.user = "USERNAME";
-}`
+	resp, err := http.Get(contentURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var contentResponse GitHubContentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&contentResponse); err != nil {
+		return nil, err
+	}
+
+	// Decode base64 content
+	content, err := tm.decodeGitHubContent(contentResponse.Content, contentResponse.Encoding)
+	if err != nil {
+		return nil, err
+	}
+
+	template := &Template{
+		Name:       fmt.Sprintf("github-%s", strings.ReplaceAll(repo, "/", "-")),
+		Source:     "github",
+		GitHubRepo: repo,
+		FilePath:   filePath,
+		Content:    content,
+		Metadata: map[string]string{
+			"github_url": contentResponse.HTMLURL,
+			"sha":        contentResponse.Sha,
+		},
+	}
+
+	return template, nil
 }
 
-func getGamingTemplate() string {
-	return `# Gaming Configuration
-{ config, pkgs, ... }:
+// ImportTemplateFromGitHub imports and saves a template from GitHub
+func (tm *TemplateManager) ImportTemplateFromGitHub(repo, filePath, name, category string) error {
+	template, err := tm.LoadTemplateFromGitHub(repo, filePath)
+	if err != nil {
+		return err
+	}
 
-{
-  # Enable Steam and gaming packages
-  programs.steam = {
-    enable = true;
-    remotePlay.openFirewall = true;
-    dedicatedServer.openFirewall = true;
-  };
-  
-  # Enable 32-bit libraries for gaming
-  hardware.opengl.driSupport32Bit = true;
-  hardware.pulseaudio.support32Bit = true;
-  
-  # NVIDIA drivers (if applicable)
-  services.xserver.videoDrivers = [ "nvidia" ];
-  hardware.nvidia = {
-    modesetting.enable = true;
-    powerManagement.enable = false;
-    powerManagement.finegrained = false;
-    open = false;
-    nvidiaSettings = true;
-    package = config.boot.kernelPackages.nvidiaPackages.stable;
-  };
-  
-  # Gaming packages
-  environment.systemPackages = with pkgs; [
-    steam
-    lutris
-    wine
-    winetricks
-    gamemode
-    mangohud
-    discord
-  ];
-  
-  # Performance optimizations
-  programs.gamemode.enable = true;
-  
-  # Enable Xbox controller support
-  hardware.xone.enable = true;
-}`
+	if name != "" {
+		template.Name = name
+	}
+	if category != "" {
+		template.Category = category
+	}
+
+	// Save as custom template
+	return tm.SaveCustomTemplate(template)
 }
 
-func getServerTemplate() string {
-	return `# Basic Server Configuration  
-{ config, pkgs, ... }:
+// SaveCustomTemplate saves a template to the custom templates directory
+func (tm *TemplateManager) SaveCustomTemplate(template *Template) error {
+	templatesDir := filepath.Join(tm.configDir, "templates")
+	if err := os.MkdirAll(templatesDir, 0755); err != nil {
+		return err
+	}
 
-{
-  # Enable SSH
-  services.openssh = {
-    enable = true;
-    settings = {
-      PasswordAuthentication = false;
-      KbdInteractiveAuthentication = false;
-      PermitRootLogin = "no";
-    };
-  };
-  
-  # Firewall configuration
-  networking.firewall = {
-    enable = true;
-    allowedTCPPorts = [ 22 ]; # SSH
-  };
-  
-  # Automatic security updates
-  system.autoUpgrade = {
-    enable = true;
-    allowReboot = false;
-  };
-  
-  # Essential server packages
-  environment.systemPackages = with pkgs; [
-    htop
-    git
-    curl
-    wget
-    vim
-    tmux
-  ];
-  
-  # User configuration
-  users.users.admin = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" ];
-    openssh.authorizedKeys.keys = [
-      # Add your SSH public key here
-      # "ssh-rsa AAAAB3Nz... your-key-here"
-    ];
-  };
-  
-  # Disable unnecessary services
-  services.xserver.enable = false;
-  sound.enable = false;
-}`
+	templateFile := filepath.Join(templatesDir, template.Name+".yaml")
+
+	data, err := yaml.Marshal(template)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(templateFile, data, 0644)
 }
 
-func getDevelopmentTemplate() string {
-	return `# Development Environment Configuration
-{ config, pkgs, ... }:
+// ExportTemplate exports a template to a file
+func (tm *TemplateManager) ExportTemplate(templateName, outputPath string) error {
+	template, err := tm.GetTemplate(templateName)
+	if err != nil {
+		return err
+	}
 
-{
-  # Development packages
-  environment.systemPackages = with pkgs; [
-    # Version control
-    git
-    gh
-    
-    # Editors
-    vim
-    neovim
-    vscode
-    
-    # Languages
-    nodejs
-    python3
-    rustc
-    cargo
-    go
-    
-    # Tools
-    docker
-    docker-compose
-    kubernetes
-    minikube
-    
-    # Database tools
-    postgresql
-    redis
-    
-    # Network tools
-    curl
-    wget
-    jq
-    
-    # Build tools
-    gnumake
-    gcc
-    pkg-config
-  ];
-  
-  # Enable Docker
-  virtualisation.docker.enable = true;
-  
-  # Enable development services
-  services.postgresql = {
-    enable = true;
-    package = pkgs.postgresql_14;
-  };
-  
-  services.redis.servers."" = {
-    enable = true;
-    port = 6379;
-  };
-  
-  # User configuration for development
-  users.users.dev = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" "docker" ];
-  };
-  
-  # Enable Nix development features
-  nix.settings.experimental-features = [ "nix-command" "flakes" ];
-}`
+	// Create export structure
+	exportData := map[string]interface{}{
+		"template":    template,
+		"exported_at": time.Now().Format(time.RFC3339),
+		"exported_by": "nixai",
+		"version":     "1.0",
+	}
+
+	data, err := yaml.Marshal(exportData)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(outputPath, data, 0644)
 }
 
-// Add commands to CLI in init function
-func init() {
-	// Add template and snippet subcommands
-	templatesCmd.AddCommand(templatesListCmd)
-	templatesCmd.AddCommand(templatesSearchCmd)
-	templatesCmd.AddCommand(templatesGithubCmd)
-	templatesCmd.AddCommand(templatesShowCmd)
-	templatesCmd.AddCommand(templatesApplyCmd)
-	templatesCmd.AddCommand(templatesSaveCmd)
-	templatesCmd.AddCommand(templatesCategoriesCmd)
+// ImportTemplateFromFile imports a template from an exported file
+func (tm *TemplateManager) ImportTemplateFromFile(filePath string) error {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
 
-	snippetsCmd.AddCommand(snippetsListCmd)
-	snippetsCmd.AddCommand(snippetsSearchCmd)
-	snippetsCmd.AddCommand(snippetsAddCmd)
-	snippetsCmd.AddCommand(snippetsApplyCmd)
-	snippetsCmd.AddCommand(snippetsShowCmd)
-	snippetsCmd.AddCommand(snippetsRemoveCmd)
+	var exportData map[string]interface{}
+	if err := yaml.Unmarshal(data, &exportData); err != nil {
+		return err
+	}
 
-	// Add flags to GitHub search command
-	templatesGithubCmd.Flags().IntP("limit", "l", 10, "Maximum number of results to show")
-	templatesGithubCmd.Flags().StringP("language", "", "nix", "Programming language to filter by")
-	templatesGithubCmd.Flags().StringP("sort", "s", "stars", "Sort results by: stars, updated, created")
+	templateData, ok := exportData["template"]
+	if !ok {
+		return fmt.Errorf("invalid template export file")
+	}
 
-	// Add flags to apply command
-	templatesApplyCmd.Flags().BoolP("merge", "m", false, "Merge template with existing configuration")
-	templatesApplyCmd.Flags().StringP("output", "o", "", "Output file for applied template")
+	// Convert back to Template struct
+	templateBytes, err := yaml.Marshal(templateData)
+	if err != nil {
+		return err
+	}
 
-	// Add flags to save command
-	templatesSaveCmd.Flags().StringP("category", "c", "", "Category for the template")
-	templatesSaveCmd.Flags().StringP("description", "d", "", "Description for the template")
-	templatesSaveCmd.Flags().StringSliceP("tags", "t", []string{}, "Tags for the template")
+	var template Template
+	if err := yaml.Unmarshal(templateBytes, &template); err != nil {
+		return err
+	}
 
-	// Add flags to add snippet command
-	snippetsAddCmd.Flags().StringP("file", "f", "", "File path for the snippet")
-	snippetsAddCmd.Flags().StringP("description", "d", "", "Description for the snippet")
-	snippetsAddCmd.Flags().StringSliceP("tags", "t", []string{}, "Tags for the snippet")
+	// Save as custom template
+	return tm.SaveCustomTemplate(&template)
+}
 
-	// Add flags to apply snippet command
-	snippetsApplyCmd.Flags().StringP("output", "o", "", "Output file for applied snippet")
+// ValidateTemplate validates a template's content and structure
+func (tm *TemplateManager) ValidateTemplate(template *Template) error {
+	// Basic validation
+	if template.Name == "" {
+		return fmt.Errorf("template name is required")
+	}
+	if template.Content == "" {
+		return fmt.Errorf("template content is required")
+	}
+
+	// Validate NixOS configuration syntax
+	if err := tm.validateNixConfiguration(template.Content); err != nil {
+		return fmt.Errorf("invalid NixOS configuration: %v", err)
+	}
+
+	return nil
+}
+
+// GetTemplatesByCategory returns templates filtered by category
+func (tm *TemplateManager) GetTemplatesByCategory(category string) ([]Template, error) {
+	allTemplates, err := tm.LoadAllTemplates()
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []Template
+	for _, template := range allTemplates {
+		if strings.EqualFold(template.Category, category) {
+			filtered = append(filtered, template)
+		}
+	}
+
+	return filtered, nil
+}
+
+// GetTemplatesByTag returns templates filtered by tag
+func (tm *TemplateManager) GetTemplatesByTag(tag string) ([]Template, error) {
+	allTemplates, err := tm.LoadAllTemplates()
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []Template
+	for _, template := range allTemplates {
+		for _, templateTag := range template.Tags {
+			if strings.EqualFold(templateTag, tag) {
+				filtered = append(filtered, template)
+				break
+			}
+		}
+	}
+
+	return filtered, nil
+}
+
+// SyncTemplates synchronizes templates with remote sources
+func (tm *TemplateManager) SyncTemplates() error {
+	tm.logger.Info("Synchronizing templates...")
+
+	// Refresh GitHub cache
+	if err := tm.RefreshGitHubTemplatesCache(); err != nil {
+		tm.logger.Warn("Failed to refresh GitHub templates: " + err.Error())
+	}
+
+	// Could add other sync operations here (GitLab, custom registries, etc.)
+
+	tm.logger.Info("Template synchronization completed")
+	return nil
+}
+
+// Helper methods
+
+func (tm *TemplateManager) categorizeFromDescription(description string) string {
+	desc := strings.ToLower(description)
+
+	if strings.Contains(desc, "desktop") || strings.Contains(desc, "gnome") || strings.Contains(desc, "kde") {
+		return "Desktop"
+	}
+	if strings.Contains(desc, "server") || strings.Contains(desc, "headless") {
+		return "Server"
+	}
+	if strings.Contains(desc, "gaming") || strings.Contains(desc, "steam") {
+		return "Gaming"
+	}
+	if strings.Contains(desc, "development") || strings.Contains(desc, "dev") {
+		return "Development"
+	}
+	if strings.Contains(desc, "minimal") || strings.Contains(desc, "minimal") {
+		return "Minimal"
+	}
+
+	return "General"
+}
+
+func (tm *TemplateManager) extractTagsFromDescription(description string) []string {
+	var tags []string
+	desc := strings.ToLower(description)
+
+	keywords := []string{"nixos", "flakes", "home-manager", "gnome", "kde", "i3", "sway",
+		"docker", "kubernetes", "gaming", "development", "server", "minimal"}
+
+	for _, keyword := range keywords {
+		if strings.Contains(desc, keyword) {
+			tags = append(tags, keyword)
+		}
+	}
+
+	return tags
+}
+
+func (tm *TemplateManager) decodeGitHubContent(content, encoding string) (string, error) {
+	if encoding == "base64" {
+		// GitHub returns content base64 encoded
+		decoded, err := utils.DecodeBase64(content)
+		if err != nil {
+			return "", err
+		}
+		return string(decoded), nil
+	}
+
+	return content, nil
+}
+
+func (tm *TemplateManager) validateNixConfiguration(content string) error {
+	// Basic NixOS syntax validation
+	if !strings.Contains(content, "{") || !strings.Contains(content, "}") {
+		return fmt.Errorf("configuration appears to be malformed")
+	}
+
+	// Check for basic NixOS structure
+	if !strings.Contains(content, "config") && !strings.Contains(content, "pkgs") {
+		return fmt.Errorf("doesn't appear to be a valid NixOS configuration")
+	}
+
+	return nil
 }

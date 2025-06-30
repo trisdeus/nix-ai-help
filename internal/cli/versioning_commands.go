@@ -324,10 +324,11 @@ func AddWebInterfaceCommands(rootCmd *cobra.Command, logger *logger.Logger) {
 	webCmd := &cobra.Command{
 		Use:   "web",
 		Short: "Start web interface",
-		Long:  "Start the web-based configuration management interface",
+		Long:  "Start the comprehensive web-based configuration management interface with real-time collaboration features",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			port, _ := cmd.Flags().GetInt("port")
 			repoPath, _ := cmd.Flags().GetString("repo")
+
 			if repoPath == "" {
 				repoPath = "."
 			}
@@ -339,16 +340,30 @@ func AddWebInterfaceCommands(rootCmd *cobra.Command, logger *logger.Logger) {
 			}
 
 			teamManager := team.NewTeamManager(logger)
-			server := web.NewServer(port, teamManager, repo, logger)
 
-			fmt.Printf("🌐 Starting web interface on port %d\n", port)
+			// Create enhanced server
+			server, err := web.NewEnhancedServer(port, teamManager, repo, logger)
+			if err != nil {
+				return fmt.Errorf("failed to create enhanced web server: %w", err)
+			}
+
+			fmt.Printf("🌐 Starting enhanced web interface on port %d\n", port)
 			fmt.Printf("📂 Repository: %s\n", repoPath)
 			fmt.Printf("🔗 Open: http://localhost:%d\n", port)
+			fmt.Printf("📊 Dashboard: http://localhost:%d/dashboard\n", port)
+			fmt.Printf("🎨 Configuration Builder: http://localhost:%d/builder\n", port)
+			fmt.Printf("🚀 Fleet Management: http://localhost:%d/fleet\n", port)
+			fmt.Printf("👥 Team Collaboration: http://localhost:%d/teams\n", port)
+			fmt.Printf("📝 Version Control: http://localhost:%d/versions\n", port)
+			fmt.Printf("🤖 AI Generation: Available in all modules\n")
+			fmt.Printf("⚡ Real-time WebSocket: Enabled\n")
 
 			return server.Start(context.Background())
 		},
 	}
-	webCmd.Flags().IntP("port", "p", 8080, "Port to serve on")
+
+	// Add flags
+	webCmd.Flags().IntP("port", "p", 34567, "Port to serve on")
 	webCmd.Flags().StringP("repo", "r", "", "Repository path")
 
 	rootCmd.AddCommand(webCmd)

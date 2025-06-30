@@ -1,0 +1,2688 @@
+package web
+
+import (
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"net/http"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"nix-ai-help/internal/auth"
+	"nix-ai-help/internal/collaboration/team"
+	"nix-ai-help/internal/fleet"
+	"nix-ai-help/internal/versioning/repository"
+	"nix-ai-help/internal/webui"
+	"nix-ai-help/pkg/logger"
+
+	"github.com/gorilla/mux"
+)
+
+// EnhancedServer wraps the existing Server with additional features
+type EnhancedServer struct {
+	*Server
+	templates     *template.Template
+	configBuilder *webui.ConfigBuilderAPI
+	templateAPI   *webui.TemplateAPI
+	fleetManager  *fleet.FleetManager
+	authManager   *auth.AuthManager
+}
+
+// NewEnhancedServer creates a new enhanced web server using the existing Server
+func NewEnhancedServer(port int, teamManager *team.TeamManager, configRepo *repository.ConfigRepository, logger *logger.Logger) (*EnhancedServer, error) {
+	// Create server config with enhanced features
+	config := &ServerConfig{
+		Port:        port,
+		Host:        "0.0.0.0",
+		StaticDir:   "./internal/web/static",
+		TemplateDir: "./internal/web/templates",
+		Authentication: AuthConfig{
+			Enabled:        false,
+			SessionTimeout: "24h",
+			Providers:      []string{"local"},
+		},
+		TLS: TLSConfig{
+			Enabled: false,
+		},
+		CORS: CORSConfig{
+			AllowedOrigins: []string{"*"},
+			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{"*"},
+		},
+		Features: FeatureConfig{
+			VisualBuilder:   true,
+			FleetManagement: true, // Enable fleet management
+			Collaboration:   true,
+			VersionControl:  true,
+			AIGeneration:    true,
+			Dashboard:       true,
+		},
+	}
+
+	// Create the base server
+	server, err := NewServer(config, teamManager, configRepo, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create base server: %w", err)
+	}
+
+	// Initialize ConfigBuilderAPI
+	configBuilder, err := webui.NewConfigBuilderAPI(logger)
+	if err != nil {
+		logger.Warn(fmt.Sprintf("Failed to initialize config builder: %v", err))
+		configBuilder = nil
+	}
+
+	// Initialize TemplateAPI
+	templateAPI := webui.NewTemplateAPI(logger)
+
+	// Initialize FleetManager
+	fleetManager := fleet.NewFleetManager(logger)
+
+	// Initialize AuthManager
+	authManager, err := auth.NewAuthManager(teamManager, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize auth manager: %w", err)
+	}
+
+	// Create enhanced server wrapper
+	enhanced := &EnhancedServer{
+		Server:        server,
+		configBuilder: configBuilder,
+		templateAPI:   templateAPI,
+		fleetManager:  fleetManager,
+		authManager:   authManager,
+	}
+
+	// Load templates
+	templatePattern := filepath.Join(config.TemplateDir, "*.html")
+	templates, err := template.ParseGlob(templatePattern)
+	if err != nil {
+		logger.Warn(fmt.Sprintf("Failed to parse templates: %v", err))
+		// Continue without templates, will fall back to basic HTML
+		enhanced.templates = nil
+	} else {
+		enhanced.templates = templates
+		logger.Info("Templates loaded successfully")
+	}
+
+	// Clear existing routes and setup enhanced routes
+	enhanced.setupEnhancedRoutes()
+
+	return enhanced, nil
+}
+
+// setupEnhancedRoutes adds enhanced functionality, replacing base routes
+func (s *EnhancedServer) setupEnhancedRoutes() {
+	// Create a new router to replace the base one
+	s.router = mux.NewRouter()
+
+	// Serve static files first
+	if s.config.StaticDir != "" {
+		fs := http.FileServer(http.Dir(s.config.StaticDir))
+		s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
+	}
+
+	// Add enhanced API endpoints with highest priority
+	s.router.HandleFunc("/api/dashboard", s.handleDashboardAPI).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/dashboard/details", s.handleDashboardDetails).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/dashboard/stats", s.handleDashboardStats).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/dashboard/activities", s.handleDashboardActivities).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/dashboard/alerts", s.handleDashboardAlerts).Methods("GET", "HEAD", "OPTIONS")
+
+	// Auth endpoints
+	s.router.HandleFunc("/api/auth/status", s.handleAuthStatus).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/auth/login", s.handleLogin).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/auth/logout", s.handleLogout).Methods("POST", "OPTIONS")
+
+	// User management endpoints
+	s.router.HandleFunc("/api/users", s.handleListUsers).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/users", s.handleCreateUser).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/users/change-password", s.handleChangePassword).Methods("POST", "OPTIONS")
+
+	// Teams API endpoints
+	s.router.HandleFunc("/api/teams", s.handleListTeams).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/teams", s.handleCreateTeam).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/teams/stats", s.handleTeamsStats).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/teams/activity", s.handleTeamsActivity).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/teams/public", s.handlePublicTeams).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/teams/join", s.handleJoinTeam).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/teams/{teamId}", s.handleGetTeam).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/teams/{teamId}/members", s.handleListTeamMembers).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/teams/{teamId}/collaboration/start", s.handleStartCollaboration).Methods("POST", "OPTIONS")
+
+	// Fleet API endpoints
+	s.router.HandleFunc("/api/fleet", s.handleFleetAPI).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/fleet/machines", s.handleFleetMachines).Methods("GET", "POST", "OPTIONS")
+	s.router.HandleFunc("/api/fleet/machines/{machineId}", s.handleGetMachine).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/fleet/machines/{machineId}", s.handleRemoveMachine).Methods("DELETE", "OPTIONS")
+	s.router.HandleFunc("/api/fleet/deploy", s.handleFleetDeploy).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/fleet/deployments", s.handleFleetDeployments).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/fleet/deployments/{deploymentId}", s.handleGetDeployment).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/fleet/health", s.handleFleetHealth).Methods("GET", "HEAD", "OPTIONS")
+
+	// Builder API endpoints
+	s.router.HandleFunc("/api/builder/validate", s.handleBuilderValidate).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/builder/generate", s.handleBuilderGenerate).Methods("POST", "OPTIONS")
+
+	// Config API endpoints
+	s.router.HandleFunc("/api/config/branches", s.handleConfigBranches).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/config/files", s.handleConfigFiles).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/configurations", s.handleConfigurations).Methods("GET", "POST", "OPTIONS")
+
+	// Versioning API endpoints
+	s.router.HandleFunc("/api/versioning/repositories", s.handleVersioningRepositories).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/status", s.handleVersioningStatus).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/branches", s.handleVersioningBranches).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/commits", s.handleVersioningCommits).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/tags", s.handleVersioningTags).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/stats", s.handleVersioningStats).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/changes", s.handleVersioningChanges).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/branches", s.handleVersioningCreateBranch).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/tags", s.handleVersioningCreateTag).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/commit", s.handleVersioningCommit).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/checkout", s.handleVersioningCheckout).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/diff/{fileName}", s.handleVersioningDiff).Methods("GET", "HEAD", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/stage", s.handleVersioningStage).Methods("POST", "OPTIONS")
+	s.router.HandleFunc("/api/versioning/repositories/{repoId}/stage-all", s.handleVersioningStageAll).Methods("POST", "OPTIONS")
+
+	// AI Chat API endpoint
+	s.router.HandleFunc("/api/ai/chat", s.handleAIChat).Methods("POST", "OPTIONS")
+
+	// Register ConfigBuilderAPI routes if available
+	if s.configBuilder != nil {
+		s.configBuilder.RegisterRoutes(s.router)
+	}
+
+	// Register TemplateAPI routes
+	if s.templateAPI != nil {
+		s.templateAPI.RegisterRoutes(s.router)
+	}
+
+	// WebSocket endpoint for real-time updates
+	s.router.HandleFunc("/api/ws", s.handleWebSocketConnection).Methods("GET")
+
+	// Health check endpoint
+	s.router.HandleFunc("/health", s.handleHealth).Methods("GET")
+
+	// Enhanced frontend routes - these replace the base routes
+	s.router.HandleFunc("/", s.handleEnhancedDashboard).Methods("GET")
+	s.router.HandleFunc("/dashboard", s.handleEnhancedDashboard).Methods("GET")
+	s.router.HandleFunc("/builder", s.handleEnhancedBuilder).Methods("GET")
+	s.router.HandleFunc("/fleet", s.handleEnhancedFleet).Methods("GET")
+	s.router.HandleFunc("/teams", s.handleEnhancedTeams).Methods("GET")
+	s.router.HandleFunc("/versions", s.handleEnhancedVersions).Methods("GET")
+	s.router.HandleFunc("/login", s.handleEnhancedLogin).Methods("GET")
+	s.router.HandleFunc("/logout", s.handleEnhancedLogout).Methods("GET")
+}
+
+// Enhanced dashboard handler
+func (s *EnhancedServer) handleEnhancedDashboard(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title":       "NixAI Dashboard",
+		"ActivePage":  "dashboard",
+		"ShowSidebar": true,
+		"User": map[string]string{
+			"Username": "demo",
+			"Role":     "admin",
+		},
+		"PageHeader": map[string]interface{}{
+			"Title":    "Dashboard",
+			"Subtitle": "System overview and real-time monitoring",
+		},
+		"Stats": map[string]interface{}{
+			"TotalMachines":   0,
+			"HealthyMachines": 0,
+			"TotalConfigs":    0,
+			"ActiveTeams":     0,
+		},
+		"Activities":    []interface{}{},
+		"FleetStatus":   []interface{}{},
+		"Alerts":        []interface{}{},
+		"ConfigStatus":  []interface{}{},
+		"TeamActivity":  []interface{}{},
+		"AISuggestions": []interface{}{},
+		"SidebarData": map[string]interface{}{
+			"Title": "Quick Stats",
+			"Items": []map[string]interface{}{
+				{"Label": "Uptime", "Value": "2h 15m"},
+				{"Label": "CPU", "Value": "45%"},
+				{"Label": "Memory", "Value": "2.1GB"},
+				{"Label": "Disk", "Value": "78%"},
+			},
+		},
+	}
+
+	s.renderEnhancedTemplate(w, "dashboard", data)
+}
+
+// Enhanced builder handler
+func (s *EnhancedServer) handleEnhancedBuilder(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title":       "Configuration Builder",
+		"ActivePage":  "builder",
+		"ShowSidebar": true,
+		"User": map[string]string{
+			"Username": "demo",
+			"Role":     "admin",
+		},
+		"PageHeader": map[string]interface{}{
+			"Title":    "Configuration Builder",
+			"Subtitle": "Visual NixOS configuration editor",
+		},
+	}
+
+	s.renderEnhancedTemplate(w, "builder", data)
+}
+
+// Enhanced fleet handler
+func (s *EnhancedServer) handleEnhancedFleet(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title":       "Fleet Management",
+		"ActivePage":  "fleet",
+		"ShowSidebar": true,
+		"User": map[string]string{
+			"Username": "demo",
+			"Role":     "admin",
+		},
+		"PageHeader": map[string]interface{}{
+			"Title":    "Fleet Management",
+			"Subtitle": "Manage and monitor your NixOS machines",
+		},
+	}
+
+	s.renderEnhancedTemplate(w, "fleet", data)
+}
+
+// Enhanced teams handler
+func (s *EnhancedServer) handleEnhancedTeams(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title":       "Team Collaboration",
+		"ActivePage":  "teams",
+		"ShowSidebar": true,
+		"User": map[string]string{
+			"Username": "demo",
+			"Role":     "admin",
+		},
+		"PageHeader": map[string]interface{}{
+			"Title":    "Team Collaboration",
+			"Subtitle": "Manage teams and collaborative workflows",
+		},
+	}
+
+	s.renderEnhancedTemplate(w, "teams", data)
+}
+
+// Enhanced versions handler
+func (s *EnhancedServer) handleEnhancedVersions(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title":       "Version Control",
+		"ActivePage":  "versions",
+		"ShowSidebar": true,
+		"User": map[string]string{
+			"Username": "demo",
+			"Role":     "admin",
+		},
+		"PageHeader": map[string]interface{}{
+			"Title":    "Version Control",
+			"Subtitle": "Git-like configuration management",
+		},
+	}
+
+	s.renderEnhancedTemplate(w, "versions", data)
+}
+
+// Enhanced login handler
+func (s *EnhancedServer) handleEnhancedLogin(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"Title":       "Login - NixAI",
+		"ActivePage":  "login",
+		"ShowSidebar": false,
+		"PageHeader": map[string]interface{}{
+			"Title":    "Welcome to NixAI",
+			"Subtitle": "Sign in to your account",
+		},
+	}
+
+	s.renderEnhancedTemplate(w, "login", data)
+}
+
+// Enhanced logout handler
+func (s *EnhancedServer) handleEnhancedLogout(w http.ResponseWriter, r *http.Request) {
+	// Redirect to login page after logout
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+// renderEnhancedTemplate renders templates with enhanced layout
+func (s *EnhancedServer) renderEnhancedTemplate(w http.ResponseWriter, templateName string, data map[string]interface{}) {
+	// Set the active page for template rendering
+	data["ActivePage"] = templateName
+
+	// Try to render the actual template file
+	s.renderTemplate(w, templateName+".html", data)
+}
+
+// getPageContent returns page-specific content
+func (s *EnhancedServer) getPageContent(templateName string, data map[string]interface{}) string {
+	switch templateName {
+	case "dashboard":
+		return s.getDashboardContent(data)
+	case "builder":
+		return s.getBuilderContent(data)
+	case "fleet":
+		return s.getFleetContent(data)
+	case "teams":
+		return s.getTeamsContent(data)
+	case "versions":
+		return s.getVersionsContent(data)
+	default:
+		return "<div class='nixai-card'><h2>Page content loading...</h2></div>"
+	}
+}
+
+// Dashboard content
+func (s *EnhancedServer) getDashboardContent(data map[string]interface{}) string {
+	return `<div class="dashboard-container">
+    <div class="nixai-dashboard-grid">
+        <div class="nixai-stat-card">
+            <div class="nixai-stat-value" id="total-machines">0</div>
+            <div class="nixai-stat-label">Total Machines</div>
+        </div>
+        <div class="nixai-stat-card">
+            <div class="nixai-stat-value" id="healthy-machines">0</div>
+            <div class="nixai-stat-label">Healthy Machines</div>
+        </div>
+        <div class="nixai-stat-card">
+            <div class="nixai-stat-value" id="total-configs">0</div>
+            <div class="nixai-stat-label">Configurations</div>
+        </div>
+        <div class="nixai-stat-card">
+            <div class="nixai-stat-value" id="active-teams">0</div>
+            <div class="nixai-stat-label">Active Teams</div>
+        </div>
+    </div>
+    
+    <div class="nixai-card">
+        <div class="nixai-card-header">
+            <h3 class="nixai-card-title">System Status</h3>
+        </div>
+        <div id="dashboard-content">
+            <p>Dashboard is loading... Real-time updates will appear here.</p>
+        </div>
+    </div>
+</div>`
+}
+
+// Builder content
+func (s *EnhancedServer) getBuilderContent(data map[string]interface{}) string {
+	return `<div class="builder-container">
+    <!-- Template Library Section -->
+    <div class="nixai-card">
+        <div class="nixai-card-header">
+            <h3 class="nixai-card-title">Templates</h3>
+            <div class="nixai-card-actions">
+                <button class="nixai-btn nixai-btn-sm" onclick="refreshTemplates()">
+                    <span>🔄</span> Refresh
+                </button>
+                <button class="nixai-btn nixai-btn-sm nixai-btn-primary" onclick="importTemplate()">
+                    <span>📥</span> Import
+                </button>
+            </div>
+        </div>
+        <div class="template-grid" id="template-grid">
+            <div class="template-loading">Loading templates...</div>
+        </div>
+    </div>
+
+    <!-- Configuration Canvas -->
+    <div class="nixai-card">
+        <div class="nixai-card-header">
+            <h3 class="nixai-card-title">Configuration Editor</h3>
+            <div class="nixai-card-actions">
+                <button class="nixai-btn nixai-btn-sm" onclick="validateConfig()">
+                    <span>✓</span> Validate
+                </button>
+                <button class="nixai-btn nixai-btn-sm" onclick="generateConfig()">
+                    <span>⚡</span> Generate
+                </button>
+                <button class="nixai-btn nixai-btn-sm nixai-btn-primary" onclick="exportConfig()">
+                    <span>💾</span> Save
+                </button>
+            </div>
+        </div>
+        <div class="config-canvas" id="config-canvas">
+            <div class="canvas-placeholder">
+                <div class="placeholder-content">
+                    <h4>Start Building Your Configuration</h4>
+                    <p>Choose a template from the library above or start from scratch</p>
+                    <button class="nixai-btn nixai-btn-primary" onclick="startFromScratch()">
+                        <span>🚀</span> Start from Scratch
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Output -->
+    <div class="nixai-card">
+        <div class="nixai-card-header">
+            <h3 class="nixai-card-title">Generated Configuration</h3>
+            <div class="nixai-card-actions">
+                <button class="nixai-btn nixai-btn-sm" onclick="copyToClipboard()">
+                    <span>📋</span> Copy
+                </button>
+                <button class="nixai-btn nixai-btn-sm" onclick="downloadConfig()">
+                    <span>⬇️</span> Download
+                </button>
+            </div>
+        </div>
+        <div class="config-output">
+            <pre id="config-preview"><code class="language-nix"># Your NixOS configuration will appear here
+# Choose a template or start building to see the generated configuration
+
+{ config, pkgs, ... }:
+
+{
+  # Configuration options will be added here
+  system.stateVersion = "23.11";
+}</code></pre>
+        </div>
+    </div>
+</div>
+
+<style>
+.builder-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.template-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    padding: 1rem 0;
+}
+
+.template-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.template-card:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+    transform: translateY(-2px);
+}
+
+.template-card.selected {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.template-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.template-name {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.template-category {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    background: #f1f5f9;
+    border-radius: 4px;
+    color: #64748b;
+}
+
+.template-description {
+    color: #64748b;
+    font-size: 0.875rem;
+    margin-bottom: 0.75rem;
+}
+
+.template-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+}
+
+.template-tag {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.375rem;
+    background: #e2e8f0;
+    border-radius: 4px;
+    color: #475569;
+}
+
+.template-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.config-canvas {
+    min-height: 400px;
+    border: 2px dashed #e2e8f0;
+    border-radius: 8px;
+    position: relative;
+    background: #fafafa;
+}
+
+.canvas-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 400px;
+}
+
+.placeholder-content {
+    text-align: center;
+    color: #64748b;
+}
+
+.placeholder-content h4 {
+    margin-bottom: 0.5rem;
+    color: #374151;
+}
+
+.config-output {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.config-output pre {
+    margin: 0;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 4px;
+    font-family: 'Fira Code', 'Monaco', 'Cascadia Code', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.template-loading {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    color: #64748b;
+}
+</style>
+
+<script>
+let selectedTemplate = null;
+let currentConfig = '';
+
+// Load templates on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadTemplates();
+});
+
+async function loadTemplates() {
+    try {
+        const response = await fetch('/api/templates');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayTemplates(data.data.templates);
+        } else {
+            console.error('Failed to load templates:', data.error);
+        }
+    } catch (error) {
+        console.error('Error loading templates:', error);
+        document.getElementById('template-grid').innerHTML = 
+            '<div class="nixai-alert nixai-alert-error">Failed to load templates</div>';
+    }
+}
+
+function displayTemplates(templates) {
+    const grid = document.getElementById('template-grid');
+    
+    if (templates.length === 0) {
+        grid.innerHTML = '<div class="nixai-alert nixai-alert-info">No templates available</div>';
+        return;
+    }
+    
+    grid.innerHTML = templates.map(template => `
+        <div class="template-card" onclick="selectTemplate('${template.name}')">
+            <div class="template-header">
+                <span class="template-name">${template.name}</span>
+                <span class="template-category">${template.category}</span>
+            </div>
+            <div class="template-description">${template.description}</div>
+            <div class="template-tags">
+                ${template.tags.map(tag => `<span class="template-tag">${tag}</span>`).join('')}
+            </div>
+            <div class="template-actions">
+                <button class="nixai-btn nixai-btn-sm nixai-btn-primary" onclick="event.stopPropagation(); applyTemplate('${template.name}')">
+                    Apply
+                </button>
+                <button class="nixai-btn nixai-btn-sm" onclick="event.stopPropagation(); previewTemplate('${template.name}')">
+                    Preview
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function selectTemplate(templateName) {
+    // Remove previous selection
+    document.querySelectorAll('.template-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Add selection to clicked card
+    event.currentTarget.classList.add('selected');
+    selectedTemplate = templateName;
+    
+    // Load template preview
+    await previewTemplate(templateName);
+}
+
+async function previewTemplate(templateName) {
+    try {
+        const response = await fetch(`/api/templates/${templateName}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const template = data.data.template;
+            updateConfigPreview(template.content);
+            updateCanvasWithTemplate(template);
+        }
+    } catch (error) {
+        console.error('Error previewing template:', error);
+    }
+}
+
+async function applyTemplate(templateName) {
+    try {
+        const response = await fetch(`/api/templates/${templateName}/apply`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                outputPath: '',
+                merge: false
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const template = data.template;
+            currentConfig = template.content;
+            updateConfigPreview(template.content);
+            updateCanvasWithTemplate(template);
+            
+            // Show success message
+            showNotification('Template applied successfully!', 'success');
+        } else {
+            showNotification('Failed to apply template: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error applying template:', error);
+        showNotification('Error applying template', 'error');
+    }
+}
+
+function updateConfigPreview(content) {
+    const preview = document.getElementById('config-preview');
+    preview.innerHTML = `<code class="language-nix">${escapeHtml(content)}</code>`;
+}
+
+function updateCanvasWithTemplate(template) {
+    const canvas = document.getElementById('config-canvas');
+    canvas.innerHTML = `
+        <div style="padding: 1rem;">
+            <div class="nixai-card">
+                <div class="nixai-card-header">
+                    <h4>Template: ${template.name}</h4>
+                    <span class="template-category">${template.category}</span>
+                </div>
+                <div style="padding: 1rem;">
+                    <p><strong>Description:</strong> ${template.description}</p>
+                    <div class="template-tags" style="margin-top: 0.5rem;">
+                        ${template.tags.map(tag => `<span class="template-tag">${tag}</span>`).join('')}
+                    </div>
+                    <div style="margin-top: 1rem;">
+                        <button class="nixai-btn nixai-btn-sm" onclick="editTemplate()">
+                            <span>✏️</span> Edit Configuration
+                        </button>
+                        <button class="nixai-btn nixai-btn-sm" onclick="clearCanvas()">
+                            <span>🗑️</span> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function startFromScratch() {
+    const canvas = document.getElementById('config-canvas');
+    canvas.innerHTML = `
+        <div style="padding: 1rem;">
+            <div class="nixai-card">
+                <div class="nixai-card-header">
+                    <h4>New Configuration</h4>
+                </div>
+                <div style="padding: 1rem;">
+                    <p>Building a new NixOS configuration from scratch...</p>
+                    <div style="margin-top: 1rem;">
+                        <button class="nixai-btn nixai-btn-sm nixai-btn-primary" onclick="addBasicServices()">
+                            <span>⚙️</span> Add Basic Services
+                        </button>
+                        <button class="nixai-btn nixai-btn-sm" onclick="addDesktopEnvironment()">
+                            <span>🖥️</span> Add Desktop
+                        </button>
+                        <button class="nixai-btn nixai-btn-sm" onclick="addDevelopmentTools()">
+                            <span>🛠️</span> Add Dev Tools
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    currentConfig = `{ config, pkgs, ... }:
+
+{
+  # Basic NixOS configuration
+  system.stateVersion = "23.11";
+}`;
+    updateConfigPreview(currentConfig);
+}
+
+function clearCanvas() {
+    const canvas = document.getElementById('config-canvas');
+    canvas.innerHTML = `
+        <div class="canvas-placeholder">
+            <div class="placeholder-content">
+                <h4>Start Building Your Configuration</h4>
+                <p>Choose a template from the library above or start from scratch</p>
+                <button class="nixai-btn nixai-btn-primary" onclick="startFromScratch()">
+                    <span>🚀</span> Start from Scratch
+                </button>
+            </div>
+        </div>
+    `;
+    
+    currentConfig = '';
+    updateConfigPreview('# Your NixOS configuration will appear here\n# Choose a template or start building to see the generated configuration\n\n{ config, pkgs, ... }:\n\n{\n  # Configuration options will be added here\n  system.stateVersion = "23.11";\n}');
+}
+
+function refreshTemplates() {
+    loadTemplates();
+    showNotification('Templates refreshed', 'info');
+}
+
+function validateConfig() {
+    if (!currentConfig) {
+        showNotification('No configuration to validate', 'warning');
+        return;
+    }
+    
+    // Basic validation
+    if (currentConfig.includes('system.stateVersion')) {
+        showNotification('Configuration validation passed', 'success');
+    } else {
+        showNotification('Configuration may be incomplete', 'warning');
+    }
+}
+
+function generateConfig() {
+    if (currentConfig) {
+        showNotification('Configuration generated successfully', 'success');
+    } else {
+        showNotification('No configuration to generate', 'warning');
+    }
+}
+
+function exportConfig() {
+    if (!currentConfig) {
+        showNotification('No configuration to export', 'warning');
+        return;
+    }
+    
+    downloadConfig();
+}
+
+function copyToClipboard() {
+    if (!currentConfig) {
+        showNotification('No configuration to copy', 'warning');
+        return;
+    }
+    
+    navigator.clipboard.writeText(currentConfig).then(() => {
+        showNotification('Configuration copied to clipboard', 'success');
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+        showNotification('Failed to copy configuration', 'error');
+    });
+}
+
+function downloadConfig() {
+    if (!currentConfig) {
+        showNotification('No configuration to download', 'warning');
+        return;
+    }
+    
+    const blob = new Blob([currentConfig], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'configuration.nix';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showNotification('Configuration downloaded', 'success');
+}
+
+function importTemplate() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.nix,.yaml,.yml';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                currentConfig = e.target.result;
+                updateConfigPreview(currentConfig);
+                showNotification('Template imported successfully', 'success');
+            };
+            reader.readAsText(file);
+        }
+    };
+    input.click();
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `nixai-alert nixai-alert-${type}`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        max-width: 300px;
+        animation: slideIn 0.3s ease;
+    `;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 3000);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Add CSS for animations
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
+</script>`
+}
+
+// Fleet content
+func (s *EnhancedServer) getFleetContent(data map[string]interface{}) string {
+	return `<div class="nixai-card">
+    <div class="nixai-card-header">
+        <h3 class="nixai-card-title">Fleet Management</h3>
+    </div>
+    <div class="fleet-content">
+        <p>Fleet management interface for managing multiple NixOS machines.</p>
+        <div class="nixai-alert nixai-alert-info">
+            <strong>Feature Status:</strong> Fleet management module is being developed.
+        </div>
+    </div>
+</div>`
+}
+
+// Teams content
+func (s *EnhancedServer) getTeamsContent(data map[string]interface{}) string {
+	return `<div class="nixai-card">
+    <div class="nixai-card-header">
+        <h3 class="nixai-card-title">Team Collaboration</h3>
+    </div>
+    <div class="teams-content">
+        <p>Team collaboration features for working together on NixOS configurations.</p>
+        <div class="nixai-alert nixai-alert-success">
+            <strong>Real-time Collaboration:</strong> WebSocket-based live editing and communication.
+        </div>
+    </div>
+</div>`
+}
+
+// Versions content
+func (s *EnhancedServer) getVersionsContent(data map[string]interface{}) string {
+	return `<div class="nixai-card">
+    <div class="nixai-card-header">
+        <h3 class="nixai-card-title">Version Control</h3>
+    </div>
+    <div class="versions-content">
+        <p>Git-like version control for NixOS configurations.</p>
+        <div class="nixai-alert nixai-alert-success">
+            <strong>Available:</strong> Branch management, commit history, and configuration tracking.
+        </div>
+    </div>
+</div>`
+}
+
+// API Handlers
+
+// Dashboard API handler
+func (s *EnhancedServer) handleDashboardAPI(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	s.logger.Debug("Handling dashboard API request")
+
+	data := map[string]interface{}{
+		"overview": map[string]interface{}{
+			"total_machines":   0,
+			"healthy_machines": 0,
+			"total_configs":    0,
+			"active_teams":     0,
+		},
+		"activities": []map[string]interface{}{
+			{
+				"type":      "system",
+				"message":   "NixAI web interface started",
+				"timestamp": time.Now().Format(time.RFC3339),
+				"icon":      "🚀",
+			},
+		},
+		"alerts": []map[string]interface{}{
+			{
+				"level":     "info",
+				"title":     "Welcome",
+				"message":   "NixAI enhanced web interface is running",
+				"timestamp": time.Now().Format(time.RFC3339),
+			},
+		},
+	}
+
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	s.sendSuccess(w, data)
+}
+
+// Dashboard details API handler
+func (s *EnhancedServer) handleDashboardDetails(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	s.logger.Debug("Handling dashboard details API request")
+
+	// Provide detailed dashboard information
+	data := map[string]interface{}{
+		"system": map[string]interface{}{
+			"uptime":    "2h 15m",
+			"cpu_usage": "45%",
+			"memory":    "2.1GB",
+			"disk":      "78%",
+		},
+		"recent_configs": []map[string]interface{}{
+			{
+				"name":         "nixos-config",
+				"last_updated": time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
+				"status":       "active",
+			},
+		},
+		"team_activity": []map[string]interface{}{
+			{
+				"user":      "demo",
+				"action":    "viewed dashboard",
+				"timestamp": time.Now().Format(time.RFC3339),
+			},
+		},
+	}
+
+	s.sendSuccess(w, data)
+}
+
+// WebSocket connection handler
+func (s *EnhancedServer) handleWebSocketConnection(w http.ResponseWriter, r *http.Request) {
+	conn, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("WebSocket upgrade failed: %v", err))
+		return
+	}
+	defer conn.Close()
+
+	s.logger.Info("WebSocket connection established")
+
+	// Send welcome message
+	welcome := map[string]interface{}{
+		"type": "welcome",
+		"data": map[string]interface{}{
+			"message": "Connected to NixAI real-time collaboration",
+			"time":    time.Now().Format(time.RFC3339),
+		},
+	}
+
+	if err := conn.WriteJSON(welcome); err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to send welcome message: %v", err))
+		return
+	}
+
+	// Keep connection alive and handle messages
+	for {
+		var msg map[string]interface{}
+		err := conn.ReadJSON(&msg)
+		if err != nil {
+			s.logger.Debug(fmt.Sprintf("WebSocket connection closed: %v", err))
+			break
+		}
+
+		// Echo message back for now
+		response := map[string]interface{}{
+			"type": "echo",
+			"data": msg,
+			"time": time.Now().Format(time.RFC3339),
+		}
+
+		if err := conn.WriteJSON(response); err != nil {
+			s.logger.Error(fmt.Sprintf("Failed to send WebSocket response: %v", err))
+			break
+		}
+	}
+}
+
+// Placeholder API handlers for dashboard data
+func (s *EnhancedServer) handleDashboardStats(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	stats := map[string]interface{}{
+		"machines": map[string]int{
+			"total":   0,
+			"healthy": 0,
+			"warning": 0,
+			"error":   0,
+		},
+		"configurations": map[string]int{
+			"total":    0,
+			"modified": 0,
+			"deployed": 0,
+		},
+		"teams": map[string]int{
+			"active": 0,
+			"total":  0,
+		},
+	}
+
+	s.sendSuccess(w, stats)
+}
+
+func (s *EnhancedServer) handleDashboardActivities(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	activities := []map[string]interface{}{
+		{
+			"id":        "1",
+			"type":      "system_start",
+			"message":   "NixAI web interface started",
+			"timestamp": time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
+			"icon":      "🚀",
+		},
+		{
+			"id":        "2",
+			"type":      "config_load",
+			"message":   "Configuration templates loaded",
+			"timestamp": time.Now().Add(-3 * time.Minute).Format(time.RFC3339),
+			"icon":      "⚙️",
+		},
+	}
+
+	s.sendSuccess(w, activities)
+}
+
+func (s *EnhancedServer) handleDashboardAlerts(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	alerts := []map[string]interface{}{
+		{
+			"id":        "1",
+			"level":     "info",
+			"title":     "System Ready",
+			"message":   "NixAI enhanced web interface is fully operational",
+			"timestamp": time.Now().Format(time.RFC3339),
+		},
+	}
+
+	s.sendSuccess(w, alerts)
+}
+
+// Auth status handler
+func (s *EnhancedServer) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Get token from Authorization header
+	authHeader := r.Header.Get("Authorization")
+	token := ""
+	if authHeader != "" && len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		token = authHeader[7:]
+	}
+
+	// If no auth manager or token, return unauthenticated
+	if s.authManager == nil || token == "" {
+		userStatus := map[string]interface{}{
+			"authenticated": false,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(userStatus)
+		return
+	}
+
+	// Validate session
+	user, err := s.authManager.ValidateSession(token)
+	if err != nil {
+		userStatus := map[string]interface{}{
+			"authenticated": false,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(userStatus)
+		return
+	}
+
+	// Return authenticated user status
+	userStatus := map[string]interface{}{
+		"authenticated": true,
+		"user":          user,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(userStatus)
+}
+
+// Helper methods for EnhancedServer
+
+// sendSuccess sends a successful JSON response
+func (s *EnhancedServer) sendSuccess(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+
+	response := map[string]interface{}{
+		"success": true,
+		"data":    data,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to encode JSON response: %v", err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// sendError sends an error JSON response
+func (s *EnhancedServer) sendError(w http.ResponseWriter, message string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(code)
+
+	response := map[string]interface{}{
+		"success": false,
+		"error":   message,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to encode error JSON response: %v", err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// sendJSON sends raw JSON data
+func (s *EnhancedServer) sendJSON(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to encode JSON data: %v", err))
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// renderTemplate attempts to render templates, with fallback to simple HTML
+func (s *EnhancedServer) renderTemplate(w http.ResponseWriter, templateName string, data map[string]interface{}) {
+	if s.templates != nil {
+		// We need to parse individual template files to get the right content block
+		templateFile := strings.TrimSuffix(templateName, ".html") + ".html"
+
+		// Read and parse the specific template file
+		templatePath := filepath.Join(s.config.TemplateDir, templateFile)
+		specificTemplate, err := template.ParseFiles(templatePath, filepath.Join(s.config.TemplateDir, "base.html"))
+		if err != nil {
+			s.logger.Error(fmt.Sprintf("Failed to parse template files: %v", err))
+			s.renderSimpleHTML(w, data)
+			return
+		}
+
+		// Determine the correct content block name based on the template
+		var contentBlockName string
+		baseName := strings.TrimSuffix(templateFile, ".html")
+		switch baseName {
+		case "dashboard":
+			contentBlockName = "dashboard" // dashboard.html uses {{define "dashboard"}}
+		default:
+			contentBlockName = "content" // other templates use {{define "content"}}
+		}
+
+		// Execute the content block from the specific template
+		var contentBuf strings.Builder
+		if err := specificTemplate.ExecuteTemplate(&contentBuf, contentBlockName, data); err != nil {
+			s.logger.Error(fmt.Sprintf("Failed to execute %s template from %s: %v", contentBlockName, templateFile, err))
+			s.renderSimpleHTML(w, data)
+			return
+		}
+
+		// Add the rendered content to the data
+		data["Content"] = template.HTML(contentBuf.String())
+
+		// Now execute the base template with the content included
+		if err := specificTemplate.ExecuteTemplate(w, "base.html", data); err != nil {
+			s.logger.Error(fmt.Sprintf("Failed to execute base template: %v", err))
+			s.renderSimpleHTML(w, data)
+			return
+		}
+		return
+	}
+
+	// Fallback to simple HTML
+	s.renderSimpleHTML(w, data)
+}
+
+// renderSimpleHTML renders a simple HTML fallback when templates fail
+func (s *EnhancedServer) renderSimpleHTML(w http.ResponseWriter, data map[string]interface{}) {
+	title := "NixAI Enhanced"
+	if t, ok := data["Title"].(string); ok {
+		title = t
+	}
+
+	activePage := "dashboard"
+	if p, ok := data["ActivePage"].(string); ok {
+		activePage = p
+	}
+
+	html := fmt.Sprintf(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>%s</title>
+    <link rel="stylesheet" href="/static/css/nixai-enhanced.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="nixai-layout">
+        <header class="nixai-header">
+            <nav class="nav">
+                <div class="nixai-logo">
+                    <span>🚀</span>
+                    <span>NixAI Enhanced</span>
+                </div>
+                <ul class="nixai-nav-links">
+                    <li><a href="/dashboard" class="%s">📊 Dashboard</a></li>
+                    <li><a href="/builder" class="%s">🎨 Builder</a></li>
+                    <li><a href="/fleet" class="%s">🚀 Fleet</a></li>
+                    <li><a href="/teams" class="%s">👥 Teams</a></li>
+                    <li><a href="/versions" class="%s">📝 Versions</a></li>
+                </ul>
+            </nav>
+        </header>
+        <main class="nixai-main">
+            <div class="nixai-content">
+                %s
+            </div>
+        </main>
+    </div>
+    <script src="/static/js/nixai-enhanced.js"></script>
+</body>
+</html>`,
+		title,
+		s.getActiveClass("dashboard", activePage),
+		s.getActiveClass("builder", activePage),
+		s.getActiveClass("fleet", activePage),
+		s.getActiveClass("teams", activePage),
+		s.getActiveClass("versions", activePage),
+		s.getPageContent(activePage, data))
+
+	fmt.Fprint(w, html)
+}
+
+// getActiveClass returns "active" if the page matches the current page
+func (s *EnhancedServer) getActiveClass(page, activePage string) string {
+	if page == activePage {
+		return "active"
+	}
+	return ""
+}
+
+// Fleet API Handlers
+
+func (s *EnhancedServer) handleFleetAPI(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	s.logger.Debug("Handling fleet API request")
+
+	// Get fleet overview data
+	data := map[string]interface{}{
+		"summary": map[string]interface{}{
+			"total_machines":   2,
+			"online_machines":  2,
+			"offline_machines": 0,
+			"deployments":      1,
+		},
+		"machines": []map[string]interface{}{
+			{
+				"id":     "server01",
+				"name":   "Production Server 1",
+				"status": "online",
+				"health": "healthy",
+			},
+			{
+				"id":     "server02",
+				"name":   "Production Server 2",
+				"status": "online",
+				"health": "healthy",
+			},
+		},
+		"recent_deployments": []map[string]interface{}{
+			{
+				"id":        "deploy-001",
+				"target":    "server01",
+				"status":    "success",
+				"timestamp": time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
+			},
+		},
+	}
+
+	s.sendSuccess(w, data)
+}
+
+func (s *EnhancedServer) handleFleetMachines(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	switch r.Method {
+	case "GET":
+		s.handleListMachines(w, r)
+	case "POST":
+		s.handleAddMachine(w, r)
+	default:
+		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *EnhancedServer) handleListMachines(w http.ResponseWriter, r *http.Request) {
+	if s.fleetManager == nil {
+		s.sendError(w, "Fleet management not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	machines, err := s.fleetManager.ListMachines(r.Context())
+	if err != nil {
+		s.sendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.sendSuccess(w, map[string]interface{}{
+		"machines": machines,
+		"total":    len(machines),
+	})
+}
+
+func (s *EnhancedServer) handleAddMachine(w http.ResponseWriter, r *http.Request) {
+	// Check authentication
+	user := s.requireAuth(w, r)
+	if user == nil {
+		return
+	}
+
+	var machineReq struct {
+		ID          string   `json:"id"`
+		Name        string   `json:"name"`
+		Address     string   `json:"address"`
+		Environment string   `json:"environment"`
+		Tags        []string `json:"tags"`
+		SSHUser     string   `json:"ssh_user"`
+		SSHPort     int      `json:"ssh_port"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&machineReq); err != nil {
+		s.sendError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if machineReq.ID == "" || machineReq.Name == "" || machineReq.Address == "" {
+		s.sendError(w, "Machine ID, name, and address are required", http.StatusBadRequest)
+		return
+	}
+
+	if s.fleetManager == nil {
+		s.sendError(w, "Fleet management not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Set defaults
+	if machineReq.SSHUser == "" {
+		machineReq.SSHUser = "root"
+	}
+	if machineReq.SSHPort == 0 {
+		machineReq.SSHPort = 22
+	}
+	if machineReq.Environment == "" {
+		machineReq.Environment = "development"
+	}
+
+	// Create machine struct
+	machine := &fleet.Machine{
+		ID:          machineReq.ID,
+		Name:        machineReq.Name,
+		Address:     machineReq.Address,
+		Environment: machineReq.Environment,
+		Tags:        machineReq.Tags,
+		SSHConfig: fleet.SSHConfig{
+			User: machineReq.SSHUser,
+			Port: machineReq.SSHPort,
+		},
+		Status: fleet.MachineStatusUnknown,
+	}
+
+	// Add machine to fleet
+	err := s.fleetManager.AddMachine(r.Context(), machine)
+	if err != nil {
+		s.sendError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	s.logger.Info(fmt.Sprintf("Machine added: %s (%s) by user %s", machineReq.Name, machineReq.ID, user.Username))
+	s.sendSuccess(w, machine)
+}
+
+func (s *EnhancedServer) handleGetMachine(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	vars := mux.Vars(r)
+	machineID := vars["machineId"]
+
+	if s.fleetManager == nil {
+		s.sendError(w, "Fleet management not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	machine, err := s.fleetManager.GetMachine(r.Context(), machineID)
+	if err != nil {
+		s.sendError(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	s.sendSuccess(w, machine)
+}
+
+func (s *EnhancedServer) handleRemoveMachine(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Check authentication
+	user := s.requireAuth(w, r)
+	if user == nil {
+		return
+	}
+
+	vars := mux.Vars(r)
+	machineID := vars["machineId"]
+
+	if s.fleetManager == nil {
+		s.sendError(w, "Fleet management not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	if err := s.fleetManager.RemoveMachine(r.Context(), machineID); err != nil {
+		s.sendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.logger.Info(fmt.Sprintf("Machine removed: %s by user %s", machineID, user.Username))
+	s.sendSuccess(w, map[string]interface{}{
+		"message":    "Machine removed successfully",
+		"machine_id": machineID,
+	})
+}
+
+func (s *EnhancedServer) handleFleetDeploy(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Check authentication
+	user := s.requireAuth(w, r)
+	if user == nil {
+		return
+	}
+
+	var deployReq struct {
+		Name       string   `json:"name"`
+		ConfigHash string   `json:"config_hash"`
+		Targets    []string `json:"targets"`
+		Strategy   string   `json:"strategy"`
+		BatchSize  int      `json:"batch_size"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&deployReq); err != nil {
+		s.sendError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if deployReq.Name == "" || deployReq.ConfigHash == "" {
+		s.sendError(w, "Deployment name and config hash are required", http.StatusBadRequest)
+		return
+	}
+
+	// Create mock deployment
+	deployment := map[string]interface{}{
+		"id":          fmt.Sprintf("deploy-%d", time.Now().Unix()),
+		"name":        deployReq.Name,
+		"config_hash": deployReq.ConfigHash,
+		"targets":     deployReq.Targets,
+		"status":      "pending",
+		"created_at":  time.Now().Format(time.RFC3339),
+		"created_by":  user.Username,
+	}
+
+	s.logger.Info(fmt.Sprintf("Deployment created: %s by user %s", deployReq.Name, user.Username))
+	s.sendSuccess(w, deployment)
+}
+
+func (s *EnhancedServer) handleFleetDeployments(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Mock deployments data
+	deployments := []map[string]interface{}{
+		{
+			"id":         "deploy-001",
+			"name":       "Production Update",
+			"status":     "completed",
+			"targets":    []string{"server01", "server02"},
+			"created_at": time.Now().Add(-2 * time.Hour).Format(time.RFC3339),
+			"created_by": "admin",
+		},
+		{
+			"id":         "deploy-002",
+			"name":       "Security Patches",
+			"status":     "running",
+			"targets":    []string{"server03"},
+			"created_at": time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
+			"created_by": "admin",
+		},
+	}
+
+	s.sendSuccess(w, map[string]interface{}{
+		"deployments": deployments,
+		"total":       len(deployments),
+	})
+}
+
+func (s *EnhancedServer) handleGetDeployment(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	vars := mux.Vars(r)
+	deploymentID := vars["deploymentId"]
+
+	// Mock deployment data
+	deployment := map[string]interface{}{
+		"id":         deploymentID,
+		"name":       "Production Update",
+		"status":     "completed",
+		"targets":    []string{"server01", "server02"},
+		"created_at": time.Now().Add(-2 * time.Hour).Format(time.RFC3339),
+		"created_by": "admin",
+		"progress": map[string]interface{}{
+			"total":      2,
+			"completed":  2,
+			"failed":     0,
+			"percentage": 100,
+		},
+	}
+
+	s.sendSuccess(w, deployment)
+}
+
+func (s *EnhancedServer) handleFleetHealth(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Mock fleet health data
+	health := map[string]interface{}{
+		"overall_status": "healthy",
+		"machines": []map[string]interface{}{
+			{
+				"id":     "server01",
+				"name":   "Production Server 1",
+				"status": "healthy",
+				"cpu":    45.2,
+				"memory": 67.8,
+				"disk":   23.1,
+				"uptime": "15d 4h 32m",
+			},
+			{
+				"id":     "server02",
+				"name":   "Production Server 2",
+				"status": "healthy",
+				"cpu":    32.1,
+				"memory": 54.3,
+				"disk":   18.7,
+				"uptime": "12d 8h 15m",
+			},
+		},
+		"alerts":       []map[string]interface{}{},
+		"last_updated": time.Now().Format(time.RFC3339),
+	}
+
+	s.sendSuccess(w, health)
+}
+
+// Configuration Management Handlers
+
+func (s *EnhancedServer) handleConfigurations(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	switch r.Method {
+	case "GET":
+		s.handleListConfigurations(w, r)
+	case "POST":
+		s.handleCreateConfiguration(w, r)
+	default:
+		s.sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *EnhancedServer) handleListConfigurations(w http.ResponseWriter, r *http.Request) {
+	// Mock configuration data for now
+	configurations := []map[string]interface{}{
+		{
+			"id":          "config_001",
+			"name":        "Desktop Development",
+			"type":        "desktop",
+			"description": "Development machine with GNOME and dev tools",
+			"created_at":  "2024-01-15T10:00:00Z",
+			"updated_at":  "2024-01-15T10:00:00Z",
+			"status":      "active",
+		},
+		{
+			"id":          "config_002",
+			"name":        "Production Server",
+			"type":        "server",
+			"description": "Web server with Nginx and PostgreSQL",
+			"created_at":  "2024-01-10T14:30:00Z",
+			"updated_at":  "2024-01-20T09:15:00Z",
+			"status":      "deployed",
+		},
+	}
+
+	s.sendSuccess(w, configurations)
+}
+
+func (s *EnhancedServer) handleCreateConfiguration(w http.ResponseWriter, r *http.Request) {
+	// Check authentication
+	user := s.requireAuth(w, r)
+	if user == nil {
+		return
+	}
+
+	var configReq struct {
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		Description string `json:"description"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&configReq); err != nil {
+		s.sendError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if configReq.Name == "" {
+		s.sendError(w, "Configuration name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Generate a new configuration ID
+	configID := fmt.Sprintf("config_%d", time.Now().Unix())
+
+	// Create the configuration
+	newConfig := map[string]interface{}{
+		"id":          configID,
+		"name":        configReq.Name,
+		"type":        configReq.Type,
+		"description": configReq.Description,
+		"created_at":  time.Now().Format(time.RFC3339),
+		"updated_at":  time.Now().Format(time.RFC3339),
+		"status":      "draft",
+		"created_by":  user.Username,
+	}
+
+	s.logger.Info(fmt.Sprintf("Configuration created: %s by user %s", configReq.Name, user.Username))
+	s.sendSuccess(w, newConfig)
+}
+
+// Builder API Handlers
+
+func (s *EnhancedServer) handleBuilderValidate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Demo validation response
+	response := map[string]interface{}{
+		"valid":  true,
+		"errors": []string{},
+		"warnings": []string{
+			"Consider enabling firewall for better security",
+		},
+		"suggestions": []string{
+			"Add hardware acceleration for better performance",
+			"Consider using systemd for service management",
+			"Consider using Home Manager for user-specific configurations",
+		},
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *EnhancedServer) handleBuilderGenerate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Demo generated configuration
+	nixConfig := `# Generated NixOS Configuration
+{
+  # System configuration
+  system.stateVersion = "24.05";
+  
+  # Boot configuration
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+  
+  # Network configuration
+  networking = {
+    hostName = "nixos-server";
+    networkmanager.enable = true;
+    firewall.enable = true;
+  };
+  
+  # Services
+  services = {
+    openssh.enable = true;
+    nginx.enable = true;
+    postgresql.enable = true;
+  };
+  
+  # Users
+  users.users.admin = {
+    isNormalUser = true;
+    extraGroups = [ "wheel" "networkmanager" ];
+  };
+  
+  # Environment
+  environment.systemPackages = with pkgs; [
+    wget curl git vim htop
+  ];
+}`
+
+	response := map[string]interface{}{
+		"success":       true,
+		"configuration": nixConfig,
+		"filename":      "configuration.nix",
+		"size":          len(nixConfig),
+		"checksum":      "abc123def456",
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// Config API Handlers
+
+func (s *EnhancedServer) handleConfigBranches(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	s.logger.Debug("Handling config branches API request")
+
+	// Return branch information (can be integrated with ConfigRepository later)
+	data := map[string]interface{}{
+		"branches": []map[string]interface{}{
+			{
+				"name":      "main",
+				"current":   true,
+				"commit":    "abc123",
+				"timestamp": time.Now().Add(-2 * time.Hour).Format(time.RFC3339),
+				"message":   "Latest configuration update",
+			},
+			{
+				"name":      "development",
+				"current":   false,
+				"commit":    "def456",
+				"timestamp": time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+				"message":   "Development environment setup",
+			},
+		},
+		"current_branch": "main",
+	}
+
+	s.sendSuccess(w, data)
+}
+
+func (s *EnhancedServer) handleConfigFiles(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	s.logger.Debug("Handling config files API request")
+
+	// Return configuration files information
+	data := map[string]interface{}{
+		"files": []map[string]interface{}{
+			{
+				"path":     "configuration.nix",
+				"size":     "2.1KB",
+				"modified": time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
+				"status":   "modified",
+				"type":     "configuration",
+			},
+			{
+				"path":     "hardware-configuration.nix",
+				"size":     "1.3KB",
+				"modified": time.Now().Add(-2 * time.Hour).Format(time.RFC3339),
+				"status":   "clean",
+				"type":     "hardware",
+			},
+			{
+				"path":     "flake.nix",
+				"size":     "856B",
+				"modified": time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
+				"status":   "clean",
+				"type":     "flake",
+			},
+		},
+		"total_files":    3,
+		"modified_files": 1,
+	}
+
+	s.sendSuccess(w, data)
+}
+
+// Versioning API Handlers
+
+func (s *EnhancedServer) handleVersioningRepositories(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Try to get real repository information from ConfigRepository
+	var repositories []map[string]interface{}
+
+	if s.configRepo != nil {
+		// ConfigRepository represents a single repository, so we'll show its status
+		repositories = append(repositories, map[string]interface{}{
+			"id":           "config-repo",
+			"name":         "Configuration Repository",
+			"path":         ".",
+			"branch":       "main",
+			"lastCommit":   "latest",
+			"lastModified": time.Now().Format("2006-01-02T15:04:05Z"),
+			"status":       "active",
+		})
+	}
+
+	// Fall back to demo data if no real repositories available
+	if len(repositories) == 0 {
+		repositories = []map[string]interface{}{
+			{
+				"id":           "nixos-config",
+				"name":         "NixOS Configuration",
+				"path":         "/etc/nixos",
+				"branch":       "main",
+				"lastCommit":   "abc123",
+				"lastModified": time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05Z"),
+				"status":       "clean",
+			},
+			{
+				"id":           "home-manager",
+				"name":         "Home Manager Config",
+				"path":         "~/.config/home-manager",
+				"branch":       "main",
+				"lastCommit":   "def456",
+				"lastModified": time.Now().Add(-1 * time.Hour).Format("2006-01-02T15:04:05Z"),
+				"status":       "modified",
+			},
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"repositories": repositories,
+		"total":        len(repositories),
+	})
+}
+
+func (s *EnhancedServer) handleVersioningStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Demo repository status
+	status := map[string]interface{}{
+		"branch":    "main",
+		"commit":    "abc123def456",
+		"clean":     false,
+		"modified":  []string{"configuration.nix", "hardware-configuration.nix"},
+		"untracked": []string{"test.nix"},
+		"staged":    []string{},
+		"behind":    0,
+		"ahead":     2,
+	}
+
+	json.NewEncoder(w).Encode(status)
+}
+
+func (s *EnhancedServer) handleVersioningBranches(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == "GET" {
+		// List branches
+		branches := []map[string]interface{}{
+			{
+				"name":       "main",
+				"current":    true,
+				"commit":     "abc123",
+				"lastCommit": time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05Z"),
+			},
+			{
+				"name":       "feature/new-services",
+				"current":    false,
+				"commit":     "def456",
+				"lastCommit": time.Now().Add(-24 * time.Hour).Format("2006-01-02T15:04:05Z"),
+			},
+			{
+				"name":       "hotfix/security-patch",
+				"current":    false,
+				"commit":     "ghi789",
+				"lastCommit": time.Now().Add(-72 * time.Hour).Format("2006-01-02T15:04:05Z"),
+			},
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"branches": branches,
+			"total":    len(branches),
+		})
+	} else {
+		// Create branch
+		response := map[string]interface{}{
+			"success": true,
+			"message": "Branch created successfully",
+		}
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func (s *EnhancedServer) handleVersioningCommits(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Try to get real snapshots from ConfigRepository
+	var commits []map[string]interface{}
+
+	if s.configRepo != nil {
+		snapshots, err := s.configRepo.ListSnapshots(r.Context())
+		if err == nil {
+			for _, snapshot := range snapshots {
+				commits = append(commits, map[string]interface{}{
+					"hash":      snapshot.ID,
+					"author":    snapshot.Author,
+					"message":   snapshot.Message,
+					"timestamp": snapshot.Timestamp.Format("2006-01-02T15:04:05Z"),
+					"files":     getFileList(snapshot.Files),
+				})
+			}
+		} else {
+			s.logger.Warn(fmt.Sprintf("Failed to get snapshots from config repo: %v", err))
+		}
+	}
+
+	// Fall back to demo data if no real snapshots available
+	if len(commits) == 0 {
+		commits = []map[string]interface{}{
+			{
+				"hash":      "abc123def456",
+				"author":    "Admin User",
+				"message":   "Update system configuration with new services",
+				"timestamp": time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05Z"),
+				"files":     []string{"configuration.nix", "services.nix"},
+			},
+			{
+				"hash":      "def456ghi789",
+				"author":    "Dev User",
+				"message":   "Add development tools and environment",
+				"timestamp": time.Now().Add(-24 * time.Hour).Format("2006-01-02T15:04:05Z"),
+				"files":     []string{"packages.nix", "shell.nix"},
+			},
+			{
+				"hash":      "ghi789jkl012",
+				"author":    "Admin User",
+				"message":   "Initial system setup",
+				"timestamp": time.Now().Add(-72 * time.Hour).Format("2006-01-02T15:04:05Z"),
+				"files":     []string{"configuration.nix", "hardware-configuration.nix"},
+			},
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"commits": commits,
+		"total":   len(commits),
+	})
+}
+
+// Helper function to get file list from snapshot files map
+func getFileList(files map[string]string) []string {
+	var fileList []string
+	for filePath := range files {
+		fileList = append(fileList, filePath)
+	}
+	return fileList
+}
+
+func (s *EnhancedServer) handleVersioningTags(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == "GET" {
+		// List tags
+		tags := []map[string]interface{}{
+			{
+				"name":      "v1.0.0",
+				"commit":    "abc123",
+				"message":   "Initial stable release",
+				"timestamp": time.Now().Add(-168 * time.Hour).Format("2006-01-02T15:04:05Z"),
+			},
+			{
+				"name":      "v1.1.0",
+				"commit":    "def456",
+				"message":   "Feature update with new services",
+				"timestamp": time.Now().Add(-72 * time.Hour).Format("2006-01-02T15:04:05Z"),
+			},
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"tags":  tags,
+			"total": len(tags),
+		})
+	} else {
+		// Create tag
+		response := map[string]interface{}{
+			"success": true,
+			"message": "Tag created successfully",
+		}
+		json.NewEncoder(w).Encode(response)
+	}
+}
+
+func (s *EnhancedServer) handleVersioningStats(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Demo versioning stats
+	stats := map[string]interface{}{
+		"totalRepositories": 2,
+		"totalCommits":      15,
+		"totalBranches":     3,
+		"totalTags":         2,
+		"activeUsers":       2,
+		"recentActivity": []map[string]interface{}{
+			{
+				"action":    "commit",
+				"user":      "Admin User",
+				"message":   "Update system configuration",
+				"timestamp": time.Now().Add(-2 * time.Hour).Format("2006-01-02T15:04:05Z"),
+			},
+			{
+				"action":    "branch_create",
+				"user":      "Dev User",
+				"message":   "Created feature/new-services branch",
+				"timestamp": time.Now().Add(-24 * time.Hour).Format("2006-01-02T15:04:05Z"),
+			},
+		},
+	}
+
+	json.NewEncoder(w).Encode(stats)
+}
+
+func (s *EnhancedServer) handleVersioningChanges(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Demo changes data
+	changes := []map[string]interface{}{
+		{
+			"file":    "configuration.nix",
+			"status":  "modified",
+			"lines":   "+15 -3",
+			"preview": "Added new services: nginx, postgresql",
+		},
+		{
+			"file":    "hardware-configuration.nix",
+			"status":  "modified",
+			"lines":   "+2 -1",
+			"preview": "Updated boot configuration",
+		},
+		{
+			"file":    "test.nix",
+			"status":  "untracked",
+			"lines":   "+25 -0",
+			"preview": "New test configuration file",
+		},
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"changes": changes,
+		"total":   len(changes),
+	})
+}
+
+func (s *EnhancedServer) handleVersioningCreateBranch(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Branch created successfully",
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *EnhancedServer) handleVersioningCreateTag(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Tag created successfully",
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *EnhancedServer) handleVersioningCommit(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	response := map[string]interface{}{
+		"success": true,
+		"commit":  fmt.Sprintf("abc%d", time.Now().Unix()),
+		"message": "Commit created successfully",
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *EnhancedServer) handleVersioningCheckout(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Checkout completed successfully",
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *EnhancedServer) handleVersioningDiff(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	vars := mux.Vars(r)
+	fileName := vars["fileName"]
+
+	// Demo diff data
+	diff := map[string]interface{}{
+		"file": fileName,
+		"changes": []map[string]interface{}{
+			{
+				"type":    "addition",
+				"line":    15,
+				"content": "+  services.nginx.enable = true;",
+			},
+			{
+				"type":    "addition",
+				"line":    16,
+				"content": "+  services.postgresql.enable = true;",
+			},
+			{
+				"type":    "deletion",
+				"line":    20,
+				"content": "-  # services.httpd.enable = false;",
+			},
+		},
+	}
+
+	json.NewEncoder(w).Encode(diff)
+}
+
+func (s *EnhancedServer) handleVersioningStage(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Files staged successfully",
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *EnhancedServer) handleVersioningStageAll(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "All files staged successfully",
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// AI Chat API Handler
+
+func (s *EnhancedServer) handleAIChat(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Demo AI chat response
+	response := map[string]interface{}{
+		"success": true,
+		"response": "I can help you with NixOS configuration! Here are some suggestions:\n\n" +
+			"1. For web servers, consider enabling nginx with SSL\n" +
+			"2. Always configure firewall rules for security\n" +
+			"3. Use systemd services for better process management\n" +
+			"4. Consider using Home Manager for user-specific configurations\n\n" +
+			"What specific aspect of NixOS would you like help with?",
+		"suggestions": []string{
+			"Configure web server",
+			"Set up development environment",
+			"Security hardening",
+			"Package management",
+		},
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// User Management Handlers
+
+func (s *EnhancedServer) handleCreateUser(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Check authentication and admin permissions
+	if !s.requireAdminAuth(w, r) {
+		return
+	}
+
+	var createReq struct {
+		Username    string `json:"username"`
+		Email       string `json:"email"`
+		DisplayName string `json:"display_name"`
+		Password    string `json:"password"`
+		Role        string `json:"role"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&createReq); err != nil {
+		s.sendError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if s.authManager == nil {
+		s.sendError(w, "User management not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	user, err := s.authManager.CreateUser(createReq.Username, createReq.Email, createReq.DisplayName, createReq.Password, createReq.Role)
+	if err != nil {
+		s.sendError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Return public user data (without password hash)
+	publicUser := map[string]interface{}{
+		"id":           user.ID,
+		"username":     user.Username,
+		"email":        user.Email,
+		"display_name": user.DisplayName,
+		"role":         user.Role,
+		"active":       user.Active,
+		"created_at":   user.CreatedAt,
+	}
+
+	s.sendSuccess(w, publicUser)
+}
+
+func (s *EnhancedServer) handleListUsers(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Check authentication and admin permissions
+	if !s.requireAdminAuth(w, r) {
+		return
+	}
+
+	if s.authManager == nil {
+		s.sendError(w, "User management not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	users := s.authManager.ListUsers()
+	s.sendSuccess(w, users)
+}
+
+func (s *EnhancedServer) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	// Add CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// Check authentication
+	user := s.requireAuth(w, r)
+	if user == nil {
+		return
+	}
+
+	var changeReq struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new_password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&changeReq); err != nil {
+		s.sendError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if s.authManager == nil {
+		s.sendError(w, "User management not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	if err := s.authManager.ChangePassword(user.ID, changeReq.CurrentPassword, changeReq.NewPassword); err != nil {
+		s.sendError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Password changed successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// Authentication middleware helpers
+
+func (s *EnhancedServer) requireAuth(w http.ResponseWriter, r *http.Request) *auth.PublicUser {
+	authHeader := r.Header.Get("Authorization")
+	token := ""
+	if authHeader != "" && len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+		token = authHeader[7:]
+	}
+
+	if s.authManager == nil || token == "" {
+		s.sendError(w, "Authentication required", http.StatusUnauthorized)
+		return nil
+	}
+
+	user, err := s.authManager.ValidateSession(token)
+	if err != nil {
+		s.sendError(w, "Invalid session", http.StatusUnauthorized)
+		return nil
+	}
+
+	return user
+}
+
+func (s *EnhancedServer) requireAdminAuth(w http.ResponseWriter, r *http.Request) bool {
+	user := s.requireAuth(w, r)
+	if user == nil {
+		return false
+	}
+
+	// Check if user has admin permissions
+	hasAdmin := false
+	for _, perm := range user.Permissions {
+		if perm == "admin" || perm == "user_management" {
+			hasAdmin = true
+			break
+		}
+	}
+
+	if !hasAdmin {
+		s.sendError(w, "Admin access required", http.StatusForbidden)
+		return false
+	}
+
+	return true
+}

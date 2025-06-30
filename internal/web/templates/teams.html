@@ -1,0 +1,757 @@
+{{define "title"}}Team Collaboration - nixai{{end}}
+
+{{define "content"}}
+<div class="nixai-container">
+    <!-- Teams Header -->
+    <div class="nixai-header">
+        <h1 class="nixai-title">Team Collaboration</h1>
+        <p class="nixai-subtitle">Collaborate on NixOS configurations with your team</p>
+        
+        <div class="nixai-actions">
+            <button class="nixai-button nixai-button-primary" onclick="createTeam()">
+                <i class="fas fa-plus"></i> Create Team
+            </button>
+            <button class="nixai-button nixai-button-secondary" onclick="joinTeam()">
+                <i class="fas fa-user-plus"></i> Join Team
+            </button>
+            <button class="nixai-button nixai-button-secondary" onclick="inviteMembers()">
+                <i class="fas fa-envelope"></i> Send Invites
+            </button>
+        </div>
+    </div>
+
+    <!-- Team Overview -->
+    <div class="nixai-grid nixai-grid-cols-3 nixai-gap">
+        <div class="nixai-card">
+            <div class="nixai-card-content">
+                <div class="stat-item">
+                    <div class="stat-icon text-primary">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalTeams">0</div>
+                        <div class="stat-label">My Teams</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nixai-card">
+            <div class="nixai-card-content">
+                <div class="stat-item">
+                    <div class="stat-icon text-success">
+                        <i class="fas fa-code-branch"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="activeProjects">0</div>
+                        <div class="stat-label">Active Projects</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nixai-card">
+            <div class="nixai-card-content">
+                <div class="stat-item">
+                    <div class="stat-icon text-warning">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="pendingReviews">0</div>
+                        <div class="stat-label">Pending Reviews</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="nixai-grid nixai-grid-cols-12 nixai-gap">
+        <!-- Teams Sidebar -->
+        <div class="nixai-grid-span-3">
+            <div class="nixai-card">
+                <div class="nixai-card-header">
+                    <h3>My Teams</h3>
+                    <button class="nixai-button nixai-button-small" onclick="refreshTeams()">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+                <div class="nixai-card-content">
+                    <div class="teams-list" id="teamsList">
+                        <!-- Teams will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Members -->
+            <div class="nixai-card nixai-mt">
+                <div class="nixai-card-header">
+                    <h3>Active Members</h3>
+                </div>
+                <div class="nixai-card-content">
+                    <div class="active-members" id="activeMembers">
+                        <!-- Active members will be shown here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Team Area -->
+        <div class="nixai-grid-span-6">
+            <div class="nixai-card nixai-full-height">
+                <div class="nixai-card-header">
+                    <h3 id="currentTeamName">Select a Team</h3>
+                    <div class="nixai-actions-small" id="teamActions" style="display: none;">
+                        <button class="nixai-button nixai-button-small" onclick="teamSettings()">
+                            <i class="fas fa-cog"></i> Settings
+                        </button>
+                        <button class="nixai-button nixai-button-small" onclick="viewProjects()">
+                            <i class="fas fa-folder"></i> Projects
+                        </button>
+                    </div>
+                </div>
+                <div class="nixai-card-content">
+                    <div id="teamContent">
+                        <div class="empty-state">
+                            <i class="fas fa-users"></i>
+                            <h3>Welcome to Team Collaboration</h3>
+                            <p>Select a team from the sidebar to view projects and collaborate with your team members.</p>
+                            <button class="nixai-button nixai-button-primary" onclick="createTeam()">
+                                Create Your First Team
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Feed -->
+        <div class="nixai-grid-span-3">
+            <div class="nixai-card">
+                <div class="nixai-card-header">
+                    <h3>Recent Activity</h3>
+                </div>
+                <div class="nixai-card-content">
+                    <div class="activity-feed" id="activityFeed">
+                        <!-- Activity items will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="nixai-card nixai-mt">
+                <div class="nixai-card-header">
+                    <h3>Quick Actions</h3>
+                </div>
+                <div class="nixai-card-content">
+                    <div class="quick-actions">
+                        <button class="nixai-button nixai-button-block" onclick="startCollabSession()">
+                            <i class="fas fa-video"></i> Start Collaboration Session
+                        </button>
+                        <button class="nixai-button nixai-button-block nixai-mt-small" onclick="shareConfiguration()">
+                            <i class="fas fa-share"></i> Share Configuration
+                        </button>
+                        <button class="nixai-button nixai-button-block nixai-mt-small" onclick="requestReview()">
+                            <i class="fas fa-eye"></i> Request Review
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Team Modal -->
+<div id="createTeamModal" class="nixai-modal">
+    <div class="nixai-modal-content">
+        <div class="nixai-modal-header">
+            <h2>Create New Team</h2>
+            <button class="nixai-modal-close" onclick="closeModal('createTeamModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="nixai-modal-body">
+            <form id="createTeamForm">
+                <div class="form-group">
+                    <label for="teamName">Team Name</label>
+                    <input type="text" id="teamName" name="name" class="nixai-input" required>
+                </div>
+                <div class="form-group">
+                    <label for="teamDescription">Description</label>
+                    <textarea id="teamDescription" name="description" class="nixai-textarea" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="teamVisibility">Visibility</label>
+                    <select id="teamVisibility" name="visibility" class="nixai-select">
+                        <option value="private">Private - Invite only</option>
+                        <option value="public">Public - Anyone can join</option>
+                        <option value="organization">Organization - Organization members can join</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="teamMembers">Initial Members (email addresses)</label>
+                    <textarea id="teamMembers" name="members" class="nixai-textarea" rows="2" placeholder="user1@example.com, user2@example.com"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="nixai-modal-footer">
+            <button class="nixai-button nixai-button-secondary" onclick="closeModal('createTeamModal')">Cancel</button>
+            <button class="nixai-button nixai-button-primary" onclick="saveTeam()">Create Team</button>
+        </div>
+    </div>
+</div>
+
+<!-- Join Team Modal -->
+<div id="joinTeamModal" class="nixai-modal">
+    <div class="nixai-modal-content">
+        <div class="nixai-modal-header">
+            <h2>Join Team</h2>
+            <button class="nixai-modal-close" onclick="closeModal('joinTeamModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="nixai-modal-body">
+            <div class="form-group">
+                <label for="teamCode">Team Invitation Code</label>
+                <input type="text" id="teamCode" class="nixai-input" placeholder="Enter invitation code">
+            </div>
+            <div class="form-group">
+                <label>Or browse public teams:</label>
+                <div class="public-teams" id="publicTeams">
+                    <!-- Public teams will be loaded here -->
+                </div>
+            </div>
+        </div>
+        <div class="nixai-modal-footer">
+            <button class="nixai-button nixai-button-secondary" onclick="closeModal('joinTeamModal')">Cancel</button>
+            <button class="nixai-button nixai-button-primary" onclick="joinTeamByCode()">Join Team</button>
+        </div>
+    </div>
+</div>
+
+<!-- Collaboration Session Modal -->
+<div id="collabSessionModal" class="nixai-modal nixai-modal-large">
+    <div class="nixai-modal-content">
+        <div class="nixai-modal-header">
+            <h2>Live Collaboration Session</h2>
+            <div class="session-controls">
+                <button class="nixai-button nixai-button-small" onclick="toggleAudio()">
+                    <i class="fas fa-microphone" id="audioIcon"></i>
+                </button>
+                <button class="nixai-button nixai-button-small" onclick="toggleVideo()">
+                    <i class="fas fa-video" id="videoIcon"></i>
+                </button>
+                <button class="nixai-button nixai-button-small" onclick="shareScreen()">
+                    <i class="fas fa-desktop"></i>
+                </button>
+            </div>
+            <button class="nixai-modal-close" onclick="closeModal('collabSessionModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="nixai-modal-body">
+            <div class="collab-session">
+                <div class="session-main">
+                    <div class="shared-editor" id="sharedEditor">
+                        <!-- Shared code editor will be here -->
+                        <textarea id="collaborativeEditor" class="nixai-textarea" rows="20" placeholder="Collaborative NixOS configuration editing..."></textarea>
+                    </div>
+                </div>
+                <div class="session-sidebar">
+                    <div class="participants">
+                        <h4>Participants</h4>
+                        <div class="participant-list" id="participantList">
+                            <!-- Participants will be shown here -->
+                        </div>
+                    </div>
+                    <div class="session-chat">
+                        <h4>Chat</h4>
+                        <div class="chat-messages" id="sessionChatMessages">
+                            <!-- Chat messages will be shown here -->
+                        </div>
+                        <div class="chat-input">
+                            <input type="text" id="sessionChatInput" placeholder="Type a message..." class="nixai-input">
+                            <button onclick="sendSessionMessage()">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="nixai-modal-footer">
+            <button class="nixai-button nixai-button-secondary" onclick="leaveSession()">Leave Session</button>
+            <button class="nixai-button nixai-button-primary" onclick="saveCollabChanges()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTeam = null;
+let allTeams = [];
+let collaborationSession = null;
+
+// Initialize teams page
+document.addEventListener('DOMContentLoaded', function() {
+    loadTeams();
+    loadActivity();
+    loadStats();
+    
+    // Setup real-time updates
+    if (window.nixaiWS) {
+        window.nixaiWS.addEventListener('message', function(event) {
+            const data = JSON.parse(event.data);
+            switch (data.type) {
+                case 'team_update':
+                    updateTeamData(data.team_id, data.update);
+                    break;
+                case 'activity_update':
+                    addActivityItem(data.activity);
+                    break;
+                case 'collaboration_event':
+                    handleCollaborationEvent(data);
+                    break;
+            }
+        });
+    }
+});
+
+function loadTeams() {
+    fetch('/api/teams')
+        .then(response => response.json())
+        .then(data => {
+            allTeams = data.teams || [];
+            renderTeams();
+            updateStats();
+        })
+        .catch(error => {
+            showNotification('Failed to load teams: ' + error.message, 'error');
+        });
+}
+
+function renderTeams() {
+    const teamsList = document.getElementById('teamsList');
+    teamsList.innerHTML = '';
+    
+    if (allTeams.length === 0) {
+        teamsList.innerHTML = `
+            <div class="empty-state-small">
+                <p>No teams yet</p>
+                <button class="nixai-button nixai-button-small" onclick="createTeam()">
+                    Create your first team
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    allTeams.forEach(team => {
+        const teamElement = document.createElement('div');
+        teamElement.className = 'team-item';
+        teamElement.onclick = () => selectTeam(team);
+        
+        teamElement.innerHTML = `
+            <div class="team-avatar">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="team-info">
+                <div class="team-name">${team.name}</div>
+                <div class="team-meta">
+                    ${team.member_count} members • ${team.project_count} projects
+                </div>
+            </div>
+            <div class="team-status">
+                <span class="status-dot ${team.online_members > 0 ? 'online' : 'offline'}"></span>
+            </div>
+        `;
+        
+        teamsList.appendChild(teamElement);
+    });
+}
+
+function selectTeam(team) {
+    currentTeam = team;
+    
+    // Update UI
+    document.querySelectorAll('.team-item').forEach(item => item.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    
+    document.getElementById('currentTeamName').textContent = team.name;
+    document.getElementById('teamActions').style.display = 'flex';
+    
+    loadTeamContent(team.id);
+    loadTeamMembers(team.id);
+}
+
+function loadTeamContent(teamId) {
+    fetch(`/api/teams/${teamId}`)
+        .then(response => response.json())
+        .then(data => {
+            renderTeamContent(data);
+        })
+        .catch(error => {
+            showNotification('Failed to load team content: ' + error.message, 'error');
+        });
+}
+
+function renderTeamContent(teamData) {
+    const content = document.getElementById('teamContent');
+    content.innerHTML = `
+        <div class="team-dashboard">
+            <div class="team-overview">
+                <div class="team-description">
+                    <p>${teamData.description || 'No description provided.'}</p>
+                </div>
+                
+                <div class="team-stats">
+                    <div class="stat-grid">
+                        <div class="stat-item">
+                            <span class="stat-number">${teamData.projects.length}</span>
+                            <span class="stat-label">Projects</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">${teamData.active_configurations}</span>
+                            <span class="stat-label">Configurations</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">${teamData.total_deployments}</span>
+                            <span class="stat-label">Deployments</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="team-projects">
+                <div class="section-header">
+                    <h4>Recent Projects</h4>
+                    <button class="nixai-button nixai-button-small" onclick="createProject()">
+                        <i class="fas fa-plus"></i> New Project
+                    </button>
+                </div>
+                
+                <div class="projects-grid">
+                    ${teamData.projects.map(project => `
+                        <div class="project-card" onclick="openProject('${project.id}')">
+                            <div class="project-header">
+                                <h5>${project.name}</h5>
+                                <span class="project-status ${project.status}">${project.status}</span>
+                            </div>
+                            <p class="project-description">${project.description || 'No description'}</p>
+                            <div class="project-meta">
+                                <span><i class="fas fa-user"></i> ${project.owner}</span>
+                                <span><i class="fas fa-clock"></i> ${project.updated_at}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            
+            <div class="team-configurations">
+                <div class="section-header">
+                    <h4>Shared Configurations</h4>
+                    <button class="nixai-button nixai-button-small" onclick="shareNewConfig()">
+                        <i class="fas fa-share"></i> Share Config
+                    </button>
+                </div>
+                
+                <div class="config-list">
+                    ${teamData.configurations.map(config => `
+                        <div class="config-item">
+                            <div class="config-icon">
+                                <i class="fas fa-file-code"></i>
+                            </div>
+                            <div class="config-info">
+                                <div class="config-name">${config.name}</div>
+                                <div class="config-meta">
+                                    by ${config.author} • ${config.updated_at}
+                                </div>
+                            </div>
+                            <div class="config-actions">
+                                <button class="nixai-button nixai-button-small" onclick="viewConfig('${config.id}')">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="nixai-button nixai-button-small" onclick="forkConfig('${config.id}')">
+                                    <i class="fas fa-code-branch"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function loadTeamMembers(teamId) {
+    fetch(`/api/teams/${teamId}/members`)
+        .then(response => response.json())
+        .then(data => {
+            renderActiveMembers(data.members);
+        })
+        .catch(error => {
+            console.error('Failed to load team members:', error);
+        });
+}
+
+function renderActiveMembers(members) {
+    const container = document.getElementById('activeMembers');
+    container.innerHTML = '';
+    
+    const onlineMembers = members.filter(m => m.online);
+    
+    if (onlineMembers.length === 0) {
+        container.innerHTML = '<p class="text-muted">No members online</p>';
+        return;
+    }
+    
+    onlineMembers.forEach(member => {
+        const memberElement = document.createElement('div');
+        memberElement.className = 'member-item';
+        memberElement.innerHTML = `
+            <div class="member-avatar">
+                <img src="${member.avatar || '/static/images/default-avatar.png'}" alt="${member.name}">
+                <span class="status-indicator online"></span>
+            </div>
+            <div class="member-info">
+                <div class="member-name">${member.name}</div>
+                <div class="member-activity">${member.current_activity || 'Available'}</div>
+            </div>
+            <div class="member-actions">
+                <button class="nixai-button nixai-button-small" onclick="startDirectChat('${member.id}')">
+                    <i class="fas fa-comment"></i>
+                </button>
+            </div>
+        `;
+        container.appendChild(memberElement);
+    });
+}
+
+function createTeam() {
+    document.getElementById('createTeamForm').reset();
+    showModal('createTeamModal');
+}
+
+function saveTeam() {
+    const form = document.getElementById('createTeamForm');
+    const formData = new FormData(form);
+    
+    const teamData = {
+        name: formData.get('name'),
+        description: formData.get('description'),
+        visibility: formData.get('visibility'),
+        initial_members: formData.get('members') ? 
+            formData.get('members').split(',').map(email => email.trim()).filter(email => email) : []
+    };
+    
+    fetch('/api/teams', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(teamData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeModal('createTeamModal');
+            loadTeams();
+            showNotification('Team created successfully', 'success');
+            
+            if (teamData.initial_members.length > 0) {
+                showNotification(`Invitations sent to ${teamData.initial_members.length} members`, 'info');
+            }
+        } else {
+            showNotification('Failed to create team: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to create team: ' + error.message, 'error');
+    });
+}
+
+function joinTeam() {
+    loadPublicTeams();
+    showModal('joinTeamModal');
+}
+
+function loadPublicTeams() {
+    fetch('/api/teams/public')
+        .then(response => response.json())
+        .then(data => {
+            renderPublicTeams(data.teams || []);
+        })
+        .catch(error => {
+            console.error('Failed to load public teams:', error);
+        });
+}
+
+function renderPublicTeams(teams) {
+    const container = document.getElementById('publicTeams');
+    container.innerHTML = '';
+    
+    if (teams.length === 0) {
+        container.innerHTML = '<p class="text-muted">No public teams available</p>';
+        return;
+    }
+    
+    teams.forEach(team => {
+        const teamElement = document.createElement('div');
+        teamElement.className = 'public-team-item';
+        teamElement.innerHTML = `
+            <div class="team-info">
+                <div class="team-name">${team.name}</div>
+                <div class="team-description">${team.description || 'No description'}</div>
+                <div class="team-meta">${team.member_count} members</div>
+            </div>
+            <button class="nixai-button nixai-button-small" onclick="joinPublicTeam('${team.id}')">
+                Join
+            </button>
+        `;
+        container.appendChild(teamElement);
+    });
+}
+
+function joinTeamByCode() {
+    const code = document.getElementById('teamCode').value.trim();
+    if (!code) {
+        showNotification('Please enter an invitation code', 'warning');
+        return;
+    }
+    
+    fetch('/api/teams/join', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({invitation_code: code})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeModal('joinTeamModal');
+            loadTeams();
+            showNotification('Successfully joined team!', 'success');
+        } else {
+            showNotification('Failed to join team: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to join team: ' + error.message, 'error');
+    });
+}
+
+function startCollabSession() {
+    if (!currentTeam) {
+        showNotification('Please select a team first', 'warning');
+        return;
+    }
+    
+    fetch(`/api/teams/${currentTeam.id}/collaboration/start`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            collaborationSession = data.session;
+            showModal('collabSessionModal');
+            initializeCollaborativeEditor();
+        } else {
+            showNotification('Failed to start collaboration session: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to start collaboration session: ' + error.message, 'error');
+    });
+}
+
+function initializeCollaborativeEditor() {
+    // Initialize collaborative editing features
+    const editor = document.getElementById('collaborativeEditor');
+    
+    // Setup real-time sync
+    editor.addEventListener('input', function() {
+        if (collaborationSession && window.nixaiWS) {
+            const message = {
+                type: 'collaboration_edit',
+                session_id: collaborationSession.id,
+                content: editor.value,
+                cursor_position: editor.selectionStart
+            };
+            window.nixaiWS.send(JSON.stringify(message));
+        }
+    });
+}
+
+function loadActivity() {
+    fetch('/api/teams/activity')
+        .then(response => response.json())
+        .then(data => {
+            renderActivity(data.activities || []);
+        })
+        .catch(error => {
+            console.error('Failed to load activity:', error);
+        });
+}
+
+function renderActivity(activities) {
+    const feed = document.getElementById('activityFeed');
+    feed.innerHTML = '';
+    
+    if (activities.length === 0) {
+        feed.innerHTML = '<p class="text-muted">No recent activity</p>';
+        return;
+    }
+    
+    activities.slice(0, 10).forEach(activity => {
+        const item = document.createElement('div');
+        item.className = 'activity-item';
+        item.innerHTML = `
+            <div class="activity-icon">
+                <i class="fas fa-${getActivityIcon(activity.type)}"></i>
+            </div>
+            <div class="activity-content">
+                <div class="activity-text">${activity.description}</div>
+                <div class="activity-meta">${activity.timestamp}</div>
+            </div>
+        `;
+        feed.appendChild(item);
+    });
+}
+
+function getActivityIcon(type) {
+    const icons = {
+        'team_create': 'users',
+        'project_create': 'folder-plus',
+        'config_share': 'share',
+        'deployment': 'rocket',
+        'collaboration': 'handshake',
+        'review_request': 'eye'
+    };
+    return icons[type] || 'info';
+}
+
+function updateStats() {
+    document.getElementById('totalTeams').textContent = allTeams.length;
+    document.getElementById('activeProjects').textContent = 
+        allTeams.reduce((sum, team) => sum + (team.project_count || 0), 0);
+    // Additional stats would be calculated from API data
+}
+
+function loadStats() {
+    fetch('/api/teams/stats')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('totalTeams').textContent = data.total_teams || 0;
+            document.getElementById('activeProjects').textContent = data.active_projects || 0;
+            document.getElementById('pendingReviews').textContent = data.pending_reviews || 0;
+        })
+        .catch(error => {
+            console.error('Failed to load stats:', error);
+        });
+}
+
+function refreshTeams() {
+    loadTeams();
+    loadActivity();
+    loadStats();
+    showNotification('Teams data refreshed', 'success');
+}
+</script>
+{{end}}

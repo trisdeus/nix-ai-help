@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -640,4 +641,9 @@ func HashString(input string) string {
 	hasher := sha256.New()
 	hasher.Write([]byte(input))
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+// DecodeBase64 decodes a base64 encoded string
+func DecodeBase64(encoded string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(encoded)
 }

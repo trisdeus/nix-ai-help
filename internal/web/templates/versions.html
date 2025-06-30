@@ -1,0 +1,838 @@
+{{define "title"}}Version Control - nixai{{end}}
+
+{{define "content"}}
+<div class="nixai-container">
+    <!-- Versions Header -->
+    <div class="nixai-header">
+        <h1 class="nixai-title">Version Control</h1>
+        <p class="nixai-subtitle">Manage configuration versions, branches, and deployments</p>
+        
+        <div class="nixai-actions">
+            <button class="nixai-button nixai-button-primary" onclick="createBranch()">
+                <i class="fas fa-code-branch"></i> New Branch
+            </button>
+            <button class="nixai-button nixai-button-secondary" onclick="createTag()">
+                <i class="fas fa-tag"></i> Create Tag
+            </button>
+            <button class="nixai-button nixai-button-secondary" onclick="viewHistory()">
+                <i class="fas fa-history"></i> History
+            </button>
+        </div>
+    </div>
+
+    <!-- Repository Status -->
+    <div class="nixai-grid nixai-grid-cols-4 nixai-gap">
+        <div class="nixai-card">
+            <div class="nixai-card-content">
+                <div class="stat-item">
+                    <div class="stat-icon text-primary">
+                        <i class="fas fa-code-branch"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalBranches">0</div>
+                        <div class="stat-label">Branches</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nixai-card">
+            <div class="nixai-card-content">
+                <div class="stat-item">
+                    <div class="stat-icon text-success">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalCommits">0</div>
+                        <div class="stat-label">Commits</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nixai-card">
+            <div class="nixai-card-content">
+                <div class="stat-item">
+                    <div class="stat-icon text-warning">
+                        <i class="fas fa-tag"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalTags">0</div>
+                        <div class="stat-label">Tags</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="nixai-card">
+            <div class="nixai-card-content">
+                <div class="stat-item">
+                    <div class="stat-icon text-info">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalDeployments">0</div>
+                        <div class="stat-label">Deployments</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Version Control Interface -->
+    <div class="nixai-grid nixai-grid-cols-12 nixai-gap">
+        <!-- Repository Tree -->
+        <div class="nixai-grid-span-3">
+            <div class="nixai-card">
+                <div class="nixai-card-header">
+                    <h3>Repository</h3>
+                    <div class="repo-selector">
+                        <select id="repoSelector" class="nixai-select-small" onchange="switchRepository()">
+                            <option value="">Select repository...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="nixai-card-content">
+                    <div class="repo-status" id="repoStatus">
+                        <div class="current-branch">
+                            <i class="fas fa-code-branch"></i>
+                            <span id="currentBranch">main</span>
+                        </div>
+                        <div class="repo-state">
+                            <span class="state-item">
+                                <i class="fas fa-plus text-success"></i>
+                                <span id="addedFiles">0</span> added
+                            </span>
+                            <span class="state-item">
+                                <i class="fas fa-edit text-warning"></i>
+                                <span id="modifiedFiles">0</span> modified
+                            </span>
+                            <span class="state-item">
+                                <i class="fas fa-minus text-error"></i>
+                                <span id="deletedFiles">0</span> deleted
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="repo-tree" id="repoTree">
+                        <!-- File tree will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Branches -->
+            <div class="nixai-card nixai-mt">
+                <div class="nixai-card-header">
+                    <h3>Branches</h3>
+                    <button class="nixai-button nixai-button-small" onclick="createBranch()">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="nixai-card-content">
+                    <div class="branches-list" id="branchesList">
+                        <!-- Branches will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="nixai-grid-span-6">
+            <div class="nixai-card nixai-full-height">
+                <div class="nixai-card-header">
+                    <h3 id="contentTitle">Commit History</h3>
+                    <div class="content-tabs">
+                        <button class="tab-button active" onclick="showCommits()">Commits</button>
+                        <button class="tab-button" onclick="showChanges()">Changes</button>
+                        <button class="tab-button" onclick="showComparison()">Compare</button>
+                    </div>
+                </div>
+                <div class="nixai-card-content">
+                    <div id="contentArea">
+                        <div id="commitsList" class="commits-view">
+                            <!-- Commits will be loaded here -->
+                        </div>
+                        
+                        <div id="changesView" class="changes-view" style="display: none;">
+                            <div class="changes-header">
+                                <div class="nixai-actions-small">
+                                    <button class="nixai-button nixai-button-small" onclick="stageAll()">
+                                        <i class="fas fa-plus"></i> Stage All
+                                    </button>
+                                    <button class="nixai-button nixai-button-small" onclick="discardAll()">
+                                        <i class="fas fa-undo"></i> Discard All
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="file-changes" id="fileChanges">
+                                <!-- File changes will be shown here -->
+                            </div>
+                        </div>
+                        
+                        <div id="comparisonView" class="comparison-view" style="display: none;">
+                            <div class="comparison-selector">
+                                <select id="compareFrom" class="nixai-select">
+                                    <option value="">Compare from...</option>
+                                </select>
+                                <span>vs</span>
+                                <select id="compareTo" class="nixai-select">
+                                    <option value="">Compare to...</option>
+                                </select>
+                                <button class="nixai-button nixai-button-small" onclick="runComparison()">
+                                    Compare
+                                </button>
+                            </div>
+                            <div class="comparison-result" id="comparisonResult">
+                                <!-- Comparison results will be shown here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="nixai-grid-span-3">
+            <!-- Commit Actions -->
+            <div class="nixai-card">
+                <div class="nixai-card-header">
+                    <h3>Commit Changes</h3>
+                </div>
+                <div class="nixai-card-content">
+                    <div class="commit-form">
+                        <div class="form-group">
+                            <label for="commitMessage">Commit Message</label>
+                            <textarea id="commitMessage" class="nixai-textarea" rows="3" placeholder="Describe your changes..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="signedCommit"> Signed commit
+                            </label>
+                        </div>
+                        <button class="nixai-button nixai-button-primary nixai-button-block" onclick="commitChanges()">
+                            <i class="fas fa-check"></i> Commit Changes
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tags -->
+            <div class="nixai-card nixai-mt">
+                <div class="nixai-card-header">
+                    <h3>Tags</h3>
+                    <button class="nixai-button nixai-button-small" onclick="createTag()">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="nixai-card-content">
+                    <div class="tags-list" id="tagsList">
+                        <!-- Tags will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deployment History -->
+            <div class="nixai-card nixai-mt">
+                <div class="nixai-card-header">
+                    <h3>Recent Deployments</h3>
+                </div>
+                <div class="nixai-card-content">
+                    <div class="deployments-list" id="deploymentsList">
+                        <!-- Recent deployments will be shown here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Branch Modal -->
+<div id="createBranchModal" class="nixai-modal">
+    <div class="nixai-modal-content">
+        <div class="nixai-modal-header">
+            <h2>Create New Branch</h2>
+            <button class="nixai-modal-close" onclick="closeModal('createBranchModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="nixai-modal-body">
+            <form id="createBranchForm">
+                <div class="form-group">
+                    <label for="branchName">Branch Name</label>
+                    <input type="text" id="branchName" name="name" class="nixai-input" required>
+                </div>
+                <div class="form-group">
+                    <label for="baseBranch">Base Branch</label>
+                    <select id="baseBranch" name="base" class="nixai-select">
+                        <option value="main">main</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="switchToBranch" checked> Switch to new branch
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="nixai-modal-footer">
+            <button class="nixai-button nixai-button-secondary" onclick="closeModal('createBranchModal')">Cancel</button>
+            <button class="nixai-button nixai-button-primary" onclick="saveBranch()">Create Branch</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create Tag Modal -->
+<div id="createTagModal" class="nixai-modal">
+    <div class="nixai-modal-content">
+        <div class="nixai-modal-header">
+            <h2>Create New Tag</h2>
+            <button class="nixai-modal-close" onclick="closeModal('createTagModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="nixai-modal-body">
+            <form id="createTagForm">
+                <div class="form-group">
+                    <label for="tagName">Tag Name</label>
+                    <input type="text" id="tagName" name="name" class="nixai-input" placeholder="v1.0.0" required>
+                </div>
+                <div class="form-group">
+                    <label for="tagMessage">Tag Message</label>
+                    <textarea id="tagMessage" name="message" class="nixai-textarea" rows="3" placeholder="Describe this release..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="tagCommit">Commit</label>
+                    <select id="tagCommit" name="commit" class="nixai-select">
+                        <option value="HEAD">Current HEAD</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="signedTag"> Signed tag
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="nixai-modal-footer">
+            <button class="nixai-button nixai-button-secondary" onclick="closeModal('createTagModal')">Cancel</button>
+            <button class="nixai-button nixai-button-primary" onclick="saveTag()">Create Tag</button>
+        </div>
+    </div>
+</div>
+
+<!-- File Diff Modal -->
+<div id="fileDiffModal" class="nixai-modal nixai-modal-large">
+    <div class="nixai-modal-content">
+        <div class="nixai-modal-header">
+            <h2 id="diffFileName">File Diff</h2>
+            <div class="diff-actions">
+                <button class="nixai-button nixai-button-small" onclick="stageDiffFile()">
+                    <i class="fas fa-plus"></i> Stage
+                </button>
+                <button class="nixai-button nixai-button-small" onclick="discardDiffFile()">
+                    <i class="fas fa-undo"></i> Discard
+                </button>
+            </div>
+            <button class="nixai-modal-close" onclick="closeModal('fileDiffModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="nixai-modal-body">
+            <div class="diff-container" id="diffContainer">
+                <!-- Diff content will be shown here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentRepository = null;
+let currentBranch = 'main';
+let repositoryData = {};
+
+// Initialize version control page
+document.addEventListener('DOMContentLoaded', function() {
+    loadRepositories();
+    loadVersionStats();
+    
+    // Setup real-time updates
+    if (window.nixaiWS) {
+        window.nixaiWS.addEventListener('message', function(event) {
+            const data = JSON.parse(event.data);
+            if (data.type === 'version_update') {
+                handleVersionUpdate(data);
+            }
+        });
+    }
+});
+
+function loadRepositories() {
+    fetch('/api/versioning/repositories')
+        .then(response => response.json())
+        .then(data => {
+            populateRepositorySelector(data.repositories || []);
+            if (data.repositories && data.repositories.length > 0) {
+                switchRepository(data.repositories[0].id);
+            }
+        })
+        .catch(error => {
+            showNotification('Failed to load repositories: ' + error.message, 'error');
+        });
+}
+
+function populateRepositorySelector(repositories) {
+    const selector = document.getElementById('repoSelector');
+    selector.innerHTML = '<option value="">Select repository...</option>';
+    
+    repositories.forEach(repo => {
+        const option = document.createElement('option');
+        option.value = repo.id;
+        option.textContent = repo.name;
+        selector.appendChild(option);
+    });
+}
+
+function switchRepository(repoId) {
+    if (!repoId) repoId = document.getElementById('repoSelector').value;
+    if (!repoId) return;
+    
+    currentRepository = repoId;
+    document.getElementById('repoSelector').value = repoId;
+    
+    loadRepositoryData(repoId);
+}
+
+function loadRepositoryData(repoId) {
+    Promise.all([
+        fetch(`/api/versioning/repositories/${repoId}/status`),
+        fetch(`/api/versioning/repositories/${repoId}/branches`),
+        fetch(`/api/versioning/repositories/${repoId}/commits`),
+        fetch(`/api/versioning/repositories/${repoId}/tags`)
+    ])
+    .then(responses => Promise.all(responses.map(r => r.json())))
+    .then(([status, branches, commits, tags]) => {
+        repositoryData = { status, branches, commits, tags };
+        updateRepositoryUI();
+    })
+    .catch(error => {
+        showNotification('Failed to load repository data: ' + error.message, 'error');
+    });
+}
+
+function updateRepositoryUI() {
+    updateRepoStatus(repositoryData.status);
+    updateBranches(repositoryData.branches);
+    updateCommits(repositoryData.commits);
+    updateTags(repositoryData.tags);
+}
+
+function updateRepoStatus(status) {
+    document.getElementById('currentBranch').textContent = status.current_branch || 'main';
+    document.getElementById('addedFiles').textContent = status.changes?.added || 0;
+    document.getElementById('modifiedFiles').textContent = status.changes?.modified || 0;
+    document.getElementById('deletedFiles').textContent = status.changes?.deleted || 0;
+    
+    currentBranch = status.current_branch || 'main';
+}
+
+function updateBranches(branches) {
+    const branchesList = document.getElementById('branchesList');
+    branchesList.innerHTML = '';
+    
+    (branches.branches || []).forEach(branch => {
+        const branchElement = document.createElement('div');
+        branchElement.className = `branch-item ${branch.name === currentBranch ? 'active' : ''}`;
+        branchElement.innerHTML = `
+            <div class="branch-info" onclick="switchBranch('${branch.name}')">
+                <i class="fas fa-code-branch"></i>
+                <span class="branch-name">${branch.name}</span>
+                ${branch.name === currentBranch ? '<i class="fas fa-check text-success"></i>' : ''}
+            </div>
+            <div class="branch-actions">
+                ${branch.name !== currentBranch ? `
+                    <button class="nixai-button nixai-button-tiny" onclick="mergeBranch('${branch.name}')">
+                        <i class="fas fa-code-branch"></i>
+                    </button>
+                ` : ''}
+                ${branch.name !== 'main' ? `
+                    <button class="nixai-button nixai-button-tiny text-error" onclick="deleteBranch('${branch.name}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                ` : ''}
+            </div>
+        `;
+        branchesList.appendChild(branchElement);
+    });
+}
+
+function updateCommits(commits) {
+    const commitsList = document.getElementById('commitsList');
+    commitsList.innerHTML = '';
+    
+    (commits.commits || []).forEach(commit => {
+        const commitElement = document.createElement('div');
+        commitElement.className = 'commit-item';
+        commitElement.innerHTML = `
+            <div class="commit-header">
+                <div class="commit-message">${commit.message}</div>
+                <div class="commit-hash">${commit.hash.substring(0, 7)}</div>
+            </div>
+            <div class="commit-meta">
+                <span class="commit-author">
+                    <i class="fas fa-user"></i> ${commit.author}
+                </span>
+                <span class="commit-date">
+                    <i class="fas fa-clock"></i> ${commit.date}
+                </span>
+            </div>
+            <div class="commit-actions">
+                <button class="nixai-button nixai-button-small" onclick="viewCommit('${commit.hash}')">
+                    <i class="fas fa-eye"></i> View
+                </button>
+                <button class="nixai-button nixai-button-small" onclick="revertCommit('${commit.hash}')">
+                    <i class="fas fa-undo"></i> Revert
+                </button>
+            </div>
+        `;
+        commitsList.appendChild(commitElement);
+    });
+}
+
+function updateTags(tags) {
+    const tagsList = document.getElementById('tagsList');
+    tagsList.innerHTML = '';
+    
+    if (!tags.tags || tags.tags.length === 0) {
+        tagsList.innerHTML = '<p class="text-muted">No tags yet</p>';
+        return;
+    }
+    
+    tags.tags.forEach(tag => {
+        const tagElement = document.createElement('div');
+        tagElement.className = 'tag-item';
+        tagElement.innerHTML = `
+            <div class="tag-info">
+                <div class="tag-name">
+                    <i class="fas fa-tag"></i>
+                    ${tag.name}
+                </div>
+                <div class="tag-message">${tag.message || 'No message'}</div>
+                <div class="tag-commit">${tag.commit.substring(0, 7)}</div>
+            </div>
+            <div class="tag-actions">
+                <button class="nixai-button nixai-button-small" onclick="checkoutTag('${tag.name}')">
+                    <i class="fas fa-code-branch"></i> Checkout
+                </button>
+                <button class="nixai-button nixai-button-small text-error" onclick="deleteTag('${tag.name}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        tagsList.appendChild(tagElement);
+    });
+}
+
+function loadVersionStats() {
+    fetch('/api/versioning/stats')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('totalBranches').textContent = data.total_branches || 0;
+            document.getElementById('totalCommits').textContent = data.total_commits || 0;
+            document.getElementById('totalTags').textContent = data.total_tags || 0;
+            document.getElementById('totalDeployments').textContent = data.total_deployments || 0;
+        })
+        .catch(error => {
+            console.error('Failed to load version stats:', error);
+        });
+}
+
+function showCommits() {
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    document.getElementById('commitsList').style.display = 'block';
+    document.getElementById('changesView').style.display = 'none';
+    document.getElementById('comparisonView').style.display = 'none';
+}
+
+function showChanges() {
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    document.getElementById('commitsList').style.display = 'none';
+    document.getElementById('changesView').style.display = 'block';
+    document.getElementById('comparisonView').style.display = 'none';
+    
+    loadFileChanges();
+}
+
+function showComparison() {
+    document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    document.getElementById('commitsList').style.display = 'none';
+    document.getElementById('changesView').style.display = 'none';
+    document.getElementById('comparisonView').style.display = 'block';
+    
+    loadComparisonOptions();
+}
+
+function loadFileChanges() {
+    if (!currentRepository) return;
+    
+    fetch(`/api/versioning/repositories/${currentRepository}/changes`)
+        .then(response => response.json())
+        .then(data => {
+            renderFileChanges(data.changes || []);
+        })
+        .catch(error => {
+            showNotification('Failed to load file changes: ' + error.message, 'error');
+        });
+}
+
+function renderFileChanges(changes) {
+    const container = document.getElementById('fileChanges');
+    container.innerHTML = '';
+    
+    if (changes.length === 0) {
+        container.innerHTML = '<p class="text-muted">No changes to commit</p>';
+        return;
+    }
+    
+    changes.forEach(change => {
+        const changeElement = document.createElement('div');
+        changeElement.className = `file-change ${change.status}`;
+        changeElement.innerHTML = `
+            <div class="change-status">
+                <i class="fas fa-${getChangeIcon(change.status)}"></i>
+            </div>
+            <div class="change-file" onclick="viewFileDiff('${change.file}')">
+                <div class="file-name">${change.file}</div>
+                <div class="file-stats">
+                    <span class="additions">+${change.additions}</span>
+                    <span class="deletions">-${change.deletions}</span>
+                </div>
+            </div>
+            <div class="change-actions">
+                <button class="nixai-button nixai-button-tiny" onclick="stageFile('${change.file}')">
+                    Stage
+                </button>
+            </div>
+        `;
+        container.appendChild(changeElement);
+    });
+}
+
+function getChangeIcon(status) {
+    const icons = {
+        'added': 'plus',
+        'modified': 'edit',
+        'deleted': 'minus',
+        'renamed': 'arrows-alt'
+    };
+    return icons[status] || 'question';
+}
+
+function createBranch() {
+    // Populate base branch options
+    const baseBranchSelect = document.getElementById('baseBranch');
+    baseBranchSelect.innerHTML = '';
+    
+    if (repositoryData.branches) {
+        repositoryData.branches.branches.forEach(branch => {
+            const option = document.createElement('option');
+            option.value = branch.name;
+            option.textContent = branch.name;
+            if (branch.name === currentBranch) option.selected = true;
+            baseBranchSelect.appendChild(option);
+        });
+    }
+    
+    showModal('createBranchModal');
+}
+
+function saveBranch() {
+    const form = document.getElementById('createBranchForm');
+    const formData = new FormData(form);
+    
+    const branchData = {
+        name: formData.get('name'),
+        base: formData.get('base'),
+        switch: document.getElementById('switchToBranch').checked
+    };
+    
+    fetch(`/api/versioning/repositories/${currentRepository}/branches`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(branchData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeModal('createBranchModal');
+            loadRepositoryData(currentRepository);
+            showNotification('Branch created successfully', 'success');
+        } else {
+            showNotification('Failed to create branch: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to create branch: ' + error.message, 'error');
+    });
+}
+
+function createTag() {
+    // Populate commit options
+    const commitSelect = document.getElementById('tagCommit');
+    commitSelect.innerHTML = '<option value="HEAD">Current HEAD</option>';
+    
+    if (repositoryData.commits) {
+        repositoryData.commits.commits.slice(0, 10).forEach(commit => {
+            const option = document.createElement('option');
+            option.value = commit.hash;
+            option.textContent = `${commit.hash.substring(0, 7)} - ${commit.message}`;
+            commitSelect.appendChild(option);
+        });
+    }
+    
+    showModal('createTagModal');
+}
+
+function saveTag() {
+    const form = document.getElementById('createTagForm');
+    const formData = new FormData(form);
+    
+    const tagData = {
+        name: formData.get('name'),
+        message: formData.get('message'),
+        commit: formData.get('commit'),
+        signed: document.getElementById('signedTag').checked
+    };
+    
+    fetch(`/api/versioning/repositories/${currentRepository}/tags`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(tagData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeModal('createTagModal');
+            loadRepositoryData(currentRepository);
+            showNotification('Tag created successfully', 'success');
+        } else {
+            showNotification('Failed to create tag: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to create tag: ' + error.message, 'error');
+    });
+}
+
+function commitChanges() {
+    const message = document.getElementById('commitMessage').value.trim();
+    if (!message) {
+        showNotification('Please enter a commit message', 'warning');
+        return;
+    }
+    
+    const commitData = {
+        message: message,
+        signed: document.getElementById('signedCommit').checked
+    };
+    
+    fetch(`/api/versioning/repositories/${currentRepository}/commit`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(commitData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('commitMessage').value = '';
+            loadRepositoryData(currentRepository);
+            showNotification('Changes committed successfully', 'success');
+        } else {
+            showNotification('Failed to commit changes: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to commit changes: ' + error.message, 'error');
+    });
+}
+
+function switchBranch(branchName) {
+    fetch(`/api/versioning/repositories/${currentRepository}/checkout`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({branch: branchName})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            currentBranch = branchName;
+            loadRepositoryData(currentRepository);
+            showNotification(`Switched to branch ${branchName}`, 'success');
+        } else {
+            showNotification('Failed to switch branch: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to switch branch: ' + error.message, 'error');
+    });
+}
+
+function viewFileDiff(fileName) {
+    fetch(`/api/versioning/repositories/${currentRepository}/diff/${encodeURIComponent(fileName)}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('diffFileName').textContent = fileName;
+            document.getElementById('diffContainer').innerHTML = `
+                <pre class="diff-content">${data.diff}</pre>
+            `;
+            showModal('fileDiffModal');
+        })
+        .catch(error => {
+            showNotification('Failed to load diff: ' + error.message, 'error');
+        });
+}
+
+function stageFile(fileName) {
+    fetch(`/api/versioning/repositories/${currentRepository}/stage`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({files: [fileName]})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadFileChanges();
+            showNotification(`Staged ${fileName}`, 'success');
+        } else {
+            showNotification('Failed to stage file: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to stage file: ' + error.message, 'error');
+    });
+}
+
+function stageAll() {
+    fetch(`/api/versioning/repositories/${currentRepository}/stage-all`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadFileChanges();
+            showNotification('All changes staged', 'success');
+        } else {
+            showNotification('Failed to stage all changes: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to stage all changes: ' + error.message, 'error');
+    });
+}
+</script>
+{{end}}

@@ -14,6 +14,7 @@ import (
 	"nix-ai-help/internal/web"
 	"nix-ai-help/internal/webui/config_builder"
 	"nix-ai-help/pkg/logger"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,7 +65,12 @@ func TestIntegrationService(t *testing.T) {
 	configRepo, err := repository.NewConfigRepository(tempDir, logger)
 	require.NoError(t, err)
 
-	webServer := web.NewServer(8080, logger)
+	webConfig := &web.ServerConfig{
+		Port: 34567,
+		Host: "localhost",
+	}
+	webServer, err := web.NewServer(webConfig, teamManager, configRepo, logger)
+	require.NoError(t, err)
 	configBuilder := config_builder.NewComponentLibrary(logger)
 
 	// Create integration service
