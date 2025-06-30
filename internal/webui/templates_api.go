@@ -63,8 +63,11 @@ func (api *TemplateAPI) handleListTemplates(w http.ResponseWriter, r *http.Reque
 	}
 
 	api.sendJSON(w, map[string]interface{}{
-		"templates": templates,
-		"count":     len(templates),
+		"success": true,
+		"data": map[string]interface{}{
+			"templates": templates,
+			"count":     len(templates),
+		},
 	})
 }
 
@@ -103,7 +106,12 @@ func (api *TemplateAPI) handleGetTemplate(w http.ResponseWriter, r *http.Request
 	templates := api.getBuiltinTemplates()
 	for _, template := range templates {
 		if template.Name == templateName {
-			api.sendJSON(w, template)
+			api.sendJSON(w, map[string]interface{}{
+				"success": true,
+				"data": map[string]interface{}{
+					"template": template,
+				},
+			})
 			return
 		}
 	}

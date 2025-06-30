@@ -653,26 +653,30 @@ function displayTemplates(templates) {
         return;
     }
     
-    grid.innerHTML = templates.map(template => `
-        <div class="template-card" onclick="selectTemplate('${template.name}')">
-            <div class="template-header">
-                <span class="template-name">${template.name}</span>
-                <span class="template-category">${template.category}</span>
-            </div>
-            <div class="template-description">${template.description}</div>
-            <div class="template-tags">
-                ${template.tags.map(tag => `<span class="template-tag">${tag}</span>`).join('')}
-            </div>
-            <div class="template-actions">
-                <button class="nixai-btn nixai-btn-sm nixai-btn-primary" onclick="event.stopPropagation(); applyTemplate('${template.name}')">
-                    Apply
-                </button>
-                <button class="nixai-btn nixai-btn-sm" onclick="event.stopPropagation(); previewTemplate('${template.name}')">
-                    Preview
-                </button>
-            </div>
-        </div>
-    `).join('');
+    let html = '';
+    templates.forEach(template => {
+        let tagsHtml = '';
+        template.tags.forEach(tag => {
+            tagsHtml += '<span class="template-tag">' + tag + '</span>';
+        });
+        
+        html += '<div class="template-card" onclick="selectTemplate(\'' + template.name + '\')">' +
+                '<div class="template-header">' +
+                '<span class="template-name">' + template.name + '</span>' +
+                '<span class="template-category">' + template.category + '</span>' +
+                '</div>' +
+                '<div class="template-description">' + template.description + '</div>' +
+                '<div class="template-tags">' + tagsHtml + '</div>' +
+                '<div class="template-actions">' +
+                '<button class="nixai-btn nixai-btn-sm nixai-btn-primary" onclick="event.stopPropagation(); applyTemplate(\'' + template.name + '\')">' +
+                'Apply</button>' +
+                '<button class="nixai-btn nixai-btn-sm" onclick="event.stopPropagation(); previewTemplate(\'' + template.name + '\')">' +
+                'Preview</button>' +
+                '</div>' +
+                '</div>';
+    });
+    
+    grid.innerHTML = html;
 }
 
 async function selectTemplate(templateName) {
@@ -691,7 +695,7 @@ async function selectTemplate(templateName) {
 
 async function previewTemplate(templateName) {
     try {
-        const response = await fetch(`/api/templates/${templateName}`);
+        const response = await fetch('/api/templates/' + templateName);
         const data = await response.json();
         
         if (data.success) {
@@ -706,7 +710,7 @@ async function previewTemplate(templateName) {
 
 async function applyTemplate(templateName) {
     try {
-        const response = await fetch(`/api/templates/${templateName}/apply`, {
+        const response = await fetch('/api/templates/' + templateName + '/apply', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -738,88 +742,86 @@ async function applyTemplate(templateName) {
 
 function updateConfigPreview(content) {
     const preview = document.getElementById('config-preview');
-    preview.innerHTML = `<code class="language-nix">${escapeHtml(content)}</code>`;
+    preview.innerHTML = '<code class="language-nix">' + escapeHtml(content) + '</code>';
 }
 
 function updateCanvasWithTemplate(template) {
     const canvas = document.getElementById('config-canvas');
-    canvas.innerHTML = `
-        <div style="padding: 1rem;">
-            <div class="nixai-card">
-                <div class="nixai-card-header">
-                    <h4>Template: ${template.name}</h4>
-                    <span class="template-category">${template.category}</span>
-                </div>
-                <div style="padding: 1rem;">
-                    <p><strong>Description:</strong> ${template.description}</p>
-                    <div class="template-tags" style="margin-top: 0.5rem;">
-                        ${template.tags.map(tag => `<span class="template-tag">${tag}</span>`).join('')}
-                    </div>
-                    <div style="margin-top: 1rem;">
-                        <button class="nixai-btn nixai-btn-sm" onclick="editTemplate()">
-                            <span>✏️</span> Edit Configuration
-                        </button>
-                        <button class="nixai-btn nixai-btn-sm" onclick="clearCanvas()">
-                            <span>🗑️</span> Clear
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    
+    let tagsHtml = '';
+    template.tags.forEach(tag => {
+        tagsHtml += '<span class="template-tag">' + tag + '</span>';
+    });
+    
+    canvas.innerHTML = 
+        '<div style="padding: 1rem;">' +
+            '<div class="nixai-card">' +
+                '<div class="nixai-card-header">' +
+                    '<h4>Template: ' + template.name + '</h4>' +
+                    '<span class="template-category">' + template.category + '</span>' +
+                '</div>' +
+                '<div style="padding: 1rem;">' +
+                    '<p><strong>Description:</strong> ' + template.description + '</p>' +
+                    '<div class="template-tags" style="margin-top: 0.5rem;">' +
+                        tagsHtml +
+                    '</div>' +
+                    '<div style="margin-top: 1rem;">' +
+                        '<button class="nixai-btn nixai-btn-sm" onclick="editTemplate()">' +
+                            '<span>✏️</span> Edit Configuration' +
+                        '</button>' +
+                        '<button class="nixai-btn nixai-btn-sm" onclick="clearCanvas()">' +
+                            '<span>🗑️</span> Clear' +
+                        '</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
 }
 
 function startFromScratch() {
     const canvas = document.getElementById('config-canvas');
-    canvas.innerHTML = `
-        <div style="padding: 1rem;">
-            <div class="nixai-card">
-                <div class="nixai-card-header">
-                    <h4>New Configuration</h4>
-                </div>
-                <div style="padding: 1rem;">
-                    <p>Building a new NixOS configuration from scratch...</p>
-                    <div style="margin-top: 1rem;">
-                        <button class="nixai-btn nixai-btn-sm nixai-btn-primary" onclick="addBasicServices()">
-                            <span>⚙️</span> Add Basic Services
-                        </button>
-                        <button class="nixai-btn nixai-btn-sm" onclick="addDesktopEnvironment()">
-                            <span>🖥️</span> Add Desktop
-                        </button>
-                        <button class="nixai-btn nixai-btn-sm" onclick="addDevelopmentTools()">
-                            <span>🛠️</span> Add Dev Tools
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    canvas.innerHTML = 
+        '<div style="padding: 1rem;">' +
+            '<div class="nixai-card">' +
+                '<div class="nixai-card-header">' +
+                    '<h4>New Configuration</h4>' +
+                '</div>' +
+                '<div style="padding: 1rem;">' +
+                    '<p>Building a new NixOS configuration from scratch...</p>' +
+                    '<div style="margin-top: 1rem;">' +
+                        '<button class="nixai-btn nixai-btn-sm nixai-btn-primary" onclick="addBasicServices()">' +
+                            '<span>⚙️</span> Add Basic Services' +
+                        '</button>' +
+                        '<button class="nixai-btn nixai-btn-sm" onclick="addDesktopEnvironment()">' +
+                            '<span>🖥️</span> Add Desktop' +
+                        '</button>' +
+                        '<button class="nixai-btn nixai-btn-sm" onclick="addDevelopmentTools()">' +
+                            '<span>🛠️</span> Add Dev Tools' +
+                        '</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
     
-    currentConfig = `{ config, pkgs, ... }:
-
-{
-  # Basic NixOS configuration
-  system.stateVersion = "23.11";
-}`;
+    currentConfig = '{ config, pkgs, ... }:\n\n{\n  # Basic NixOS configuration\n  system.stateVersion = "23.11";\n}';
     updateConfigPreview(currentConfig);
 }
 
 function clearCanvas() {
     const canvas = document.getElementById('config-canvas');
-    canvas.innerHTML = `
-        <div class="canvas-placeholder">
-            <div class="placeholder-content">
-                <h4>Start Building Your Configuration</h4>
-                <p>Choose a template from the library above or start from scratch</p>
-                <button class="nixai-btn nixai-btn-primary" onclick="startFromScratch()">
-                    <span>🚀</span> Start from Scratch
-                </button>
-            </div>
-        </div>
-    `;
+    canvas.innerHTML = 
+        '<div class="canvas-placeholder">' +
+            '<div class="placeholder-content">' +
+                '<h4>Start Building Your Configuration</h4>' +
+                '<p>Choose a template from the library above or start from scratch</p>' +
+                '<button class="nixai-btn nixai-btn-primary" onclick="startFromScratch()">' +
+                    '<span>🚀</span> Start from Scratch' +
+                '</button>' +
+            '</div>' +
+        '</div>';
     
     currentConfig = '';
-    updateConfigPreview('# Your NixOS configuration will appear here\n# Choose a template or start building to see the generated configuration\n\n{ config, pkgs, ... }:\n\n{\n  # Configuration options will be added here\n  system.stateVersion = "23.11";\n}');
+    updateConfigPreview('# Your NixOS configuration will appear here\\n# Choose a template or start building to see the generated configuration\\n\\n{ config, pkgs, ... }:\\n\\n{\\n  # Configuration options will be added here\\n  system.stateVersion = "23.11";\\n}');
 }
 
 function refreshTemplates() {
@@ -910,18 +912,19 @@ function importTemplate() {
     input.click();
 }
 
-function showNotification(message, type = 'info') {
+function showNotification(message, type) {
+    if (!type) type = 'info';
+    
     // Create notification element
     const notification = document.createElement('div');
-    notification.className = `nixai-alert nixai-alert-${type}`;
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 1000;
-        max-width: 300px;
-        animation: slideIn 0.3s ease;
-    `;
+    notification.className = 'nixai-alert nixai-alert-' + type;
+    notification.style.cssText = 
+        'position: fixed;' +
+        'top: 20px;' +
+        'right: 20px;' +
+        'z-index: 1000;' +
+        'max-width: 300px;' +
+        'animation: slideIn 0.3s ease;';
     notification.textContent = message;
     
     document.body.appendChild(notification);
@@ -943,17 +946,15 @@ function escapeHtml(text) {
 
 // Add CSS for animations
 const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-    
-    @keyframes slideOut {
-        from { transform: translateX(0); opacity: 1; }
-        to { transform: translateX(100%); opacity: 0; }
-    }
-`;
+style.textContent = 
+    '@keyframes slideIn {' +
+        'from { transform: translateX(100%); opacity: 0; }' +
+        'to { transform: translateX(0); opacity: 1; }' +
+    '}' +
+    '@keyframes slideOut {' +
+        'from { transform: translateX(0); opacity: 1; }' +
+        'to { transform: translateX(100%); opacity: 0; }' +
+    '}';
 document.head.appendChild(style);
 </script>`
 }
@@ -1422,11 +1423,11 @@ func (s *EnhancedServer) renderSimpleHTML(w http.ResponseWriter, data map[string
                     <span>NixAI Enhanced</span>
                 </div>
                 <ul class="nixai-nav-links">
-                    <li><a href="/dashboard" class="%s">📊 Dashboard</a></li>
-                    <li><a href="/builder" class="%s">🎨 Builder</a></li>
-                    <li><a href="/fleet" class="%s">🚀 Fleet</a></li>
-                    <li><a href="/teams" class="%s">👥 Teams</a></li>
-                    <li><a href="/versions" class="%s">📝 Versions</a></li>
+                    <li><a href="/dashboard" data-nav="/dashboard" class="%s">📊 Dashboard</a></li>
+                    <li><a href="/builder" data-nav="/builder" class="%s">🎨 Builder</a></li>
+                    <li><a href="/fleet" data-nav="/fleet" class="%s">🚀 Fleet</a></li>
+                    <li><a href="/teams" data-nav="/teams" class="%s">👥 Teams</a></li>
+                    <li><a href="/versions" data-nav="/versions" class="%s">📝 Versions</a></li>
                 </ul>
             </nav>
         </header>

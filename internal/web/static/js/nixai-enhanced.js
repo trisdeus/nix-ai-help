@@ -101,12 +101,13 @@ class NixAIApp {
     }
 
     setupEventListeners() {
-        // Navigation
+        // Navigation - Allow normal navigation for now, no SPA behavior
         document.addEventListener('click', (e) => {
-            if (e.target.matches('[data-nav]')) {
-                e.preventDefault();
-                this.navigate(e.target.getAttribute('data-nav'));
-            }
+            // Remove SPA navigation handling for now
+            // if (e.target.matches('[data-nav]')) {
+            //     e.preventDefault();
+            //     this.navigate(e.target.getAttribute('data-nav'));
+            // }
         });
 
         // Theme toggle
