@@ -69,7 +69,7 @@ func TestIntegrationService(t *testing.T) {
 		Port: 34567,
 		Host: "localhost",
 	}
-	webServer, err := web.NewServer(webConfig, teamManager, configRepo, logger)
+	webServer, err := web.NewServer(webConfig, teamManager, configRepo, fleetManager, logger)
 	require.NoError(t, err)
 	configBuilder := config_builder.NewComponentLibrary(logger)
 
@@ -331,7 +331,12 @@ func BenchmarkIntegrationService(b *testing.B) {
 	pluginManager := plugins.NewManager(tempDir, logger)
 	teamManager := team.NewTeamManager(logger)
 	configRepo, _ := repository.NewConfigRepository(tempDir, logger)
-	webServer := web.NewServer(8080, logger)
+	webConfig := &web.ServerConfig{
+		Port: 8080,
+		Host: "localhost",
+	}
+	webServer, err := web.NewServer(webConfig, teamManager, configRepo, fleetManager, logger)
+	require.NoError(b, err)
 	configBuilder := config_builder.NewComponentLibrary(logger)
 
 	service := NewService(

@@ -3690,6 +3690,13 @@ func initializeCommands() {
 	rootCmd.AddCommand(neovimSetupCmd)
 	rootCmd.AddCommand(packageRepoCmd)
 
+	// Add web dashboard command (reuse existing cfg and err from above)
+	if err == nil {
+		log := logger.NewLoggerWithLevel(cfg.LogLevel)
+		webCommands := NewWebCommands(log, nil) // TODO: Add proper config
+		rootCmd.AddCommand(webCommands.CreateCommand())
+	}
+
 	commandsInitialized = true
 }
 

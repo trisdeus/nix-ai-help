@@ -63,7 +63,7 @@ func TestHelpAgent_Query(t *testing.T) {
 			context: &HelpContext{
 				UserGoal:    "Setup development environment",
 				UserLevel:   "Intermediate",
-				Environment: "NixOS 23.11",
+				Environment: "NixOS 25.05",
 			},
 			providerResp: "Use nixai devenv for development setup",
 			expectInResp: []string{"devenv", "💡 **Additional Help Resources**"},
@@ -186,7 +186,7 @@ func TestHelpAgent_BuildHelpPrompt(t *testing.T) {
 				CurrentTask:  "Initial setup",
 				AvailableCmd: []string{"config", "doctor"},
 				ErrorContext: "permission denied",
-				Environment:  "NixOS 23.11",
+				Environment:  "NixOS 25.05",
 			},
 			expectInPrompt: []string{
 				"Help Request",
@@ -195,7 +195,7 @@ func TestHelpAgent_BuildHelpPrompt(t *testing.T) {
 				"Current Task**: Initial setup",
 				"Available Commands**: config, doctor",
 				"Error Context**: permission denied",
-				"Environment**: NixOS 23.11",
+				"Environment**: NixOS 25.05",
 			},
 		},
 	}

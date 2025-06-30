@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 
+	"nix-ai-help/internal/fleet"
+	"nix-ai-help/internal/repository"
 	"nix-ai-help/internal/webui/config_builder"
 	"nix-ai-help/pkg/logger"
 
@@ -13,15 +16,23 @@ import (
 
 // ConfigBuilderAPI provides API endpoints for the visual configuration builder
 type ConfigBuilderAPI struct {
-	library    *config_builder.ComponentLibrary
-	dragDrop   *config_builder.DragDropInterface
-	preview    *config_builder.RealTimePreview
-	visualizer *config_builder.DependencyVisualizer
-	logger     *logger.Logger
+	library         *config_builder.ComponentLibrary
+	dragDrop        *config_builder.DragDropInterface
+	preview         *config_builder.RealTimePreview
+	visualizer      *config_builder.DependencyVisualizer
+	fleetManager    *fleet.FleetManager
+	repository      *repository.NixOSRepository
+	repositoryMutex sync.RWMutex
+	logger          *logger.Logger
 }
 
 // NewConfigBuilderAPI creates a new configuration builder API
-func NewConfigBuilderAPI(logger *logger.Logger) (*ConfigBuilderAPI, error) {
+func NewConfigBuilderAPI(fleetManager *fleet.FleetManager, logger *logger.Logger) (*ConfigBuilderAPI, error) {
+	return NewConfigBuilderAPIWithRepository(fleetManager, nil, logger)
+}
+
+// NewConfigBuilderAPIWithRepository creates a new configuration builder API with an optional repository
+func NewConfigBuilderAPIWithRepository(fleetManager *fleet.FleetManager, repo *repository.NixOSRepository, logger *logger.Logger) (*ConfigBuilderAPI, error) {
 	library := config_builder.NewComponentLibrary(logger)
 	dragDrop := config_builder.NewDragDropInterface(library, logger)
 
@@ -34,11 +45,13 @@ func NewConfigBuilderAPI(logger *logger.Logger) (*ConfigBuilderAPI, error) {
 	visualizer := config_builder.NewDependencyVisualizer(canvas, library, logger)
 
 	return &ConfigBuilderAPI{
-		library:    library,
-		dragDrop:   dragDrop,
-		preview:    preview,
-		visualizer: visualizer,
-		logger:     logger,
+		library:      library,
+		dragDrop:     dragDrop,
+		preview:      preview,
+		visualizer:   visualizer,
+		fleetManager: fleetManager,
+		repository:   repo,
+		logger:       logger,
 	}, nil
 }
 
@@ -94,6 +107,21 @@ func (api *ConfigBuilderAPI) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/api/generate/home-manager", api.handleGenerateHomeManagerConfig).Methods("POST")
 	router.HandleFunc("/api/generate/flake", api.handleGenerateFlakeConfig).Methods("POST")
 	router.HandleFunc("/api/generate/module", api.handleGenerateModuleConfig).Methods("POST")
+
+	// Fleet management routes
+	router.HandleFunc("/api/fleet", api.handleFleetOverview).Methods("GET")
+	router.HandleFunc("/api/fleet/machines", api.handleFleetMachines).Methods("GET", "POST")
+	router.HandleFunc("/api/fleet/machines/{machineId}", api.handleFleetMachine).Methods("GET", "PUT", "DELETE")
+	router.HandleFunc("/api/fleet/health", api.handleFleetHealth).Methods("GET")
+	router.HandleFunc("/api/fleet/deploy", api.handleFleetDeploy).Methods("POST")
+	router.HandleFunc("/api/fleet/deployments", api.handleFleetDeployments).Methods("GET")
+
+	// Repository analysis routes
+	router.HandleFunc("/api/repository/scan", api.handleRepositoryScan).Methods("POST")
+	router.HandleFunc("/api/repository/configurations", api.handleRepositoryConfigurations).Methods("GET")
+	router.HandleFunc("/api/repository/configurations/{type}", api.handleRepositoryConfigurationsByType).Methods("GET")
+	router.HandleFunc("/api/repository/machines", api.handleRepositoryMachines).Methods("GET")
+	router.HandleFunc("/api/repository/stats", api.handleRepositoryStats).Methods("GET")
 }
 
 // Component Library Handlers
@@ -287,6 +315,7 @@ func (api *ConfigBuilderAPI) handleUpdateComponentConfig(w http.ResponseWriter, 
 		api.sendJSON(w, map[string]bool{"success": true})
 	} else {
 		api.sendError(w, http.StatusNotFound, "Component not found")
+		return
 	}
 }
 
@@ -653,6 +682,368 @@ func (api *ConfigBuilderAPI) handleGenerateModuleConfig(w http.ResponseWriter, r
 	}
 
 	api.sendJSON(w, response)
+}
+
+// Fleet Management Handlers
+
+func (api *ConfigBuilderAPI) handleFleetOverview(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	machines, err := api.fleetManager.ListMachines(ctx)
+	if err != nil {
+		api.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get fleet overview: %v", err))
+		return
+	}
+
+	// Calculate fleet statistics
+	totalMachines := len(machines)
+	onlineMachines := 0
+	healthyMachines := 0
+
+	for _, machine := range machines {
+		if machine.Status == "online" {
+			onlineMachines++
+		}
+		if machine.Health.Overall == "healthy" {
+			healthyMachines++
+		}
+	}
+
+	response := map[string]interface{}{
+		"summary": map[string]interface{}{
+			"total_machines":   totalMachines,
+			"online_machines":  onlineMachines,
+			"offline_machines": totalMachines - onlineMachines,
+			"healthy_machines": healthyMachines,
+			"deployments":      0, // TODO: Add deployment counting
+		},
+		"machines": machines,
+	}
+
+	api.sendJSON(w, response)
+}
+
+func (api *ConfigBuilderAPI) handleFleetMachines(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	switch r.Method {
+	case "GET":
+		machines, err := api.fleetManager.ListMachines(ctx)
+		if err != nil {
+			api.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to list machines: %v", err))
+			return
+		}
+		api.sendJSON(w, machines)
+
+	case "POST":
+		var machine fleet.Machine
+		if err := api.decodeJSON(r, &machine); err != nil {
+			api.sendError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		if err := api.fleetManager.AddMachine(ctx, &machine); err != nil {
+			api.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to add machine: %v", err))
+			return
+		}
+
+		api.sendJSON(w, machine)
+	}
+}
+
+func (api *ConfigBuilderAPI) handleFleetMachine(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	vars := mux.Vars(r)
+	machineID := vars["machineId"]
+
+	switch r.Method {
+	case "GET":
+		machine, err := api.fleetManager.GetMachine(ctx, machineID)
+		if err != nil {
+			api.sendError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		api.sendJSON(w, machine)
+
+	case "PUT":
+		// For updates, we would need to add an UpdateMachine method to FleetManager
+		// For now, return a placeholder response
+		api.sendJSON(w, map[string]string{"message": "Machine update not yet implemented"})
+
+	case "DELETE":
+		if err := api.fleetManager.RemoveMachine(ctx, machineID); err != nil {
+			api.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to remove machine: %v", err))
+			return
+		}
+		api.sendJSON(w, map[string]bool{"success": true})
+	}
+}
+
+func (api *ConfigBuilderAPI) handleFleetHealth(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	machines, err := api.fleetManager.ListMachines(ctx)
+	if err != nil {
+		api.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get fleet health: %v", err))
+		return
+	}
+
+	healthStatus := make(map[string]interface{})
+	for _, machine := range machines {
+		healthStatus[machine.ID] = map[string]interface{}{
+			"status":    machine.Health.Overall,
+			"last_seen": machine.LastSeen,
+			"details":   machine.Health,
+		}
+	}
+
+	api.sendJSON(w, healthStatus)
+}
+
+func (api *ConfigBuilderAPI) handleFleetDeploy(w http.ResponseWriter, r *http.Request) {
+	// TODO: Implement deployment functionality
+	// This would require integration with the deployment manager
+	api.sendJSON(w, map[string]string{"message": "Fleet deployment not yet implemented"})
+}
+
+func (api *ConfigBuilderAPI) handleFleetDeployments(w http.ResponseWriter, r *http.Request) {
+	// TODO: Implement deployment listing
+	// This would require integration with the deployment manager
+	api.sendJSON(w, []interface{}{})
+}
+
+// Repository Analysis Handlers
+
+func (api *ConfigBuilderAPI) handleRepositoryScan(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Path string `json:"path"`
+	}
+
+	if err := api.decodeJSON(r, &request); err != nil {
+		api.sendError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if request.Path == "" {
+		api.sendError(w, http.StatusBadRequest, "repository path is required")
+		return
+	}
+
+	// Create and scan the repository
+	repo, err := repository.NewNixOSRepository(request.Path, api.logger)
+	if err != nil {
+		api.sendError(w, http.StatusBadRequest, fmt.Sprintf("Failed to initialize repository: %v", err))
+		return
+	}
+
+	if err := repo.ScanRepository(); err != nil {
+		api.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to scan repository: %v", err))
+		return
+	}
+
+	// Store the repository in the API for future requests
+	api.repositoryMutex.Lock()
+	api.repository = repo
+	api.repositoryMutex.Unlock()
+
+	configs := repo.GetConfigurations()
+	machines, err := repo.GetMachineDefinitions()
+	if err != nil {
+		api.logger.Warn(fmt.Sprintf("Failed to get machine definitions: %v", err))
+		machines = []*fleet.Machine{}
+	}
+
+	response := map[string]interface{}{
+		"success":        true,
+		"path":           request.Path,
+		"configurations": len(configs),
+		"machines":       len(machines),
+		"message":        "Repository scanned successfully",
+	}
+
+	api.sendJSON(w, response)
+}
+
+func (api *ConfigBuilderAPI) handleRepositoryConfigurations(w http.ResponseWriter, r *http.Request) {
+	api.repositoryMutex.RLock()
+	defer api.repositoryMutex.RUnlock()
+
+	if api.repository == nil {
+		api.sendError(w, http.StatusBadRequest, "No repository has been scanned. Please scan a repository first.")
+		return
+	}
+
+	configs := api.repository.GetConfigurations()
+
+	// Convert to API-friendly format
+	var result []map[string]interface{}
+	for path, config := range configs {
+		configData := map[string]interface{}{
+			"path":         path,
+			"name":         config.Name,
+			"type":         config.Type,
+			"hostname":     config.Hostname,
+			"services":     config.Services,
+			"packages":     config.Packages,
+			"dependencies": config.Dependencies,
+		}
+
+		// Add network config if present
+		if config.NetworkConfig != nil {
+			configData["network"] = map[string]interface{}{
+				"static_ip":  config.NetworkConfig.StaticIP,
+				"gateway":    config.NetworkConfig.Gateway,
+				"dns":        config.NetworkConfig.DNS,
+				"interfaces": config.NetworkConfig.Interfaces,
+			}
+		}
+
+		// Add hardware config if present
+		if config.Hardware != nil {
+			configData["hardware"] = map[string]interface{}{
+				"cpu":            config.Hardware.CPU,
+				"memory":         config.Hardware.Memory,
+				"storage":        config.Hardware.Storage,
+				"graphics":       config.Hardware.Graphics,
+				"networking":     config.Hardware.Networking,
+				"boot_loader":    config.Hardware.BootLoader,
+				"kernel_modules": config.Hardware.KernelModules,
+			}
+		}
+
+		result = append(result, configData)
+	}
+
+	api.sendJSON(w, result)
+}
+
+func (api *ConfigBuilderAPI) handleRepositoryConfigurationsByType(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	configType := vars["type"]
+
+	api.repositoryMutex.RLock()
+	defer api.repositoryMutex.RUnlock()
+
+	if api.repository == nil {
+		api.sendError(w, http.StatusBadRequest, "No repository has been scanned. Please scan a repository first.")
+		return
+	}
+
+	configs := api.repository.GetConfigurationsByType(configType)
+
+	// Convert to API-friendly format
+	var result []map[string]interface{}
+	for _, config := range configs {
+		configData := map[string]interface{}{
+			"path":         config.Path,
+			"name":         config.Name,
+			"type":         config.Type,
+			"hostname":     config.Hostname,
+			"services":     config.Services,
+			"packages":     config.Packages,
+			"dependencies": config.Dependencies,
+		}
+
+		// Add network config if present
+		if config.NetworkConfig != nil {
+			configData["network"] = map[string]interface{}{
+				"static_ip":  config.NetworkConfig.StaticIP,
+				"gateway":    config.NetworkConfig.Gateway,
+				"dns":        config.NetworkConfig.DNS,
+				"interfaces": config.NetworkConfig.Interfaces,
+			}
+		}
+
+		// Add hardware config if present
+		if config.Hardware != nil {
+			configData["hardware"] = map[string]interface{}{
+				"cpu":            config.Hardware.CPU,
+				"memory":         config.Hardware.Memory,
+				"storage":        config.Hardware.Storage,
+				"graphics":       config.Hardware.Graphics,
+				"networking":     config.Hardware.Networking,
+				"boot_loader":    config.Hardware.BootLoader,
+				"kernel_modules": config.Hardware.KernelModules,
+			}
+		}
+
+		result = append(result, configData)
+	}
+
+	api.sendJSON(w, result)
+}
+
+func (api *ConfigBuilderAPI) handleRepositoryMachines(w http.ResponseWriter, r *http.Request) {
+	api.repositoryMutex.RLock()
+	defer api.repositoryMutex.RUnlock()
+
+	if api.repository == nil {
+		api.sendError(w, http.StatusBadRequest, "No repository has been scanned. Please scan a repository first.")
+		return
+	}
+
+	machines, err := api.repository.GetMachineDefinitions()
+	if err != nil {
+		api.sendError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get machine definitions: %v", err))
+		return
+	}
+
+	// Convert to API-friendly format
+	var result []map[string]interface{}
+	for _, machine := range machines {
+		machineData := map[string]interface{}{
+			"id":          machine.ID,
+			"name":        machine.Name,
+			"address":     machine.Address,
+			"tags":        machine.Tags,
+			"environment": machine.Environment,
+			"metadata":    machine.Metadata,
+		}
+		result = append(result, machineData)
+	}
+
+	api.sendJSON(w, result)
+}
+
+func (api *ConfigBuilderAPI) handleRepositoryStats(w http.ResponseWriter, r *http.Request) {
+	api.repositoryMutex.RLock()
+	defer api.repositoryMutex.RUnlock()
+
+	if api.repository == nil {
+		stats := map[string]interface{}{
+			"total_configurations": 0,
+			"system_configs":       0,
+			"home_manager_configs": 0,
+			"flake_configs":        0,
+			"module_configs":       0,
+			"machines_discovered":  0,
+			"repository_scanned":   false,
+		}
+		api.sendJSON(w, stats)
+		return
+	}
+
+	configs := api.repository.GetConfigurations()
+	machines, _ := api.repository.GetMachineDefinitions()
+
+	// Count configurations by type
+	systemConfigs := len(api.repository.GetConfigurationsByType("system"))
+	homeManagerConfigs := len(api.repository.GetConfigurationsByType("home-manager"))
+	flakeConfigs := len(api.repository.GetConfigurationsByType("flake"))
+	moduleConfigs := len(api.repository.GetConfigurationsByType("module"))
+
+	stats := map[string]interface{}{
+		"total_configurations": len(configs),
+		"system_configs":       systemConfigs,
+		"home_manager_configs": homeManagerConfigs,
+		"flake_configs":        flakeConfigs,
+		"module_configs":       moduleConfigs,
+		"machines_discovered":  len(machines),
+		"repository_scanned":   true,
+		"repository_path":      api.repository.Path,
+	}
+
+	api.sendJSON(w, stats)
 }
 
 // Utility Methods

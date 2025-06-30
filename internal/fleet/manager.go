@@ -300,6 +300,58 @@ func (fm *FleetManager) UpdateMachineHealth(ctx context.Context, machineID strin
 	return nil
 }
 
+// AddRepositoryMachine adds a machine discovered from a repository with relaxed validation
+// This allows machines without addresses (DHCP machines) to be tracked
+func (fm *FleetManager) AddRepositoryMachine(ctx context.Context, machine *Machine) error {
+	fm.mu.Lock()
+	defer fm.mu.Unlock()
+
+	// Use relaxed validation for repository machines
+	if err := fm.validateRepositoryMachine(machine); err != nil {
+		return fmt.Errorf("invalid machine configuration: %w", err)
+	}
+
+	// Check if machine already exists
+	if existingMachine, exists := fm.machines[machine.ID]; exists {
+		fm.logger.Warn(fmt.Sprintf("Machine %s already exists, updating from repository", machine.ID))
+		// Update existing machine with repository data
+		existingMachine.Name = machine.Name
+		if machine.Address != "" {
+			existingMachine.Address = machine.Address
+		}
+		existingMachine.Tags = machine.Tags
+		existingMachine.Environment = machine.Environment
+		existingMachine.Metadata = machine.Metadata
+		return nil
+	}
+
+	// Set defaults for repository machines
+	if machine.Status == "" {
+		machine.Status = MachineStatusUnknown
+	}
+	if machine.SSHConfig.Port <= 0 {
+		machine.SSHConfig.Port = 22
+	}
+	if machine.SSHConfig.Timeout <= 0 {
+		machine.SSHConfig.Timeout = 30
+	}
+	if machine.SSHConfig.User == "" {
+		machine.SSHConfig.User = "nixos" // default NixOS user
+	}
+
+	// Add metadata to indicate this is a repository-discovered machine
+	if machine.Metadata == nil {
+		machine.Metadata = make(map[string]string)
+	}
+	machine.Metadata["source"] = "repository"
+	machine.Metadata["discovered_at"] = time.Now().Format(time.RFC3339)
+
+	fm.machines[machine.ID] = machine
+	fm.logger.Info(fmt.Sprintf("Added repository machine: %s (%s)", machine.ID, machine.Name))
+
+	return nil
+}
+
 // validateMachine validates machine configuration
 func (fm *FleetManager) validateMachine(machine *Machine) error {
 	if machine.ID == "" {
@@ -320,6 +372,20 @@ func (fm *FleetManager) validateMachine(machine *Machine) error {
 	if machine.SSHConfig.Timeout <= 0 {
 		machine.SSHConfig.Timeout = 30 // default timeout
 	}
+
+	return nil
+}
+
+// validateRepositoryMachine validates machine configuration with relaxed rules for repository machines
+func (fm *FleetManager) validateRepositoryMachine(machine *Machine) error {
+	if machine.ID == "" {
+		return fmt.Errorf("machine ID is required")
+	}
+	if machine.Name == "" {
+		return fmt.Errorf("machine name is required")
+	}
+	// Note: Address is not required for repository machines (DHCP machines)
+	// Note: SSH config is not required for repository machines (may not be accessible)
 
 	return nil
 }

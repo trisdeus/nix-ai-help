@@ -347,7 +347,7 @@ func sampleNixOSConfig() string {
   networking.hostName = "nixos-test";
   networking.networkmanager.enable = true;
   
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
   
   environment.systemPackages = with pkgs; [
     git
@@ -377,7 +377,7 @@ func generateLargeConfig() string {
 		builder.WriteString(fmt.Sprintf("  services.service%d.enable = true;\n", i))
 	}
 
-	builder.WriteString("  system.stateVersion = \"23.11\";\n")
+	builder.WriteString("  system.stateVersion = \"25.05\";\n")
 	builder.WriteString("}\n")
 
 	return builder.String()

@@ -47,7 +47,7 @@ func TestDiagnoseFunctionValidation(t *testing.T) {
 			params: map[string]interface{}{
 				"error_message": "Permission denied",
 				"system_info": map[string]interface{}{
-					"nixos_version":   "23.11",
+					"nixos_version":   "25.05",
 					"is_flake_system": true,
 				},
 			},
@@ -178,7 +178,7 @@ func TestParseRequest(t *testing.T) {
 		"analysis_type":    "service",
 		"include_steps":    true,
 		"system_info": map[string]interface{}{
-			"nixos_version":   "23.11",
+			"nixos_version":   "25.05",
 			"nix_version":     "2.18.1",
 			"is_flake_system": true,
 		},
@@ -208,8 +208,8 @@ func TestParseRequest(t *testing.T) {
 	if request.SystemInfo == nil {
 		t.Error("Expected system_info to be parsed")
 	} else {
-		if request.SystemInfo.NixOSVersion != "23.11" {
-			t.Errorf("Expected nixos_version '23.11', got '%s'", request.SystemInfo.NixOSVersion)
+		if request.SystemInfo.NixOSVersion != "25.05" {
+			t.Errorf("Expected nixos_version '25.05', got '%s'", request.SystemInfo.NixOSVersion)
 		}
 		if !request.SystemInfo.IsFlakeSystem {
 			t.Error("Expected is_flake_system to be true")

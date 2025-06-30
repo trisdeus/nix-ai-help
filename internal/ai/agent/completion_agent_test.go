@@ -110,7 +110,7 @@ func TestCompletionAgent_DiagnoseCompletionIssues(t *testing.T) {
 	ctx := &CompletionContext{
 		ShellType:        "bash",
 		CompletionErrors: []string{"command not found", "completion not loaded"},
-		SystemInfo:       "NixOS 23.11",
+		SystemInfo:       "NixOS 25.05",
 	}
 	agent.SetContext(ctx)
 

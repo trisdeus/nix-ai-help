@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Fleet API</title>
+</head>
+<body>
+    <h1>Fleet API Test</h1>
+    
+    <div id="results">
+        <p>Loading...</p>
+    </div>
+
+    <script>
+        async function testFleet() {
+            try {
+                const response = await fetch('http://localhost:8083/api/fleet/machines');
+                const data = await response.json();
+                
+                console.log('Full API response:', data);
+                
+                const machines = data.data?.machines || [];
+                
+                const resultsDiv = document.getElementById('results');
+                resultsDiv.innerHTML = `
+                    <h2>API Response Structure:</h2>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    
+                    <h2>Fleet Stats:</h2>
+                    <ul>
+                        <li>Total Machines: ${machines.length}</li>
+                        <li>Machines with 'online' status: ${machines.filter(m => m.status === 'online').length}</li>
+                        <li>Machines with 'unknown' status: ${machines.filter(m => m.status === 'unknown').length}</li>
+                        <li>Machines with 'offline' status: ${machines.filter(m => m.status === 'offline').length}</li>
+                    </ul>
+                    
+                    <h2>Machine Details:</h2>
+                    <ul>
+                        ${machines.map(m => `<li><strong>${m.name}</strong> (${m.id}) - Status: ${m.status}, Address: ${m.address || 'No address'}</li>`).join('')}
+                    </ul>
+                `;
+            } catch (error) {
+                document.getElementById('results').innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Test the API when page loads
+        testFleet();
+    </script>
+</body>
+</html>

@@ -232,7 +232,7 @@ func (tm *TemplateManager) LoadBuiltinTemplates() []Template {
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "23.11"; # Did you read the comment?
+  system.stateVersion = "25.05"; # Did you read the comment?
 }`,
 			Metadata: map[string]string{
 				"type":        "desktop",
@@ -317,7 +317,7 @@ func (tm *TemplateManager) LoadBuiltinTemplates() []Template {
 
   # This value determines the NixOS release from which the default
   # settings for stateful data were taken
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`,
 			Metadata: map[string]string{
 				"type":        "server",
@@ -424,7 +424,7 @@ func (tm *TemplateManager) LoadBuiltinTemplates() []Template {
 
   # This value determines the NixOS release from which the default
   # settings for stateful data were taken
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`,
 			Metadata: map[string]string{
 				"type":        "development",

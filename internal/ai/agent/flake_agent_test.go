@@ -59,7 +59,7 @@ func TestFlakeContext_Formatting(t *testing.T) {
 		FlakePath:     "/home/user/project",
 		FlakeNix:      "{ inputs = { nixpkgs.url = \"github:NixOS/nixpkgs\"; }; }",
 		FlakeLock:     "{ \"nodes\": { \"nixpkgs\": { \"locked\": {} } } }",
-		FlakeInputs:   map[string]string{"nixpkgs": "github:NixOS/nixpkgs/nixos-23.11", "home-manager": "github:nix-community/home-manager"},
+		FlakeInputs:   map[string]string{"nixpkgs": "github:NixOS/nixpkgs/nixos-25.05", "home-manager": "github:nix-community/home-manager"},
 		FlakeOutputs:  []string{"packages.x86_64-linux.default", "devShells.x86_64-linux.default"},
 		FlakeMetadata: "path:/home/user/project?lastModified=1234567890",
 		FlakeErrors:   []string{"error: flake output 'packages' is not a function", "warning: Git tree '/home/user/project' is dirty"},

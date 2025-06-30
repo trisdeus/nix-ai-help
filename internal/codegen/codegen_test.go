@@ -32,7 +32,7 @@ func NewMockAIProvider() *MockAIProvider {
   
   sound.enable = true;
   hardware.pulseaudio.enable = true;
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }
 ` + "```" + `
 
@@ -60,7 +60,7 @@ Consider adding development tools and enabling bluetooth if needed.`,
   security.acme.defaults.email = "admin@example.com";
   
   networking.firewall.allowedTCPPorts = [ 80 443 ];
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }
 ` + "```" + `
 
@@ -89,7 +89,7 @@ func (m *MockAIProvider) Query(prompt string) (string, error) {
 ` + "```nix" + `
 # Basic Configuration
 {
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }
 ` + "```" + `
 
@@ -278,7 +278,7 @@ func TestValidator_Validate(t *testing.T) {
 {
   services.openssh.enable = true;
   networking.firewall.allowedTCPPorts = [ 22 ];
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`,
 			expectValid:  false, // Validator may be strict, expect some issues
 			expectErrors: 1,     // Allow for 1 error
@@ -299,7 +299,7 @@ func TestValidator_Validate(t *testing.T) {
 {
   services.openssh.enable = true;
   # No firewall configuration - should generate warning
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`,
 			expectValid:  false, // May have warnings treated as errors
 			expectErrors: 1,     // Allow for 1 error
@@ -340,7 +340,7 @@ func TestOptimizer_Optimize(t *testing.T) {
 			config: `# Basic SSH Configuration
 {
   services.openssh.enable = true;
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`,
 			categories:      []string{"performance"},
 			expectOptimized: true,
@@ -350,7 +350,7 @@ func TestOptimizer_Optimize(t *testing.T) {
 			config: `# Web Server Configuration
 {
   services.nginx.enable = true;
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`,
 			categories:      []string{"security"},
 			expectOptimized: true,

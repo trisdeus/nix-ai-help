@@ -101,9 +101,9 @@ type Server struct {
 }
 
 // NewServer creates a new web server with enhanced functionality
-func NewServer(config *ServerConfig, teamManager *team.TeamManager, configRepo *repository.ConfigRepository, logger *logger.Logger) (*Server, error) {
+func NewServer(config *ServerConfig, teamManager *team.TeamManager, configRepo *repository.ConfigRepository, fleetManager *fleet.FleetManager, logger *logger.Logger) (*Server, error) {
 	// Initialize configuration builder API
-	configBuilder, err := webui.NewConfigBuilderAPI(logger)
+	configBuilder, err := webui.NewConfigBuilderAPI(fleetManager, logger)
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Failed to initialize config builder: %v", err))
 		configBuilder = nil
@@ -113,6 +113,7 @@ func NewServer(config *ServerConfig, teamManager *team.TeamManager, configRepo *
 		config:        config,
 		teamManager:   teamManager,
 		configRepo:    configRepo,
+		fleetManager:  fleetManager,
 		configBuilder: configBuilder,
 		logger:        logger,
 		upgrader: websocket.Upgrader{

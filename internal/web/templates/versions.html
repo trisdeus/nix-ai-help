@@ -834,5 +834,57 @@ function stageAll() {
         showNotification('Failed to stage all changes: ' + error.message, 'error');
     });
 }
+
+function stageDiffFile() {
+    const fileName = document.getElementById('diffFileName').textContent;
+    fetch(`/api/versioning/repositories/${currentRepository}/stage`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({files: [fileName]})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeModal('fileDiffModal');
+            loadFileChanges();
+            showNotification(`Staged ${fileName}`, 'success');
+        } else {
+            showNotification('Failed to stage file: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to stage file: ' + error.message, 'error');
+    });
+}
+
+function discardDiffFile() {
+    const fileName = document.getElementById('diffFileName').textContent;
+    fetch(`/api/versioning/repositories/${currentRepository}/discard`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({files: [fileName]})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeModal('fileDiffModal');
+            loadFileChanges();
+            showNotification(`Discarded changes for ${fileName}`, 'success');
+        } else {
+            showNotification('Failed to discard changes: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to discard changes: ' + error.message, 'error');
+    });
+}
+
+function showNotification(message, type = 'info') {
+    if (window.nixaiApp && typeof window.nixaiApp.showNotification === 'function') {
+        window.nixaiApp.showNotification(message, type);
+    } else {
+        alert(`[${type}] ${message}`);
+    }
+}
 </script>
 {{end}}

@@ -266,7 +266,7 @@ nixai --agent migrate --role migrate --context-file migration-plan.json "Migrati
     "nginx[1234]: nginx: [emerg] bind() to 0.0.0.0:80 failed"
   ],
   "errorMessages": ["Port 80 already in use"],
-  "systemInfo": "NixOS 23.11, nginx 1.24.0",
+  "systemInfo": "NixOS 25.05, nginx 1.24.0",
   "configSnippet": "services.nginx.enable = true;",
   "failedServices": ["nginx"],
   "recentChanges": ["Added nginx configuration"]

@@ -151,10 +151,12 @@ func (api *TemplateAPI) handleApplyTemplate(w http.ResponseWriter, r *http.Reque
 
 	// For now, return the template configuration for the frontend to handle
 	response := map[string]interface{}{
-		"success":      true,
-		"template":     selectedTemplate,
-		"clear_canvas": request.ClearCanvas,
-		"message":      fmt.Sprintf("Template '%s' ready to apply", templateName),
+		"success": true,
+		"data": map[string]interface{}{
+			"template":     selectedTemplate,
+			"clear_canvas": request.ClearCanvas,
+			"message":      fmt.Sprintf("Template '%s' ready to apply", templateName),
+		},
 	}
 
 	api.sendJSON(w, response)
@@ -263,7 +265,7 @@ func (api *TemplateAPI) getBuiltinTemplates() []Template {
   ];
 
   # This value determines the NixOS release
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`,
 			Metadata: map[string]string{
 				"type":        "desktop",
@@ -341,7 +343,7 @@ func (api *TemplateAPI) getBuiltinTemplates() []Template {
   };
 
   # This value determines the NixOS release
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`,
 			Metadata: map[string]string{
 				"type":        "server",
@@ -447,7 +449,7 @@ func (api *TemplateAPI) getBuiltinTemplates() []Template {
   services.openssh.enable = true;
 
   # This value determines the NixOS release
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`,
 			Metadata: map[string]string{
 				"type":        "development",
@@ -468,6 +470,7 @@ func (api *TemplateAPI) setJSONHeaders(w http.ResponseWriter) {
 }
 
 func (api *TemplateAPI) sendJSON(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		api.logger.Error(fmt.Sprintf("Failed to encode JSON response: %v", err))
@@ -475,6 +478,7 @@ func (api *TemplateAPI) sendJSON(w http.ResponseWriter, data interface{}) {
 }
 
 func (api *TemplateAPI) sendError(w http.ResponseWriter, statusCode int, message string) {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	response := map[string]interface{}{
 		"error":   true,

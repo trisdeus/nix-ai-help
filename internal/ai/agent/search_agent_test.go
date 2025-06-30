@@ -18,7 +18,7 @@ func TestSearchAgent_Query(t *testing.T) {
 		SearchType:     "packages",
 		SearchResults:  []string{"firefox", "firefox-esr", "firefox-bin"},
 		SearchSources:  []string{"nixpkgs", "wiki"},
-		ChannelVersion: "nixos-23.11",
+		ChannelVersion: "nixos-25.05",
 		SystemArch:     "x86_64-linux",
 		PackageFilters: []string{"license:mpl", "maintainer:mozilla"},
 		SearchLimit:    10,

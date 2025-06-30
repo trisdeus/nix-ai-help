@@ -314,7 +314,7 @@ const desktopBasicTemplate = `{ config, pkgs, ... }:
   networking.networkmanager.enable = true;
 
   # This value determines the NixOS release
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`
 
 const webServerBasicTemplate = `{ config, pkgs, ... }:
@@ -362,7 +362,7 @@ const webServerBasicTemplate = `{ config, pkgs, ... }:
   users.groups.web = {};
 
   # This value determines the NixOS release
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`
 
 const webServerAdvancedTemplate = `{ config, pkgs, ... }:
@@ -443,7 +443,7 @@ const webServerAdvancedTemplate = `{ config, pkgs, ... }:
   };
 
   # This value determines the NixOS release
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`
 
 const developmentBasicTemplate = `{ config, pkgs, ... }:
@@ -523,7 +523,7 @@ const developmentBasicTemplate = `{ config, pkgs, ... }:
   };
 
   # This value determines the NixOS release
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`
 
 const homeManagerDevTemplate = `{ config, pkgs, ... }:
@@ -604,7 +604,7 @@ const homeManagerDevTemplate = `{ config, pkgs, ... }:
   ];
 
   # This value determines the Home Manager release
-  home.stateVersion = "23.11";
+  home.stateVersion = "25.05";
 }`
 
 const gamingBasicTemplate = `{ config, pkgs, ... }:
@@ -678,7 +678,7 @@ const gamingBasicTemplate = `{ config, pkgs, ... }:
   };
 
   # This value determines the NixOS release
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`
 
 const securityBasicTemplate = `{ config, pkgs, ... }:
@@ -741,5 +741,5 @@ const securityBasicTemplate = `{ config, pkgs, ... }:
   security.auditd.enable = true;
 
   # This value determines the NixOS release
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }`

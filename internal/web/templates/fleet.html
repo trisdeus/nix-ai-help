@@ -265,7 +265,7 @@ function loadFleetData() {
     fetch('/api/fleet/machines')
         .then(response => response.json())
         .then(data => {
-            allMachines = data.machines || [];
+            allMachines = data.data?.machines || [];
             updateFleetStats();
             renderMachines();
         })
@@ -279,9 +279,9 @@ function loadFleetData() {
 function updateFleetStats() {
     const stats = {
         total: allMachines.length,
-        healthy: allMachines.filter(m => m.status === 'healthy').length,
-        warning: allMachines.filter(m => m.status === 'warning').length,
-        error: allMachines.filter(m => m.status === 'error').length
+        healthy: allMachines.filter(m => m.status === 'online').length,
+        warning: allMachines.filter(m => m.status === 'degraded').length,
+        error: allMachines.filter(m => m.status === 'offline').length
     };
     
     document.getElementById('totalMachines').textContent = stats.total;
@@ -306,17 +306,17 @@ function createMachineCard(machine) {
     div.dataset.machineId = machine.id;
     
     const statusClass = {
-        'healthy': 'text-success',
-        'warning': 'text-warning',
-        'error': 'text-error',
-        'offline': 'text-muted'
+        'online': 'text-success',
+        'degraded': 'text-warning',
+        'offline': 'text-error',
+        'unknown': 'text-muted'
     }[machine.status] || 'text-muted';
     
     const statusIcon = {
-        'healthy': 'check-circle',
-        'warning': 'exclamation-triangle',
-        'error': 'times-circle',
-        'offline': 'power-off'
+        'online': 'check-circle',
+        'degraded': 'exclamation-triangle',
+        'offline': 'times-circle',
+        'unknown': 'question-circle'
     }[machine.status] || 'question-circle';
     
     div.innerHTML = `
@@ -326,7 +326,7 @@ function createMachineCard(machine) {
                     <input type="checkbox" class="machine-checkbox" value="${machine.id}">
                     <div class="machine-title">
                         <h4>${machine.name}</h4>
-                        <span class="machine-host">${machine.host}</span>
+                        <span class="machine-host">${machine.address || 'No address'}</span>
                     </div>
                 </div>
                 <div class="machine-status">
@@ -502,7 +502,7 @@ function filterMachines() {
     
     const filtered = allMachines.filter(machine => {
         const matchesSearch = machine.name.toLowerCase().includes(search) || 
-                            machine.host.toLowerCase().includes(search);
+                            (machine.address && machine.address.toLowerCase().includes(search));
         const matchesStatus = !statusFilter || machine.status === statusFilter;
         const matchesTags = !tagFilter || (machine.tags && machine.tags.includes(tagFilter));
         

@@ -12,6 +12,7 @@ import (
 	"nix-ai-help/internal/auth"
 	"nix-ai-help/internal/collaboration/team"
 	"nix-ai-help/internal/fleet"
+	nixosrepo "nix-ai-help/internal/repository"
 	"nix-ai-help/internal/versioning/repository"
 	"nix-ai-help/internal/webui"
 	"nix-ai-help/pkg/logger"
@@ -31,6 +32,11 @@ type EnhancedServer struct {
 
 // NewEnhancedServer creates a new enhanced web server using the existing Server
 func NewEnhancedServer(port int, teamManager *team.TeamManager, configRepo *repository.ConfigRepository, logger *logger.Logger) (*EnhancedServer, error) {
+	return NewEnhancedServerWithRepository(port, teamManager, configRepo, nil, logger)
+}
+
+// NewEnhancedServerWithRepository creates a new enhanced web server with an optional NixOS repository
+func NewEnhancedServerWithRepository(port int, teamManager *team.TeamManager, configRepo *repository.ConfigRepository, nixosRepo *nixosrepo.NixOSRepository, logger *logger.Logger) (*EnhancedServer, error) {
 	// Create server config with enhanced features
 	config := &ServerConfig{
 		Port:        port,
@@ -60,14 +66,22 @@ func NewEnhancedServer(port int, teamManager *team.TeamManager, configRepo *repo
 		},
 	}
 
-	// Create the base server
-	server, err := NewServer(config, teamManager, configRepo, logger)
+	// Initialize FleetManager first
+	fleetManager := fleet.NewFleetManager(logger)
+
+	// Create the base server with FleetManager
+	server, err := NewServer(config, teamManager, configRepo, fleetManager, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create base server: %w", err)
 	}
 
-	// Initialize ConfigBuilderAPI
-	configBuilder, err := webui.NewConfigBuilderAPI(logger)
+	// Initialize ConfigBuilderAPI with FleetManager and optional repository
+	var configBuilder *webui.ConfigBuilderAPI
+	if nixosRepo != nil {
+		configBuilder, err = webui.NewConfigBuilderAPIWithRepository(fleetManager, nixosRepo, logger)
+	} else {
+		configBuilder, err = webui.NewConfigBuilderAPI(fleetManager, logger)
+	}
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Failed to initialize config builder: %v", err))
 		configBuilder = nil
@@ -75,9 +89,6 @@ func NewEnhancedServer(port int, teamManager *team.TeamManager, configRepo *repo
 
 	// Initialize TemplateAPI
 	templateAPI := webui.NewTemplateAPI(logger)
-
-	// Initialize FleetManager
-	fleetManager := fleet.NewFleetManager(logger)
 
 	// Initialize AuthManager
 	authManager, err := auth.NewAuthManager(teamManager, logger)
@@ -107,6 +118,91 @@ func NewEnhancedServer(port int, teamManager *team.TeamManager, configRepo *repo
 	}
 
 	// Clear existing routes and setup enhanced routes
+	enhanced.setupEnhancedRoutes()
+
+	return enhanced, nil
+}
+
+// NewEnhancedServerWithFleetAndRepository creates a new enhanced web server with existing fleet manager and repository
+func NewEnhancedServerWithFleetAndRepository(port int, teamManager *team.TeamManager, configRepo *repository.ConfigRepository, fleetManager *fleet.FleetManager, nixosRepo *nixosrepo.NixOSRepository, logger *logger.Logger) (*EnhancedServer, error) {
+	// Create server config with enhanced features
+	config := &ServerConfig{
+		Port:        port,
+		Host:        "0.0.0.0",
+		StaticDir:   "./internal/web/static",
+		TemplateDir: "./internal/web/templates",
+		Authentication: AuthConfig{
+			Enabled:        false,
+			SessionTimeout: "24h",
+			Providers:      []string{"local"},
+		},
+		TLS: TLSConfig{
+			Enabled: false,
+		},
+		CORS: CORSConfig{
+			AllowedOrigins: []string{"*"},
+			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowedHeaders: []string{"*"},
+		},
+		Features: FeatureConfig{
+			VisualBuilder:   true,
+			FleetManagement: true,
+			Collaboration:   true,
+			VersionControl:  true,
+			AIGeneration:    true,
+			Dashboard:       true,
+		},
+	}
+
+	// Use the provided FleetManager (don't create a new one)
+	server, err := NewServer(config, teamManager, configRepo, fleetManager, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create base server: %w", err)
+	}
+
+	// Initialize ConfigBuilderAPI with FleetManager and optional repository
+	var configBuilder *webui.ConfigBuilderAPI
+	if nixosRepo != nil {
+		configBuilder, err = webui.NewConfigBuilderAPIWithRepository(fleetManager, nixosRepo, logger)
+	} else {
+		configBuilder, err = webui.NewConfigBuilderAPI(fleetManager, logger)
+	}
+	if err != nil {
+		logger.Warn(fmt.Sprintf("Failed to initialize config builder: %v", err))
+		configBuilder = nil
+	}
+
+	// Initialize TemplateAPI
+	templateAPI := webui.NewTemplateAPI(logger)
+
+	// Initialize AuthManager
+	authManager, err := auth.NewAuthManager(teamManager, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize auth manager: %w", err)
+	}
+
+	// Create enhanced server wrapper
+	enhanced := &EnhancedServer{
+		Server:        server,
+		configBuilder: configBuilder,
+		templateAPI:   templateAPI,
+		fleetManager:  fleetManager, // Use the provided fleet manager
+		authManager:   authManager,
+	}
+
+	// Load templates
+	templatePattern := filepath.Join(config.TemplateDir, "*.html")
+	templates, err := template.ParseGlob(templatePattern)
+	if err != nil {
+		logger.Warn(fmt.Sprintf("Failed to parse templates: %v", err))
+		// Continue without templates, will fall back to basic HTML
+		enhanced.templates = nil
+	} else {
+		enhanced.templates = templates
+		logger.Info("Templates loaded successfully")
+	}
+
+	// Setup routes
 	enhanced.setupEnhancedRoutes()
 
 	return enhanced, nil
@@ -1020,29 +1116,79 @@ func (s *EnhancedServer) handleDashboardAPI(w http.ResponseWriter, r *http.Reque
 
 	s.logger.Debug("Handling dashboard API request")
 
+	// Get real fleet data
+	machines, err := s.fleetManager.ListMachines(r.Context())
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to get machines: %v", err))
+		machines = []*fleet.Machine{} // Fallback to empty list
+	}
+
+	// Count machine statuses
+	totalMachines := len(machines)
+	healthyMachines := 0
+
+	for _, machine := range machines {
+		if machine.Status == "online" {
+			healthyMachines++
+		}
+	}
+
+	// Get configuration count from repository if available
+	totalConfigs := 0
+	if s.configBuilder != nil {
+		// TODO: Add method to configBuilder to get repository configurations
+		// For now, use a placeholder
+		totalConfigs = 0
+	}
+
+	// Create activities based on actual data
+	activities := []map[string]interface{}{
+		{
+			"type":      "system",
+			"message":   "NixAI web interface started",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"icon":      "🚀",
+		},
+	}
+
+	// Add machine-related activities
+	if totalMachines > 0 {
+		activities = append(activities, map[string]interface{}{
+			"type":      "fleet",
+			"message":   fmt.Sprintf("Discovered %d machines from repository", totalMachines),
+			"timestamp": time.Now().Add(-5 * time.Minute).Format(time.RFC3339),
+			"icon":      "🖥️",
+		})
+	}
+
+	// Create alerts based on actual status
+	alerts := []map[string]interface{}{}
+
+	if totalMachines == 0 {
+		alerts = append(alerts, map[string]interface{}{
+			"level":     "info",
+			"title":     "No Machines Found",
+			"message":   "No machines configured. Use --repo flag to analyze a NixOS repository",
+			"timestamp": time.Now().Format(time.RFC3339),
+		})
+	} else {
+		alerts = append(alerts, map[string]interface{}{
+			"level":     "success",
+			"title":     "Fleet Status",
+			"message":   fmt.Sprintf("%d machines discovered, %d healthy", totalMachines, healthyMachines),
+			"timestamp": time.Now().Format(time.RFC3339),
+		})
+	}
+
 	data := map[string]interface{}{
 		"overview": map[string]interface{}{
-			"total_machines":   0,
-			"healthy_machines": 0,
-			"total_configs":    0,
-			"active_teams":     0,
+			"total_machines":   totalMachines,
+			"healthy_machines": healthyMachines,
+			"total_configs":    totalConfigs,
+			"active_teams":     1, // Default to 1 for now
 		},
-		"activities": []map[string]interface{}{
-			{
-				"type":      "system",
-				"message":   "NixAI web interface started",
-				"timestamp": time.Now().Format(time.RFC3339),
-				"icon":      "🚀",
-			},
-		},
-		"alerts": []map[string]interface{}{
-			{
-				"level":     "info",
-				"title":     "Welcome",
-				"message":   "NixAI enhanced web interface is running",
-				"timestamp": time.Now().Format(time.RFC3339),
-			},
-		},
+		"activities": activities,
+		"alerts":     alerts,
 	}
 
 	// For HEAD requests, only send headers
@@ -1163,20 +1309,41 @@ func (s *EnhancedServer) handleDashboardStats(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Get real fleet data
+	machines, err := s.fleetManager.ListMachines(r.Context())
+	if err != nil {
+		s.sendError(w, fmt.Sprintf("Failed to get machines: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Count machine statuses
+	machineStats := map[string]int{
+		"total":   len(machines),
+		"healthy": 0,
+		"warning": 0,
+		"error":   0,
+	}
+
+	for _, machine := range machines {
+		switch machine.Status {
+		case "online":
+			machineStats["healthy"]++
+		case "degraded":
+			machineStats["warning"]++
+		case "offline":
+			machineStats["error"]++
+		}
+	}
+
 	stats := map[string]interface{}{
-		"machines": map[string]int{
-			"total":   0,
-			"healthy": 0,
-			"warning": 0,
-			"error":   0,
-		},
+		"machines": machineStats,
 		"configurations": map[string]int{
-			"total":    0,
+			"total":    0, // TODO: Get from repository if available
 			"modified": 0,
 			"deployed": 0,
 		},
 		"teams": map[string]int{
-			"active": 0,
+			"active": 0, // TODO: Get from team manager if available
 			"total":  0,
 		},
 	}
@@ -1481,35 +1648,48 @@ func (s *EnhancedServer) handleFleetAPI(w http.ResponseWriter, r *http.Request) 
 
 	s.logger.Debug("Handling fleet API request")
 
+	// Get real fleet data from fleet manager
+	machines, err := s.fleetManager.ListMachines(r.Context())
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to get machines: %v", err))
+		machines = []*fleet.Machine{} // Fallback to empty list
+	}
+
+	// Count machine statuses
+	totalMachines := len(machines)
+	onlineMachines := 0
+	offlineMachines := 0
+
+	for _, machine := range machines {
+		if machine.Status == "online" {
+			onlineMachines++
+		} else {
+			offlineMachines++
+		}
+	}
+
+	// Convert machines to API format
+	apiMachines := make([]map[string]interface{}, 0, len(machines))
+	for _, machine := range machines {
+		apiMachines = append(apiMachines, map[string]interface{}{
+			"id":     machine.ID,
+			"name":   machine.Name,
+			"status": machine.Status,
+			"health": "healthy", // TODO: Use actual health data when available
+		})
+	}
+
 	// Get fleet overview data
 	data := map[string]interface{}{
 		"summary": map[string]interface{}{
-			"total_machines":   2,
-			"online_machines":  2,
-			"offline_machines": 0,
-			"deployments":      1,
+			"total_machines":   totalMachines,
+			"online_machines":  onlineMachines,
+			"offline_machines": offlineMachines,
+			"deployments":      0, // TODO: Get from deployment history when available
 		},
-		"machines": []map[string]interface{}{
-			{
-				"id":     "server01",
-				"name":   "Production Server 1",
-				"status": "online",
-				"health": "healthy",
-			},
-			{
-				"id":     "server02",
-				"name":   "Production Server 2",
-				"status": "online",
-				"health": "healthy",
-			},
-		},
+		"machines":           apiMachines,
 		"recent_deployments": []map[string]interface{}{
-			{
-				"id":        "deploy-001",
-				"target":    "server01",
-				"status":    "success",
-				"timestamp": time.Now().Add(-30 * time.Minute).Format(time.RFC3339),
-			},
+			// TODO: Get from deployment history when available
 		},
 	}
 

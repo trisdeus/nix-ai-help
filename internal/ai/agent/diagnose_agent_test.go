@@ -52,9 +52,9 @@ func TestDiagnoseAgent_QueryWithContext(t *testing.T) {
 			ErrorMessage:    "bind: address already in use",
 			UserDescription: "nginx won't start after reboot",
 			SystemInfo: &SystemInfo{
-				NixOSVersion:  "23.11",
+				NixOSVersion:  "25.05",
 				NixVersion:    "2.18.1",
-				Channel:       "nixos-23.11",
+				Channel:       "nixos-25.05",
 				Architecture:  "x86_64-linux",
 				IsFlakeSystem: false,
 			},
@@ -66,7 +66,7 @@ func TestDiagnoseAgent_QueryWithContext(t *testing.T) {
 		// Check that context is properly included
 		require.Contains(t, result, "DIAGNOSTIC CONTEXT")
 		require.Contains(t, result, "System Information")
-		require.Contains(t, result, "NixOS Version: 23.11")
+		require.Contains(t, result, "NixOS Version: 25.05")
 		require.Contains(t, result, "Log Output")
 		require.Contains(t, result, "service failed to start")
 		require.Contains(t, result, "Configuration Snippet")
@@ -169,13 +169,13 @@ func TestBuildDiagnosticContext(t *testing.T) {
 func TestDiagnosticContext_AddSystemInfo(t *testing.T) {
 	ctx := &DiagnosticContext{}
 	sysInfo := &SystemInfo{
-		NixOSVersion:  "23.11",
+		NixOSVersion:  "25.05",
 		IsFlakeSystem: true,
 	}
 
 	ctx.AddSystemInfo(sysInfo)
 	require.Equal(t, sysInfo, ctx.SystemInfo)
-	require.Equal(t, "23.11", ctx.SystemInfo.NixOSVersion)
+	require.Equal(t, "25.05", ctx.SystemInfo.NixOSVersion)
 	require.True(t, ctx.SystemInfo.IsFlakeSystem)
 }
 
@@ -201,7 +201,7 @@ func TestDiagnoseAgent_buildDiagnosticPrompt(t *testing.T) {
 			UserDescription: "user describes problem",
 			CommandOutput:   "command result",
 			SystemInfo: &SystemInfo{
-				NixOSVersion:  "23.11",
+				NixOSVersion:  "25.05",
 				IsFlakeSystem: true,
 			},
 			ExistingDiagnostics: []nixos.Diagnostic{
@@ -225,7 +225,7 @@ func TestDiagnoseAgent_buildDiagnosticPrompt(t *testing.T) {
 		require.Contains(t, result, "INSTRUCTIONS")
 
 		// Check content is included
-		require.Contains(t, result, "NixOS Version: 23.11")
+		require.Contains(t, result, "NixOS Version: 25.05")
 		require.Contains(t, result, "Flake System: true")
 		require.Contains(t, result, "log content")
 		require.Contains(t, result, "nix config")

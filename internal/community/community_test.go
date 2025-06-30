@@ -58,7 +58,7 @@ func TestManager_ValidateConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = os.Remove(file.Name()) }()
-	_, _ = file.WriteString("system.stateVersion = \"23.11\";\n")
+	_, _ = file.WriteString("system.stateVersion = \"25.05\";\n")
 	_ = file.Close()
 	result, err := mgr.ValidateConfiguration(file.Name())
 	if err != nil {

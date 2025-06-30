@@ -63,8 +63,8 @@ func TestBuildContext_Formatting(t *testing.T) {
 		FailedPackages: []string{"pkg1", "pkg2"},
 		BuildSystem:    "nixos-rebuild",
 		Architecture:   "x86_64-linux",
-		NixChannels:    []string{"nixos-23.11", "nixpkgs-unstable"},
-		SystemInfo:     "NixOS 23.11",
+		NixChannels:    []string{"nixos-25.05", "nixpkgs-unstable"},
+		SystemInfo:     "NixOS 25.05",
 	}
 
 	// Test that context can be created and has expected fields

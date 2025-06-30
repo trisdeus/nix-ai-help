@@ -106,6 +106,47 @@
       nixosModules.default = import ./nix/modules/nixos.nix;
       homeManagerModules.default = import ./nix/modules/home-manager.nix;
 
+      # Sample nixosConfigurations for testing web UI integration
+      nixosConfigurations = {
+        dev-server = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            ({pkgs, ...}: {
+              system.stateVersion = "25.05";
+              environment.systemPackages = with pkgs; [nixai];
+              networking.hostName = "dev-server";
+              services.openssh.enable = true;
+            })
+          ];
+        };
+
+        prod-web = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            ({pkgs, ...}: {
+              system.stateVersion = "25.05";
+              environment.systemPackages = with pkgs; [nixai nginx];
+              networking.hostName = "prod-web";
+              services.openssh.enable = true;
+              services.nginx.enable = true;
+            })
+          ];
+        };
+
+        database-server = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            ({pkgs, ...}: {
+              system.stateVersion = "25.05";
+              environment.systemPackages = with pkgs; [nixai postgresql];
+              networking.hostName = "database-server";
+              services.openssh.enable = true;
+              services.postgresql.enable = true;
+            })
+          ];
+        };
+      };
+
       # Flake-level overlays - provide nixai package for each system
       overlays.default = final: prev: {
         nixai = self.packages.${prev.system}.nixai or (throw "nixai package not available for system ${prev.system}");
