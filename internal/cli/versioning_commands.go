@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"nix-ai-help/internal/collaboration/team"
+	"nix-ai-help/internal/fleet"
+	nixosrepo "nix-ai-help/internal/repository"
 	"nix-ai-help/internal/versioning/repository"
 	"nix-ai-help/internal/web"
 	"nix-ai-help/pkg/logger"
@@ -333,16 +335,59 @@ func AddWebInterfaceCommands(rootCmd *cobra.Command, logger *logger.Logger) {
 				repoPath = "."
 			}
 
+			logger.Info("Starting nixai web interface...")
+
+			// Initialize fleet manager
+			fleetManager := fleet.NewFleetManager(logger)
+
+			// Initialize repository parser if repo path provided
+			var nixosRepo *nixosrepo.NixOSRepository
+			if repoPath != "" && repoPath != "." {
+				logger.Info(fmt.Sprintf("Analyzing NixOS repository: %s", repoPath))
+
+				repo, err := nixosrepo.NewNixOSRepository(repoPath, logger)
+				if err != nil {
+					return fmt.Errorf("failed to initialize repository: %w", err)
+				}
+
+				if err := repo.ScanRepository(); err != nil {
+					return fmt.Errorf("failed to scan repository: %w", err)
+				}
+
+				nixosRepo = repo
+
+				// Extract machine definitions from repository and add to fleet
+				machines, err := repo.GetMachineDefinitions()
+				if err != nil {
+					logger.Warn(fmt.Sprintf("Failed to extract machine definitions: %v", err))
+				} else {
+					ctx := context.Background()
+					for _, machine := range machines {
+						if err := fleetManager.AddRepositoryMachine(ctx, machine); err != nil {
+							logger.Warn(fmt.Sprintf("Failed to add machine %s to fleet: %v", machine.ID, err))
+						} else {
+							logger.Info(fmt.Sprintf("Added machine %s to fleet from repository", machine.ID))
+						}
+					}
+				}
+			}
+
 			// Initialize components
-			repo, err := repository.NewConfigRepository(repoPath, logger)
+			configRepo, err := repository.NewConfigRepository("/tmp/nixai-configs", logger)
 			if err != nil {
-				return fmt.Errorf("failed to open repository: %w", err)
+				logger.Warn(fmt.Sprintf("Failed to create config repository: %v", err))
 			}
 
 			teamManager := team.NewTeamManager(logger)
 
-			// Create enhanced server
-			server, err := web.NewEnhancedServer(port, teamManager, repo, logger)
+			// Create enhanced server with repository support
+			var server *web.EnhancedServer
+			if nixosRepo != nil {
+				server, err = web.NewEnhancedServerWithFleetAndRepository(port, teamManager, configRepo, fleetManager, nixosRepo, logger)
+			} else {
+				server, err = web.NewEnhancedServerWithFleetAndRepository(port, teamManager, configRepo, fleetManager, nil, logger)
+			}
+
 			if err != nil {
 				return fmt.Errorf("failed to create enhanced web server: %w", err)
 			}

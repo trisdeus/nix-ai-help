@@ -246,6 +246,132 @@
         </div>
     </div>
 
+    <!-- Modal Dialogs -->
+    
+    <!-- Create Configuration Modal -->
+    <div id="create-config-modal" class="nixai-modal" style="display: none;">
+        <div class="nixai-modal-overlay" data-modal-close></div>
+        <div class="nixai-modal-content">
+            <div class="nixai-modal-header">
+                <h3>Create New Configuration</h3>
+                <button class="nixai-modal-close" data-modal-close>&times;</button>
+            </div>
+            <div class="nixai-modal-body">
+                <form id="create-config-form">
+                    <div class="form-group">
+                        <label for="config-name">Configuration Name</label>
+                        <input type="text" id="config-name" name="name" class="nixai-input" placeholder="my-nixos-config" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="config-description">Description</label>
+                        <textarea id="config-description" name="description" class="nixai-input" rows="3" placeholder="Describe this configuration..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="config-template">Template</label>
+                        <select id="config-template" name="template" class="nixai-select">
+                            <option value="">Select a template...</option>
+                            <option value="minimal">Minimal System</option>
+                            <option value="desktop">Desktop Environment</option>
+                            <option value="server">Server Configuration</option>
+                            <option value="development">Development Environment</option>
+                            <option value="container">Container Host</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="nixai-modal-footer">
+                <button class="nixai-btn nixai-btn-secondary" data-modal-close>Cancel</button>
+                <button class="nixai-btn nixai-btn-primary" onclick="createConfiguration()">Create Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Machine Modal -->
+    <div id="add-machine-modal" class="nixai-modal" style="display: none;">
+        <div class="nixai-modal-overlay" data-modal-close></div>
+        <div class="nixai-modal-content">
+            <div class="nixai-modal-header">
+                <h3>Add New Machine</h3>
+                <button class="nixai-modal-close" data-modal-close>&times;</button>
+            </div>
+            <div class="nixai-modal-body">
+                <form id="add-machine-form">
+                    <div class="form-group">
+                        <label for="machine-name">Machine Name</label>
+                        <input type="text" id="machine-name" name="name" class="nixai-input" placeholder="my-server" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="machine-address">IP Address / Hostname</label>
+                        <input type="text" id="machine-address" name="address" class="nixai-input" placeholder="192.168.1.100 or server.local">
+                    </div>
+                    <div class="form-group">
+                        <label for="machine-user">SSH User</label>
+                        <input type="text" id="machine-user" name="user" class="nixai-input" value="nixos">
+                    </div>
+                    <div class="form-group">
+                        <label for="machine-port">SSH Port</label>
+                        <input type="number" id="machine-port" name="port" class="nixai-input" value="22">
+                    </div>
+                    <div class="form-group">
+                        <label for="machine-environment">Environment</label>
+                        <select id="machine-environment" name="environment" class="nixai-select">
+                            <option value="development">Development</option>
+                            <option value="staging">Staging</option>
+                            <option value="production">Production</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="machine-tags">Tags (comma-separated)</label>
+                        <input type="text" id="machine-tags" name="tags" class="nixai-input" placeholder="web, database, frontend">
+                    </div>
+                </form>
+            </div>
+            <div class="nixai-modal-footer">
+                <button class="nixai-btn nixai-btn-secondary" data-modal-close>Cancel</button>
+                <button class="nixai-btn nixai-btn-primary" onclick="addMachine()">Add Machine</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Team Modal -->
+    <div id="create-team-modal" class="nixai-modal" style="display: none;">
+        <div class="nixai-modal-overlay" data-modal-close></div>
+        <div class="nixai-modal-content">
+            <div class="nixai-modal-header">
+                <h3>Create New Team</h3>
+                <button class="nixai-modal-close" data-modal-close>&times;</button>
+            </div>
+            <div class="nixai-modal-body">
+                <form id="create-team-form">
+                    <div class="form-group">
+                        <label for="team-name">Team Name</label>
+                        <input type="text" id="team-name" name="name" class="nixai-input" placeholder="Development Team" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="team-description">Description</label>
+                        <textarea id="team-description" name="description" class="nixai-input" rows="3" placeholder="Describe the team's purpose..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="team-members">Initial Members (email addresses)</label>
+                        <textarea id="team-members" name="members" class="nixai-input" rows="2" placeholder="alice@example.com, bob@example.com"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="team-access">Access Level</label>
+                        <select id="team-access" name="access" class="nixai-select">
+                            <option value="read">Read Only</option>
+                            <option value="write">Read & Write</option>
+                            <option value="admin">Administrator</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="nixai-modal-footer">
+                <button class="nixai-btn nixai-btn-secondary" data-modal-close>Cancel</button>
+                <button class="nixai-btn nixai-btn-primary" onclick="createTeam()">Create Team</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="/static/js/nixai-enhanced.js"></script>
     
@@ -262,236 +388,101 @@
     {{.InlineScripts}}
     </script>
     {{end}}
+
+    <!-- Modal Functions -->
+    <script>
+    function createConfiguration() {
+        const form = document.getElementById('create-config-form');
+        const formData = new FormData(form);
+        const configData = {
+            name: formData.get('name'),
+            description: formData.get('description'),
+            template: formData.get('template')
+        };
+        
+        fetch('/api/config/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(configData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                closeModal('create-config-modal');
+                showNotification('Configuration created successfully', 'success');
+                setTimeout(() => window.location.href = '/builder', 1000);
+            } else {
+                showNotification('Failed to create configuration: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Failed to create configuration: ' + error.message, 'error');
+        });
+    }
+
+    function addMachine() {
+        const form = document.getElementById('add-machine-form');
+        const formData = new FormData(form);
+        const machineData = {
+            name: formData.get('name'),
+            address: formData.get('address'),
+            ssh_config: {
+                user: formData.get('user'),
+                port: parseInt(formData.get('port'))
+            },
+            environment: formData.get('environment'),
+            tags: formData.get('tags').split(',').map(t => t.trim()).filter(t => t)
+        };
+        
+        fetch('/api/fleet/machines', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(machineData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                closeModal('add-machine-modal');
+                showNotification('Machine added successfully', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showNotification('Failed to add machine: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Failed to add machine: ' + error.message, 'error');
+        });
+    }
+
+    function createTeam() {
+        const form = document.getElementById('create-team-form');
+        const formData = new FormData(form);
+        const teamData = {
+            name: formData.get('name'),
+            description: formData.get('description'),
+            members: formData.get('members').split(',').map(m => m.trim()).filter(m => m),
+            access_level: formData.get('access')
+        };
+        
+        fetch('/api/teams', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(teamData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                closeModal('create-team-modal');
+                showNotification('Team created successfully', 'success');
+                setTimeout(() => window.location.href = '/teams', 1000);
+            } else {
+                showNotification('Failed to create team: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Failed to create team: ' + error.message, 'error');
+        });
+    }
+    </script>
 </body>
 </html>
-
-<style>
-/* Modal Styles */
-.nixai-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-}
-
-.nixai-modal-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.nixai-modal-content {
-    background: var(--bg-surface);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-    max-width: 600px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-    position: relative;
-}
-
-.nixai-modal-header {
-    padding: var(--spacing-lg);
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.nixai-modal-header h3 {
-    margin: 0;
-}
-
-.nixai-modal-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--text-secondary);
-}
-
-.nixai-modal-close:hover {
-    color: var(--text-primary);
-}
-
-.nixai-modal-body {
-    padding: var(--spacing-lg);
-}
-
-/* Activity Stream */
-.activity-stream {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.activity-item {
-    display: flex;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm) 0;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.activity-item:last-child {
-    border-bottom: none;
-}
-
-.activity-icon {
-    font-size: 1.2rem;
-    width: 24px;
-    text-align: center;
-}
-
-.activity-content {
-    flex: 1;
-}
-
-.activity-message {
-    font-size: 0.875rem;
-    color: var(--text-primary);
-}
-
-.activity-time {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    margin-top: var(--spacing-xs);
-}
-
-.activity-placeholder {
-    padding: var(--spacing-xl);
-    font-style: italic;
-}
-
-/* Sidebar Items */
-.sidebar-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-sm) 0;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.sidebar-item:last-child {
-    border-bottom: none;
-}
-
-.sidebar-item-label {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-}
-
-.sidebar-item-value {
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-primary);
-}
-
-/* Breadcrumbs */
-.breadcrumbs {
-    font-size: 0.875rem;
-    color: var(--text-secondary);
-}
-
-.breadcrumb-link {
-    color: var(--primary-color);
-}
-
-.breadcrumb-link:hover {
-    color: var(--primary-dark);
-}
-
-.breadcrumb-current {
-    color: var(--text-primary);
-    font-weight: 500;
-}
-
-/* Page Header */
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: var(--spacing-md);
-}
-
-.page-title {
-    font-size: 1.875rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.page-subtitle {
-    margin-top: var(--spacing-xs);
-}
-
-.page-actions {
-    display: flex;
-    gap: var(--spacing-sm);
-    flex-wrap: wrap;
-}
-
-/* Connection indicator */
-.connection-indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: var(--success-color);
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
-}
-
-/* Search */
-.search-form {
-    position: relative;
-}
-
-.search-results {
-    margin-top: var(--spacing-md);
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-/* Shortcuts */
-.shortcut-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-}
-
-.shortcut-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-kbd {
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-sm);
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-family: monospace;
-    font-size: 0.75rem;
-}
-
-/* User Info */
-.user-info {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-</style>
