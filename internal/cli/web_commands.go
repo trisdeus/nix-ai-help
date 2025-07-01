@@ -104,6 +104,8 @@ func (wc *WebCommands) runWebDashboard(port int, host, repoPath string) error {
 				}
 			}
 		}
+	} else {
+		wc.logger.Warn("No --repo provided: repository features will be unavailable and warnings may appear in logs.")
 	}
 
 	// Create team manager

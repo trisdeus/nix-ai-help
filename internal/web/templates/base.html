@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.Title}} - NixAI Enhanced Web Interface</title>
     
+    <!-- Early theme script: set data-theme before CSS loads for no flash -->
+    <script>
+      (function() {
+        try {
+          var theme = localStorage.getItem('nixai-theme') || 'light';
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {}
+      })();
+    </script>
     <!-- Preload critical resources -->
     <link rel="preload" href="/static/css/nixai-enhanced.css" as="style">
     <link rel="preload" href="/static/js/nixai-enhanced.js" as="script">

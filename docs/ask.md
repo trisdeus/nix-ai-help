@@ -101,3 +101,21 @@ Both modes use the same comprehensive AI analysis - quiet mode just changes the 
   nixai ask "How do I set up Home Manager?" --provider gemini
   nixai ask "Debug my NixOS build failure" --provider openai --quiet
   ```
+
+---
+
+# nixai web dashboard: Repository Requirement
+
+The nixai web dashboard provides advanced repository analysis and configuration features. To enable these features, you must provide the `--repo` flag with the path to your NixOS configuration repository:
+
+```sh
+nixai web --repo /path/to/nixos-config
+```
+
+If you do not provide `--repo`, repository features will be unavailable and you may see warnings such as:
+
+```
+WARN: nixosRepo is nil in getTotalConfigs
+```
+
+This is expected. To avoid these warnings and enable full functionality, always specify `--repo` when starting the dashboard.
