@@ -1712,7 +1712,7 @@ func (s *EnhancedServer) getActiveClass(page, activePage string) string {
 	return ""
 }
 
-// Fleet API Handlers
+// Fleet API handlers
 
 func (s *EnhancedServer) handleFleetAPI(w http.ResponseWriter, r *http.Request) {
 	// Add CORS headers
@@ -1732,51 +1732,48 @@ func (s *EnhancedServer) handleFleetAPI(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.logger.Debug("Handling fleet API request")
-
 	// Get real fleet data from fleet manager
 	machines, err := s.fleetManager.ListMachines(r.Context())
 	if err != nil {
-		s.logger.Error(fmt.Sprintf("Failed to get machines: %v", err))
-		machines = []*fleet.Machine{} // Fallback to empty list
+		s.sendError(w, fmt.Sprintf("Failed to get machines: %v", err), http.StatusInternalServerError)
+		return
 	}
 
 	// Count machine statuses
-	totalMachines := len(machines)
-	onlineMachines := 0
-	offlineMachines := 0
+	machineStats := map[string]int{
+		"total":   len(machines),
+		"healthy": 0,
+		"warning": 0,
+		"error":   0,
+	}
 
 	for _, machine := range machines {
-		if machine.Status == "online" {
-			onlineMachines++
-		} else {
-			offlineMachines++
+		switch machine.Status {
+		case "online":
+			machineStats["healthy"]++
+		case "degraded":
+			machineStats["warning"]++
+		case "offline":
+			machineStats["error"]++
 		}
 	}
 
 	// Convert machines to API format
-	apiMachines := make([]map[string]interface{}, 0, len(machines))
+	var apiMachines []map[string]interface{}
 	for _, machine := range machines {
 		apiMachines = append(apiMachines, map[string]interface{}{
-			"id":     machine.ID,
-			"name":   machine.Name,
-			"status": machine.Status,
-			"health": "healthy", // TODO: Use actual health data when available
+			"id":       machine.ID,
+			"name":     machine.Name,
+			"status":   machine.Status,
+			"address":  machine.Address,
+			"metadata": machine.Metadata,
 		})
 	}
 
 	// Get fleet overview data
 	data := map[string]interface{}{
-		"summary": map[string]interface{}{
-			"total_machines":   totalMachines,
-			"online_machines":  onlineMachines,
-			"offline_machines": offlineMachines,
-			"deployments":      0, // TODO: Get from deployment history when available
-		},
-		"machines":           apiMachines,
-		"recent_deployments": []map[string]interface{}{
-			// TODO: Get from deployment history when available
-		},
+		"overview": machineStats,
+		"machines": apiMachines,
 	}
 
 	s.sendSuccess(w, data)
@@ -1794,7 +1791,7 @@ func (s *EnhancedServer) handleFleetMachines(w http.ResponseWriter, r *http.Requ
 	}
 
 	switch r.Method {
-	case "GET":
+	case "GET", "HEAD":
 		s.handleListMachines(w, r)
 	case "POST":
 		s.handleAddMachine(w, r)
@@ -1804,88 +1801,63 @@ func (s *EnhancedServer) handleFleetMachines(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *EnhancedServer) handleListMachines(w http.ResponseWriter, r *http.Request) {
-	if s.fleetManager == nil {
-		s.sendError(w, "Fleet management not available", http.StatusServiceUnavailable)
+	// For HEAD requests, only send headers
+	if r.Method == "HEAD" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
 		return
 	}
 
 	machines, err := s.fleetManager.ListMachines(r.Context())
 	if err != nil {
-		s.sendError(w, err.Error(), http.StatusInternalServerError)
+		s.sendError(w, fmt.Sprintf("Failed to list machines: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	s.sendSuccess(w, map[string]interface{}{
-		"machines": machines,
-		"total":    len(machines),
-	})
+	// Convert to API format
+	var apiMachines []map[string]interface{}
+	for _, machine := range machines {
+		apiMachines = append(apiMachines, map[string]interface{}{
+			"id":       machine.ID,
+			"name":     machine.Name,
+			"status":   machine.Status,
+			"address":  machine.Address,
+			"metadata": machine.Metadata,
+		})
+	}
+
+	s.sendSuccess(w, apiMachines)
 }
 
 func (s *EnhancedServer) handleAddMachine(w http.ResponseWriter, r *http.Request) {
-	// Check authentication
-	user := s.requireAuth(w, r)
-	if user == nil {
-		return
-	}
-
 	var machineReq struct {
-		ID          string   `json:"id"`
-		Name        string   `json:"name"`
-		Address     string   `json:"address"`
-		Environment string   `json:"environment"`
-		Tags        []string `json:"tags"`
-		SSHUser     string   `json:"ssh_user"`
-		SSHPort     int      `json:"ssh_port"`
+		ID       string            `json:"id"`
+		Name     string            `json:"name"`
+		Address  string            `json:"address"`
+		Metadata map[string]string `json:"metadata"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&machineReq); err != nil {
-		s.sendError(w, "Invalid request body", http.StatusBadRequest)
+		s.sendError(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	if machineReq.ID == "" || machineReq.Name == "" || machineReq.Address == "" {
-		s.sendError(w, "Machine ID, name, and address are required", http.StatusBadRequest)
-		return
-	}
-
-	if s.fleetManager == nil {
-		s.sendError(w, "Fleet management not available", http.StatusServiceUnavailable)
-		return
-	}
-
-	// Set defaults
-	if machineReq.SSHUser == "" {
-		machineReq.SSHUser = "root"
-	}
-	if machineReq.SSHPort == 0 {
-		machineReq.SSHPort = 22
-	}
-	if machineReq.Environment == "" {
-		machineReq.Environment = "development"
-	}
-
-	// Create machine struct
+	// Create machine object
 	machine := &fleet.Machine{
-		ID:          machineReq.ID,
-		Name:        machineReq.Name,
-		Address:     machineReq.Address,
-		Environment: machineReq.Environment,
-		Tags:        machineReq.Tags,
-		SSHConfig: fleet.SSHConfig{
-			User: machineReq.SSHUser,
-			Port: machineReq.SSHPort,
-		},
-		Status: fleet.MachineStatusUnknown,
+		ID:       machineReq.ID,
+		Name:     machineReq.Name,
+		Address:  machineReq.Address,
+		Status:   "offline", // Default status
+		Metadata: machineReq.Metadata,
 	}
 
-	// Add machine to fleet
-	err := s.fleetManager.AddMachine(r.Context(), machine)
-	if err != nil {
-		s.sendError(w, err.Error(), http.StatusBadRequest)
+	// Add to fleet
+	if err := s.fleetManager.AddMachine(r.Context(), machine); err != nil {
+		s.sendError(w, fmt.Sprintf("Failed to add machine: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	s.logger.Info(fmt.Sprintf("Machine added: %s (%s) by user %s", machineReq.Name, machineReq.ID, user.Username))
+	s.logger.Info(fmt.Sprintf("Machine added: %s (%s)", machineReq.Name, machineReq.ID))
 	s.sendSuccess(w, machine)
 }
 
