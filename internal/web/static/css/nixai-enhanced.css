@@ -684,6 +684,167 @@ a:hover {
   border-top: 1px solid var(--border-color);
 }
 
+/* Utility Classes */
+.flex {
+    display: flex;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-between {
+    justify-content: space-between;
+}
+
+.justify-center {
+    justify-content: center;
+}
+
+.flex-col {
+    flex-direction: column;
+}
+
+.flex-wrap {
+    flex-wrap: wrap;
+}
+
+.w-full {
+    width: 100%;
+}
+
+/* Gap utilities */
+.gap-xs {
+    gap: var(--spacing-xs);
+}
+
+.gap-sm {
+    gap: var(--spacing-sm);
+}
+
+.gap-md {
+    gap: var(--spacing-md);
+}
+
+.gap-lg {
+    gap: var(--spacing-lg);
+}
+
+.gap-xl {
+    gap: var(--spacing-xl);
+}
+
+/* Margin utilities */
+.mb-sm {
+    margin-bottom: var(--spacing-sm);
+}
+
+.mb-md {
+    margin-bottom: var(--spacing-md);
+}
+
+.mb-lg {
+    margin-bottom: var(--spacing-lg);
+}
+
+.mb-xl {
+    margin-bottom: var(--spacing-xl);
+}
+
+.mt-sm {
+    margin-top: var(--spacing-sm);
+}
+
+.mt-md {
+    margin-top: var(--spacing-md);
+}
+
+.mt-lg {
+    margin-top: var(--spacing-lg);
+}
+
+.mt-xl {
+    margin-top: var(--spacing-xl);
+}
+
+/* Text utilities */
+.text-center {
+    text-align: center;
+}
+
+.text-secondary {
+    color: var(--text-secondary);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+.text-light {
+    color: var(--text-light);
+}
+
+/* User info and header styling */
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.user-info span {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Theme toggle specific styling */
+#theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+    border: none;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#theme-toggle:hover {
+    background: var(--bg-secondary);
+    transform: scale(1.05);
+}
+
+/* Ensure header right section is properly aligned */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    height: 40px; /* Ensure consistent height */
+}
+
+.nixai-header .nav > div:last-child {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    height: 40px; /* Ensure consistent height */
+}
+
+/* Quick actions alignment fix */
+.nixai-sidebar .nixai-card .flex {
+    align-items: stretch;
+}
+
+.nixai-sidebar .nixai-btn {
+    justify-content: flex-start;
+    text-align: left;
+    height: auto;
+    min-height: 44px;
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
 /* Responsive Design */
 @media (max-width: 640px) {
   .nixai-modal-content {
