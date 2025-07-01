@@ -2130,3 +2130,337 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('✅ Drag & Drop functionality initialized');
     }, 500);
 });
+
+// ===== ADDITIONAL BUILDER FUNCTIONS =====
+// These functions are called by the builder template
+
+// Functions called by the builder template buttons
+window.createNewConfig = function() {
+    if (confirm('Create a new configuration? This will clear the current canvas.')) {
+        window.clearCanvas();
+        window.showNotification('New configuration started', 'success');
+    }
+};
+
+window.loadTemplate = function() {
+    // Create template selection modal
+    const modal = document.createElement('div');
+    modal.className = 'nixai-modal';
+    modal.style.display = 'flex';
+    modal.innerHTML = `
+        <div class="nixai-modal-content">
+            <div class="nixai-modal-header">
+                <h3>Load Configuration Template</h3>
+                <button class="nixai-modal-close" onclick="closeModal('templateModal')">&times;</button>
+            </div>
+            <div class="nixai-modal-body">
+                <div class="template-grid">
+                    <div class="template-item" onclick="loadTemplateType('minimal')">
+                        <i class="fas fa-cube"></i>
+                        <h4>Minimal System</h4>
+                        <p>Basic NixOS configuration with essential services</p>
+                    </div>
+                    <div class="template-item" onclick="loadTemplateType('desktop')">
+                        <i class="fas fa-desktop"></i>
+                        <h4>Desktop Environment</h4>
+                        <p>Full desktop setup with GNOME and applications</p>
+                    </div>
+                    <div class="template-item" onclick="loadTemplateType('server')">
+                        <i class="fas fa-server"></i>
+                        <h4>Web Server</h4>
+                        <p>Nginx web server with SSL and firewall</p>
+                    </div>
+                    <div class="template-item" onclick="loadTemplateType('development')">
+                        <i class="fas fa-code"></i>
+                        <h4>Development Machine</h4>
+                        <p>Development tools and programming languages</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    modal.id = 'templateModal';
+    document.body.appendChild(modal);
+    
+    // Add styles for template grid
+    if (!document.getElementById('templateStyles')) {
+        const styles = document.createElement('style');
+        styles.id = 'templateStyles';
+        styles.textContent = `
+            .template-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: var(--spacing-md);
+            }
+            .template-item {
+                padding: var(--spacing-lg);
+                border: 2px solid var(--border-color);
+                border-radius: var(--radius-md);
+                text-align: center;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            .template-item:hover {
+                border-color: var(--primary-color);
+                transform: translateY(-2px);
+            }
+            .template-item i {
+                font-size: 2rem;
+                color: var(--primary-color);
+                margin-bottom: var(--spacing-sm);
+            }
+            .template-item h4 {
+                margin: var(--spacing-sm) 0;
+                color: var(--text-primary);
+            }
+            .template-item p {
+                color: var(--text-secondary);
+                font-size: 0.875rem;
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+};
+
+window.loadTemplateType = function(templateType) {
+    window.clearCanvas();
+    
+    const templates = {
+        minimal: ['boot', 'network', 'users'],
+        desktop: ['boot', 'network', 'users', 'desktop', 'system-packages'],
+        server: ['boot', 'network', 'users', 'ssh', 'nginx'],
+        development: ['boot', 'network', 'users', 'development', 'docker']
+    };
+    
+    const modules = templates[templateType] || [];
+    modules.forEach(moduleType => {
+        setTimeout(() => window.addModuleFromType(moduleType), 100);
+    });
+    
+    window.closeModal('templateModal');
+    window.showNotification(`${templateType.charAt(0).toUpperCase() + templateType.slice(1)} template loaded!`, 'success');
+    
+    // Generate preview after loading
+    setTimeout(() => window.previewConfig(), 500);
+};
+
+window.importConfig = function() {
+    // Create file input for importing configurations
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.nix,.conf';
+    input.onchange = function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                window.parseImportedConfig(e.target.result);
+            };
+            reader.readAsText(file);
+        }
+    };
+    input.click();
+};
+
+window.parseImportedConfig = function(configContent) {
+    // Simple parser to extract common NixOS configurations
+    window.clearCanvas();
+    
+    // Look for common service patterns
+    const servicePatterns = [
+        { pattern: /services\.openssh\.enable\s*=\s*true/i, module: 'ssh' },
+        { pattern: /services\.nginx\.enable\s*=\s*true/i, module: 'nginx' },
+        { pattern: /virtualisation\.docker\.enable\s*=\s*true/i, module: 'docker' },
+        { pattern: /services\.postgresql\.enable\s*=\s*true/i, module: 'postgresql' },
+               { pattern: /services\.xserver\.enable\s*=\s*true/i, module: 'desktop' }
+    ];
+    
+    let foundModules = [];
+    servicePatterns.forEach(({ pattern, module }) => {
+        if (pattern.test(configContent)) {
+            foundModules.push(module);
+        }
+    });
+    
+    // Always add basic modules
+    ['boot', 'network', 'users'].forEach(module => {
+        if (!foundModules.includes(module)) {
+            foundModules.unshift(module);
+        }
+    });
+    
+    // Add detected modules to canvas
+    foundModules.forEach((moduleType, index) => {
+        setTimeout(() => window.addModuleFromType(moduleType), index * 100);
+    });
+    
+    window.showNotification(`Imported configuration with ${foundModules.length} modules`, 'success');
+    setTimeout(() => window.previewConfig(), 1000);
+};
+
+// Modal close function that handles both ID and element
+window.closeModal = function(modalId) {
+    let modal;
+    if (typeof modalId === 'string') {
+        modal = document.getElementById(modalId);
+    } else {
+        modal = modalId; // assume it's already an element
+    }
+    
+    if (modal) {
+        modal.remove();
+    }
+    
+    // Also close any modals that might be open
+    document.querySelectorAll('.nixai-modal').forEach(m => {
+        if (m.style.display === 'flex' || m.style.display === 'block') {
+            m.remove();
+        }
+    });
+};
+
+// Enhanced AI assistant with better module suggestions
+window.sendAIMessage = async function() {
+    const input = document.getElementById('aiInput');
+    const message = input.value.trim();
+    if (!message) return;
+
+    window.addChatMessage('user', message);
+    input.value = '';
+
+    try {
+        window.addChatMessage('assistant', '🤔 Thinking...');
+        
+        const response = await fetch('/api/ai/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                message: message,
+                context: 'configuration-builder',
+                modules: window.configModules || []
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Remove thinking message
+        const messages = document.getElementById('chatMessages');
+        if (messages && messages.lastElementChild) {
+            messages.removeChild(messages.lastElementChild);
+        }
+        
+        if (data.success) {
+            window.addChatMessage('assistant', data.response);
+            
+            // Check if the AI response suggests adding modules
+            const suggestedModules = window.extractModuleSuggestions(message, data.response);
+            if (suggestedModules.length > 0) {
+                window.showModuleSuggestions(suggestedModules);
+            }
+        } else {
+            window.addChatMessage('assistant', 'Sorry, I encountered an error processing your request.');
+        }
+    } catch (error) {
+        // Remove thinking message
+        const messages = document.getElementById('chatMessages');
+        if (messages && messages.lastElementChild) {
+            messages.removeChild(messages.lastElementChild);
+        }
+        window.addChatMessage('assistant', 'Sorry, I encountered an error: ' + error.message);
+    }
+};
+
+// Extract module suggestions from AI response
+window.extractModuleSuggestions = function(userMessage, aiResponse) {
+    const suggestions = [];
+    const lowerMessage = userMessage.toLowerCase();
+    const lowerResponse = aiResponse.toLowerCase();
+    
+    // Check for service mentions
+    const serviceKeywords = {
+        'web server': 'nginx',
+        'nginx': 'nginx',
+        'ssh': 'ssh',
+        'docker': 'docker',
+        'database': 'postgresql',
+        'postgres': 'postgresql',
+        'desktop': 'desktop',
+        'gnome': 'desktop',
+        'development': 'development',
+        'dev tools': 'development'
+    };
+    
+    Object.entries(serviceKeywords).forEach(([keyword, module]) => {
+        if (lowerMessage.includes(keyword) || lowerResponse.includes(keyword)) {
+            if (!window.configModules.find(m => m.type === module)) {
+                suggestions.push(module);
+            }
+        }
+    });
+    
+    return [...new Set(suggestions)]; // Remove duplicates
+};
+
+// Show module suggestions from AI
+window.showModuleSuggestions = function(suggestions) {
+    if (suggestions.length === 0) return;
+    
+    const suggestionHTML = suggestions.map(module => 
+        `<button class="nixai-button nixai-button-small nixai-button-primary" 
+                 onclick="addModuleFromType('${module}'); this.parentElement.remove();">
+            Add ${module.charAt(0).toUpperCase() + module.slice(1)}
+         </button>`
+    ).join(' ');
+    
+    const suggestionDiv = document.createElement('div');
+    suggestionDiv.className = 'ai-suggestions';
+    suggestionDiv.innerHTML = `
+        <div class="suggestion-header">
+            <small>💡 Suggested modules:</small>
+        </div>
+        <div class="suggestion-buttons">
+            ${suggestionHTML}
+            <button class="nixai-button nixai-button-small nixai-button-secondary" 
+                    onclick="this.parentElement.parentElement.remove();">
+                Dismiss
+            </button>
+        </div>
+    `;
+    
+    // Add to chat
+    const messagesContainer = document.getElementById('chatMessages');
+    if (messagesContainer) {
+        messagesContainer.appendChild(suggestionDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    // Add styles for suggestions
+    if (!document.getElementById('suggestionStyles')) {
+        const styles = document.createElement('style');
+        styles.id = 'suggestionStyles';
+        styles.textContent = `
+            .ai-suggestions {
+                margin: var(--spacing-sm) 0;
+                padding: var(--spacing-sm);
+                background: rgb(59 130 246 / 0.1);
+                border-radius: var(--radius-sm);
+                border-left: 3px solid var(--primary-color);
+            }
+            .suggestion-header {
+                margin-bottom: var(--spacing-xs);
+                color: var(--text-secondary);
+            }
+            .suggestion-buttons {
+                display: flex;
+                gap: var(--spacing-xs);
+                flex-wrap: wrap;
+            }
+            .nixai-button-small {
+                padding: var(--spacing-xs) var(--spacing-sm);
+                font-size: 0.75rem;
+                border-radius: var(--radius-sm);
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+};

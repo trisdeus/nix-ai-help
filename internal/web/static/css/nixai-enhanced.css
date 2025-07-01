@@ -726,52 +726,244 @@ a:hover {
   }
 }
 
-/* Utility Classes */
-.text-center { text-align: center; }
-.text-right { text-align: right; }
-.text-left { text-align: left; }
+/* ===== ENHANCED WEB INTERFACE STYLES ===== */
+/* Modern, clean design with excellent UX */
 
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.items-center { align-items: center; }
-.justify-between { justify-content: space-between; }
-.justify-center { justify-content: center; }
-.gap-sm { gap: var(--spacing-sm); }
-.gap-md { gap: var(--spacing-md); }
-.gap-lg { gap: var(--spacing-lg); }
-
-.w-full { width: 100%; }
-.h-full { height: 100%; }
-
-.mb-sm { margin-bottom: var(--spacing-sm); }
-.mb-md { margin-bottom: var(--spacing-md); }
-.mb-lg { margin-bottom: var(--spacing-lg); }
-.mb-xl { margin-bottom: var(--spacing-xl); }
-
-.p-sm { padding: var(--spacing-sm); }
-.p-md { padding: var(--spacing-md); }
-.p-lg { padding: var(--spacing-lg); }
-.p-xl { padding: var(--spacing-xl); }
-
-.hidden { display: none; }
-.block { display: block; }
-.inline-block { display: inline-block; }
-
-/* Animation utilities */
-.fade-in {
-  animation: fadeIn 0.3s ease-in-out;
+/* Enhanced Builder Styles */
+.builder-module-tree {
+    max-height: 400px;
+    overflow-y: auto;
 }
 
+.module-category {
+    margin-bottom: var(--spacing-sm);
+}
+
+.module-category-header {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-sm);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.module-category-header:hover {
+    background: var(--bg-accent);
+}
+
+.module-category-header i {
+    margin-right: var(--spacing-sm);
+    color: var(--primary-color);
+}
+
+.module-category-header .toggle-icon {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+}
+
+.module-list {
+    padding: var(--spacing-sm) 0;
+}
+
+.module-item {
+    display: flex;
+    align-items: center;
+    padding: var(--spacing-sm);
+    margin: var(--spacing-xs) 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: grab;
+    transition: all 0.2s ease;
+}
+
+.module-item:hover {
+    background: var(--bg-accent);
+    border-color: var(--primary-color);
+    transform: translateX(4px);
+}
+
+.module-item:active {
+    cursor: grabbing;
+}
+
+.module-item i {
+    margin-right: var(--spacing-sm);
+    color: var(--primary-color);
+    width: 16px;
+    text-align: center;
+}
+
+.builder-canvas {
+    min-height: 400px;
+    padding: var(--spacing-lg);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    transition: all 0.2s ease;
+}
+
+.canvas-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.canvas-dropzone i {
+    font-size: 3rem;
+    color: var(--primary-color);
+    margin-bottom: var(--spacing-md);
+    opacity: 0.5;
+}
+
+.ai-chat {
+    display: flex;
+    flex-direction: column;
+    height: 300px;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-sm);
+    margin-bottom: var(--spacing-sm);
+}
+
+.chat-message {
+    display: flex;
+    margin-bottom: var(--spacing-sm);
+    animation: fadeIn 0.3s ease;
+}
+
+.chat-message.user {
+    justify-content: flex-end;
+}
+
+.chat-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.875rem;
+    margin: 0 var(--spacing-sm);
+}
+
+.chat-message.user .chat-avatar {
+    background: var(--secondary-color);
+    order: 2;
+}
+
+.chat-content {
+    max-width: 70%;
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+}
+
+.chat-message.user .chat-content {
+    background: var(--primary-color);
+    color: white;
+    order: 1;
+}
+
+.chat-input {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.chat-input input {
+    flex: 1;
+}
+
+/* Properties panel */
+.property-form {
+    padding: var(--spacing-md);
+}
+
+.form-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+.form-section h5 {
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.form-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--border-color);
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-xl);
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.empty-state i {
+    font-size: 2rem;
+    margin-bottom: var(--spacing-sm);
+    opacity: 0.5;
+}
+
+/* Configuration preview */
+#configPreview {
+    margin-top: var(--spacing-lg);
+}
+
+#configCode {
+    background: var(--bg-secondary);
+    padding: var(--spacing-md);
+    border-radius: var(--radius-sm);
+    font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    overflow-x: auto;
+}
+
+/* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.slide-up {
-  animation: slideUp 0.3s ease-in-out;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+.fade-in {
+    animation: fadeIn 0.3s ease;
 }
