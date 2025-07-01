@@ -625,7 +625,7 @@ func (s *EnhancedServer) getBuilderContent(data map[string]interface{}) string {
 
 {
   # Configuration options will be added here
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
 }</code></pre>
         </div>
     </div>
@@ -944,7 +944,7 @@ function startFromScratch() {
             '</div>' +
         '</div>';
     
-    currentConfig = '{ config, pkgs, ... }:\n\n{\n  # Basic NixOS configuration\n  system.stateVersion = "23.11";\n}';
+    currentConfig = '{ config, pkgs, ... }:\n\n{\n  # Basic NixOS configuration\n  system.stateVersion = "25.05";\n}';
     updateConfigPreview(currentConfig);
 }
 
@@ -962,7 +962,7 @@ function clearCanvas() {
         '</div>';
     
     currentConfig = '';
-    updateConfigPreview('# Your NixOS configuration will appear here\\n# Choose a template or start building to see the generated configuration\\n\\n{ config, pkgs, ... }:\\n\\n{\\n  # Configuration options will be added here\\n  system.stateVersion = "23.11";\\n}');
+    updateConfigPreview('# Your NixOS configuration will appear here\\n# Choose a template or start building to see the generated configuration\\n\\n{ config, pkgs, ... }:\\n\\n{\\n  # Configuration options will be added here\\n  system.stateVersion = "25.05";\\n}');
 }
 
 function refreshTemplates() {

@@ -2,162 +2,114 @@
 
 {{define "content"}}
 <!-- Builder Content -->
-    <div class="nixai-grid nixai-grid-cols-12 nixai-gap">
-        <!-- Sidebar -->
-        <div class="nixai-grid-span-3">
-            <div class="nixai-card">
-                <div class="nixai-card-header">
-                    <h3>Configuration Modules</h3>
-                </div>
-                <div class="nixai-card-content">
-                    <div class="builder-module-tree" id="moduleTree">
-                        <div class="module-category" data-category="system">
-                            <div class="module-category-header">
-                                <i class="fas fa-cog"></i>
-                                <span>System</span>
-                                <i class="fas fa-chevron-down toggle-icon"></i>
-                            </div>
-                            <div class="module-list">
-                                <div class="module-item" data-module="boot" draggable="true">
-                                    <i class="fas fa-power-off"></i>
-                                    <span>Boot Configuration</span>
-                                </div>
-                                <div class="module-item" data-module="network" draggable="true">
-                                    <i class="fas fa-network-wired"></i>
-                                    <span>Network Settings</span>
-                                </div>
-                                <div class="module-item" data-module="users" draggable="true">
-                                    <i class="fas fa-users"></i>
-                                    <span>Users & Groups</span>
-                                </div>
-                                <div class="module-item" data-module="filesystem" draggable="true">
-                                    <i class="fas fa-hdd"></i>
-                                    <span>File Systems</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="module-category" data-category="services">
-                            <div class="module-category-header">
-                                <i class="fas fa-server"></i>
-                                <span>Services</span>
-                                <i class="fas fa-chevron-down toggle-icon"></i>
-                            </div>
-                            <div class="module-list">
-                                <div class="module-item" data-module="ssh" draggable="true">
-                                    <i class="fas fa-terminal"></i>
-                                    <span>SSH Server</span>
-                                </div>
-                                <div class="module-item" data-module="nginx" draggable="true">
-                                    <i class="fas fa-globe"></i>
-                                    <span>Nginx</span>
-                                </div>
-                                <div class="module-item" data-module="docker" draggable="true">
-                                    <i class="fab fa-docker"></i>
-                                    <span>Docker</span>
-                                </div>
-                                <div class="module-item" data-module="postgresql" draggable="true">
-                                    <i class="fas fa-database"></i>
-                                    <span>PostgreSQL</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="module-category" data-category="packages">
-                            <div class="module-category-header">
-                                <i class="fas fa-box"></i>
-                                <span>Packages</span>
-                                <i class="fas fa-chevron-down toggle-icon"></i>
-                            </div>
-                            <div class="module-list">
-                                <div class="module-item" data-module="system-packages" draggable="true">
-                                    <i class="fas fa-cubes"></i>
-                                    <span>System Packages</span>
-                                </div>
-                                <div class="module-item" data-module="development" draggable="true">
-                                    <i class="fas fa-code"></i>
-                                    <span>Development Tools</span>
-                                </div>
-                                <div class="module-item" data-module="desktop" draggable="true">
-                                    <i class="fas fa-desktop"></i>
-                                    <span>Desktop Environment</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+<div class="builder-main-container">
+    <!-- Main Builder Area -->
+    <div class="nixai-card nixai-full-height">
+        <div class="nixai-card-header">
+            <h3>Configuration Canvas</h3>
+            <div class="nixai-actions-small">
+                <button class="nixai-btn nixai-btn-secondary nixai-btn-sm" onclick="validateConfig()">
+                    ✅ Validate
+                </button>
+                <button class="nixai-btn nixai-btn-secondary nixai-btn-sm" onclick="previewConfig()">
+                    👁️ Preview
+                </button>
+            </div>
+        </div>
+        <div class="nixai-card-content">
+            <div class="builder-canvas" id="builderCanvas">
+                <div class="canvas-dropzone">
+                    <i class="fas fa-plus-circle"></i>
+                    <p>Drag modules here to build your configuration</p>
+                    <p class="text-muted">or use AI assistance to generate configurations</p>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Main Builder Area -->
-        <div class="nixai-grid-span-6">
-            <div class="nixai-card nixai-full-height">
-                <div class="nixai-card-header">
-                    <h3>Configuration Canvas</h3>
-                    <div class="nixai-actions-small">
-                        <button class="nixai-button nixai-button-small" onclick="validateConfig()">
-                            <i class="fas fa-check"></i> Validate
-                        </button>
-                        <button class="nixai-button nixai-button-small" onclick="previewConfig()">
-                            <i class="fas fa-eye"></i> Preview
-                        </button>
-                    </div>
-                </div>
-                <div class="nixai-card-content">
-                    <div class="builder-canvas" id="builderCanvas">
-                        <div class="canvas-dropzone">
-                            <i class="fas fa-plus-circle"></i>
-                            <p>Drag modules here to build your configuration</p>
-                            <p class="text-muted">or use AI assistance to generate configurations</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Configuration Modules Panel (Floating) -->
+    <div class="modules-panel" id="modulesPanel">
+        <div class="modules-panel-header">
+            <h4>Configuration Modules</h4>
+            <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" onclick="toggleModulesPanel()">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
-
-        <!-- Properties Panel -->
-        <div class="nixai-grid-span-3">
-            <div class="nixai-card">
-                <div class="nixai-card-header">
-                    <h3>Properties</h3>
-                </div>
-                <div class="nixai-card-content">
-                    <div id="propertiesPanel">
-                        <div class="empty-state">
-                            <i class="fas fa-cog"></i>
-                            <p>Select a module to configure its properties</p>
+        <div class="modules-panel-content">
+            <div class="builder-module-tree" id="moduleTree">
+                <!-- System Modules -->
+                <div class="module-category" data-category="system">
+                    <div class="module-category-header">
+                        <i class="fas fa-cog"></i>
+                        <span>System</span>
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </div>
+                    <div class="module-list">
+                        <div class="module-item" data-module="boot" draggable="true">
+                            <i class="fas fa-power-off"></i>
+                            <span>Boot Configuration</span>
+                        </div>
+                        <div class="module-item" data-module="network" draggable="true">
+                            <i class="fas fa-network-wired"></i>
+                            <span>Network Settings</span>
+                        </div>
+                        <div class="module-item" data-module="users" draggable="true">
+                            <i class="fas fa-users"></i>
+                            <span>Users & Groups</span>
+                        </div>
+                        <div class="module-item" data-module="filesystem" draggable="true">
+                            <i class="fas fa-hdd"></i>
+                            <span>File Systems</span>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- AI Assistant -->
-            <div class="nixai-card nixai-mt">
-                <div class="nixai-card-header">
-                    <h3>AI Assistant</h3>
-                </div>
-                <div class="nixai-card-content">
-                    <div class="ai-chat" id="aiChat">
-                        <div class="chat-messages" id="chatMessages">
-                            <div class="chat-message assistant">
-                                <div class="chat-avatar">
-                                    <i class="fas fa-robot"></i>
-                                </div>
-                                <div class="chat-content">
-                                    <p>Hello! I can help you build your NixOS configuration. Try asking:</p>
-                                    <ul>
-                                        <li>"Set up a web server"</li>
-                                        <li>"Configure development environment"</li>
-                                        <li>"Add user with sudo access"</li>
-                                    </ul>
-                                </div>
-                            </div>
+                <!-- Services Modules -->
+                <div class="module-category" data-category="services">
+                    <div class="module-category-header">
+                        <i class="fas fa-server"></i>
+                        <span>Services</span>
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </div>
+                    <div class="module-list">
+                        <div class="module-item" data-module="ssh" draggable="true">
+                            <i class="fas fa-terminal"></i>
+                            <span>SSH Server</span>
                         </div>
-                        <div class="chat-input">
-                            <input type="text" id="aiInput" placeholder="Ask AI to help with configuration..." class="nixai-input">
-                            <button class="nixai-button nixai-button-primary" onclick="sendAIMessage()">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
+                        <div class="module-item" data-module="nginx" draggable="true">
+                            <i class="fas fa-globe"></i>
+                            <span>Nginx</span>
+                        </div>
+                        <div class="module-item" data-module="docker" draggable="true">
+                            <i class="fab fa-docker"></i>
+                            <span>Docker</span>
+                        </div>
+                        <div class="module-item" data-module="postgresql" draggable="true">
+                            <i class="fas fa-database"></i>
+                            <span>PostgreSQL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Package Modules -->
+                <div class="module-category" data-category="packages">
+                    <div class="module-category-header">
+                        <i class="fas fa-box"></i>
+                        <span>Packages</span>
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </div>
+                    <div class="module-list">
+                        <div class="module-item" data-module="system-packages" draggable="true">
+                            <i class="fas fa-cubes"></i>
+                            <span>System Packages</span>
+                        </div>
+                        <div class="module-item" data-module="development" draggable="true">
+                            <i class="fas fa-code"></i>
+                            <span>Development Tools</span>
+                        </div>
+                        <div class="module-item" data-module="desktop" draggable="true">
+                            <i class="fas fa-desktop"></i>
+                            <span>Desktop Environment</span>
                         </div>
                     </div>
                 </div>
@@ -165,18 +117,83 @@
         </div>
     </div>
 
+    <!-- Properties Panel (Floating) -->
+    <div class="properties-panel" id="propertiesPanel">
+        <div class="properties-panel-header">
+            <h4>Module Properties</h4>
+            <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" onclick="togglePropertiesPanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="properties-panel-content">
+            <div class="empty-state">
+                <i class="fas fa-cog"></i>
+                <p>Select a module to configure its properties</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Action Buttons -->
+    <div class="floating-actions">
+        <button class="fab" onclick="toggleModulesPanel()" title="Toggle Modules Panel">
+            <i class="fas fa-th-large"></i>
+        </button>
+        <button class="fab" onclick="togglePropertiesPanel()" title="Toggle Properties Panel">
+            <i class="fas fa-cog"></i>
+        </button>
+        <button class="fab" onclick="toggleAIAssistant()" title="AI Assistant">
+            <i class="fas fa-robot"></i>
+        </button>
+    </div>
+
+    <!-- AI Assistant Panel (Floating) -->
+    <div class="ai-assistant-panel" id="aiAssistantPanel">
+        <div class="ai-assistant-header">
+            <h4>AI Assistant</h4>
+            <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" onclick="toggleAIAssistant()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="ai-assistant-content">
+            <div class="ai-chat" id="aiChat">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message assistant">
+                        <div class="chat-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="chat-content">
+                            <p>Hello! I can help you build your NixOS configuration. Try asking:</p>
+                            <ul>
+                                <li>"Set up a web server"</li>
+                                <li>"Configure development environment"</li>
+                                <li>"Add user with sudo access"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input">
+                    <input type="text" id="aiInput" placeholder="Ask AI to help with configuration..." class="nixai-input">
+                    <button class="nixai-btn nixai-btn-primary nixai-btn-sm" onclick="sendAIMessage()">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
     <!-- Generated Configuration Preview -->
     <div class="nixai-card nixai-mt" id="configPreview" style="display: none;">
         <div class="nixai-card-header">
             <h3>Generated Configuration</h3>
             <div class="nixai-actions-small">
-                <button class="nixai-button nixai-button-small" onclick="copyToClipboard()">
+                <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" onclick="copyToClipboard()">
                     <i class="fas fa-copy"></i> Copy
                 </button>
-                <button class="nixai-button nixai-button-small" onclick="downloadConfig()">
+                <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" onclick="downloadConfig()">
                     <i class="fas fa-download"></i> Download
                 </button>
-                <button class="nixai-button nixai-button-small" onclick="saveToRepo()">
+                <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" onclick="saveToRepo()">
                     <i class="fas fa-save"></i> Save to Repository
                 </button>
             </div>
@@ -185,6 +202,199 @@
             <pre><code id="configCode" class="language-nix"></code></pre>
         </div>
     </div>
+</div>
+
+<style>
+/* Builder Layout */
+.builder-main-container {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 200px);
+    overflow: hidden;
+}
+
+/* Floating Panels */
+.modules-panel,
+.properties-panel,
+.ai-assistant-panel {
+    position: absolute;
+    top: 20px;
+    width: 320px;
+    max-height: calc(100vh - 300px);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+}
+
+.modules-panel {
+    left: 20px;
+}
+
+.properties-panel {
+    right: 20px;
+    transform: translateX(100%);
+}
+
+.ai-assistant-panel {
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%) translateX(100%);
+    height: 400px;
+    max-height: 400px;
+}
+
+.modules-panel.active,
+.properties-panel.active,
+.ai-assistant-panel.active {
+    transform: translateX(0) translateY(-50%);
+}
+
+.modules-panel.active {
+    transform: translateX(0);
+}
+
+.properties-panel.active {
+    transform: translateX(0);
+}
+
+.ai-assistant-panel.active {
+    transform: translateY(-50%) translateX(0);
+}
+
+/* Panel Headers */
+.modules-panel-header,
+.properties-panel-header,
+.ai-assistant-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.modules-panel-header h4,
+.properties-panel-header h4,
+.ai-assistant-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Panel Content */
+.modules-panel-content,
+.properties-panel-content,
+.ai-assistant-content {
+    padding: var(--spacing-md);
+    max-height: calc(100% - 60px);
+    overflow-y: auto;
+}
+
+/* Floating Action Buttons */
+.floating-actions {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    z-index: 50;
+}
+
+.fab {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    transition: all 0.2s ease;
+}
+
+.fab:hover {
+    background: var(--primary-dark);
+    transform: scale(1.1);
+}
+
+.fab.active {
+    background: var(--accent-color);
+}
+
+/* Full Height Cards */
+.nixai-full-height {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.nixai-full-height .nixai-card-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+/* AI Chat Enhancements */
+.ai-assistant-panel .ai-chat {
+    height: calc(100% - 20px);
+    display: flex;
+    flex-direction: column;
+}
+
+.ai-assistant-panel .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    margin-bottom: var(--spacing-sm);
+}
+
+.ai-assistant-panel .chat-input {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.ai-assistant-panel .chat-input input {
+    flex: 1;
+    font-size: 0.875rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .modules-panel,
+    .properties-panel,
+    .ai-assistant-panel {
+        width: calc(100vw - 40px);
+        left: 20px;
+        right: 20px;
+    }
+    
+    .properties-panel {
+        transform: translateY(100%);
+        top: auto;
+        bottom: 20px;
+    }
+    
+    .ai-assistant-panel {
+        transform: translateY(100%);
+        top: auto;
+        bottom: 20px;
+    }
+    
+    .properties-panel.active,
+    .ai-assistant-panel.active {
+        transform: translateY(0);
+    }
+}
+</style>
 
 <!-- Module Configuration Modal -->
 <div id="moduleConfigModal" class="nixai-modal">
@@ -208,321 +418,75 @@
 </div>
 
 <script>
-// Builder-specific functionality
-let selectedModule = null;
-let configModules = [];
-
-function createNewConfig() {
-    if (confirm('Create a new configuration? This will clear the current canvas.')) {
-        clearCanvas();
-        showNotification('New configuration started', 'success');
-    }
-}
-
-function loadTemplate() {
-    // Implementation for loading templates
-    showModal('templateModal'); // Would need template selection modal
-}
-
-function importConfig() {
-    // Implementation for importing existing configurations
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.nix';
-    input.onchange = function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                // Parse and load the configuration
-                parseImportedConfig(e.target.result);
-            };
-            reader.readAsText(file);
+// Builder page initialization - use functions from nixai-enhanced.js
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for nixai-enhanced.js to load completely
+    setTimeout(() => {
+        // Auto-open modules panel on load if we're on the builder page
+        if (window.toggleModulesPanel) {
+            window.toggleModulesPanel();
         }
-    };
-    input.click();
-}
+    }, 500);
+});
 
-function clearCanvas() {
-    document.getElementById('builderCanvas').innerHTML = `
-        <div class="canvas-dropzone">
-            <i class="fas fa-plus-circle"></i>
-            <p>Drag modules here to build your configuration</p>
-            <p class="text-muted">or use AI assistance to generate configurations</p>
-        </div>
-    `;
-    configModules = [];
-    clearPropertiesPanel();
-}
-
-function clearPropertiesPanel() {
-    document.getElementById('propertiesPanel').innerHTML = `
-        <div class="empty-state">
-            <i class="fas fa-cog"></i>
-            <p>Select a module to configure its properties</p>
-        </div>
-    `;
-}
-
+// Simple wrapper functions for template onclick handlers - delegate to nixai-enhanced.js
 function validateConfig() {
-    fetch('/api/builder/validate', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({modules: configModules})
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.valid) {
-            showNotification('Configuration is valid', 'success');
-        } else {
-            showNotification('Configuration errors: ' + data.errors.join(', '), 'error');
-        }
-    })
-    .catch(error => {
-        showNotification('Validation failed: ' + error.message, 'error');
-    });
+    if (window.validateConfig) {
+        window.validateConfig();
+    }
 }
 
 function previewConfig() {
-    fetch('/api/builder/generate', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({modules: configModules})
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('configCode').textContent = data.config;
-        document.getElementById('configPreview').style.display = 'block';
-        // Highlight syntax if Prism.js is available
-        if (window.Prism) {
-            Prism.highlightElement(document.getElementById('configCode'));
-        }
-    })
-    .catch(error => {
-        showNotification('Preview generation failed: ' + error.message, 'error');
-    });
+    if (window.previewConfig) {
+        window.previewConfig();
+    }
+}
+
+function toggleModulesPanel() {
+    if (window.toggleModulesPanel) {
+        window.toggleModulesPanel();
+    }
+}
+
+function togglePropertiesPanel() {
+    if (window.togglePropertiesPanel) {
+        window.togglePropertiesPanel();
+    }
+}
+
+function toggleAIAssistant() {
+    if (window.toggleAIAssistant) {
+        window.toggleAIAssistant();
+    }
 }
 
 function sendAIMessage() {
-    const input = document.getElementById('aiInput');
-    const message = input.value.trim();
-    if (!message) return;
-
-    addChatMessage('user', message);
-    input.value = '';
-
-    fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            message: message,
-            context: 'configuration-builder',
-            modules: configModules
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        addChatMessage('assistant', data.response);
-        if (data.suggested_modules) {
-            applySuggestedModules(data.suggested_modules);
-        }
-    })
-    .catch(error => {
-        addChatMessage('assistant', 'Sorry, I encountered an error: ' + error.message);
-    });
-}
-
-function addChatMessage(role, message) {
-    const messagesContainer = document.getElementById('chatMessages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `chat-message ${role}`;
-    
-    messageDiv.innerHTML = `
-        <div class="chat-avatar">
-            <i class="fas fa-${role === 'user' ? 'user' : 'robot'}"></i>
-        </div>
-        <div class="chat-content">
-            <p>${message}</p>
-        </div>
-    `;
-    
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-function applySuggestedModules(modules) {
-    modules.forEach(module => {
-        addModuleToCanvas(module);
-    });
-    generatePreview();
-}
-
-function addModuleToCanvas(moduleData) {
-    const canvas = document.getElementById('builderCanvas');
-    const dropzone = canvas.querySelector('.canvas-dropzone');
-    
-    if (dropzone) {
-        dropzone.style.display = 'none';
+    if (window.sendAIMessage) {
+        window.sendAIMessage();
     }
-
-    const moduleElement = document.createElement('div');
-    moduleElement.className = 'canvas-module';
-    moduleElement.dataset.moduleId = moduleData.id || Date.now();
-    moduleElement.innerHTML = `
-        <div class="module-header">
-            <i class="fas fa-${moduleData.icon || 'cog'}"></i>
-            <span>${moduleData.name}</span>
-            <button class="module-remove" onclick="removeModule(this)">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-        <div class="module-body">
-            <p>${moduleData.description || 'Module configuration'}</p>
-        </div>
-    `;
-
-    moduleElement.onclick = () => selectModule(moduleElement, moduleData);
-    canvas.appendChild(moduleElement);
-    
-    configModules.push(moduleData);
-}
-
-function selectModule(element, moduleData) {
-    // Remove previous selection
-    document.querySelectorAll('.canvas-module').forEach(m => m.classList.remove('selected'));
-    
-    // Select current module
-    element.classList.add('selected');
-    selectedModule = moduleData;
-    
-    // Update properties panel
-    updatePropertiesPanel(moduleData);
-}
-
-function updatePropertiesPanel(moduleData) {
-    const panel = document.getElementById('propertiesPanel');
-    // Generate form based on module schema
-    // This would be implemented based on the module's configuration schema
-    panel.innerHTML = `
-        <div class="property-form">
-            <h4>${moduleData.name} Configuration</h4>
-            <!-- Dynamic form fields would be generated here -->
-            <div class="form-group">
-                <label>Module Name</label>
-                <input type="text" value="${moduleData.name}" class="nixai-input">
-            </div>
-        </div>
-    `;
 }
 
 function removeModule(button) {
-    const moduleElement = button.closest('.canvas-module');
-    const moduleId = moduleElement.dataset.moduleId;
-    
-    moduleElement.remove();
-    configModules = configModules.filter(m => m.id !== moduleId);
-    
-    // Show dropzone if no modules left
-    const canvas = document.getElementById('builderCanvas');
-    if (canvas.children.length === 0) {
-        canvas.innerHTML = `
-            <div class="canvas-dropzone">
-                <i class="fas fa-plus-circle"></i>
-                <p>Drag modules here to build your configuration</p>
-                <p class="text-muted">or use AI assistance to generate configurations</p>
-            </div>
-        `;
+    if (window.removeModule) {
+        window.removeModule(button);
     }
-    
-    clearPropertiesPanel();
 }
 
-// Initialize drag and drop functionality
-document.addEventListener('DOMContentLoaded', function() {
-    // Make module items draggable
-    document.querySelectorAll('.module-item').forEach(item => {
-        item.addEventListener('dragstart', function(e) {
-            e.dataTransfer.setData('text/plain', this.dataset.module);
-        });
-    });
+function copyToClipboard() {
+    if (window.copyToClipboard) {
+        window.copyToClipboard();
+    }
+}
 
-    // Make canvas a drop target
-    const canvas = document.getElementById('builderCanvas');
-    canvas.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        this.classList.add('drag-over');
-    });
+function downloadConfig() {
+    if (window.downloadConfig) {
+        window.downloadConfig();
+    }
+}
 
-    canvas.addEventListener('dragleave', function(e) {
-        this.classList.remove('drag-over');
-    });
-
-    canvas.addEventListener('drop', function(e) {
-        e.preventDefault();
-        this.classList.remove('drag-over');
-        
-        const moduleType = e.dataTransfer.getData('text/plain');
-        addModuleFromType(moduleType);
-    });
-
-    // Module category toggles
-    document.querySelectorAll('.module-category-header').forEach(header => {
-        header.addEventListener('click', function() {
-            const category = this.parentElement;
-            const moduleList = category.querySelector('.module-list');
-            const toggleIcon = this.querySelector('.toggle-icon');
-            
-            if (moduleList.style.display === 'none') {
-                moduleList.style.display = 'block';
-                toggleIcon.style.transform = 'rotate(0deg)';
-            } else {
-                moduleList.style.display = 'none';
-                toggleIcon.style.transform = 'rotate(-90deg)';
-            }
-        });
-    });
-});
-
-function addModuleFromType(moduleType) {
-    // Module templates based on type
-    const moduleTemplates = {
-        'boot': {
-            name: 'Boot Configuration',
-            icon: 'power-off',
-            description: 'System boot configuration'
-        },
-        'network': {
-            name: 'Network Settings',
-            icon: 'network-wired',
-            description: 'Network interface configuration'
-        },
-        'users': {
-            name: 'Users & Groups',
-            icon: 'users',
-            description: 'User account management'
-        },
-        'ssh': {
-            name: 'SSH Server',
-            icon: 'terminal',
-            description: 'SSH daemon configuration'
-        },
-        'nginx': {
-            name: 'Nginx',
-            icon: 'globe',
-            description: 'Nginx web server'
-        },
-        'docker': {
-            name: 'Docker',
-            icon: 'docker',
-            description: 'Docker container runtime'
-        }
-    };
-
-    const template = moduleTemplates[moduleType];
-    if (template) {
-        template.id = Date.now();
-        template.type = moduleType;
-        addModuleToCanvas(template);
+function saveToRepo() {
+    if (window.saveToRepo) {
+        window.saveToRepo();
     }
 }
 </script>

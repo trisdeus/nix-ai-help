@@ -1458,55 +1458,6 @@ window.closeModal = function(modalId) {
     }
 };
 
-// UI Update Functions
-function updateFleetUI(data) {
-    // Update fleet statistics
-    if (data.data && data.data.machines) {
-        const machines = data.data.machines;
-        document.getElementById('totalMachines').textContent = machines.length;
-        
-        const healthy = machines.filter(m => m.status === 'healthy').length;
-        const warnings = machines.filter(m => m.status === 'warning').length;
-        const errors = machines.filter(m => m.status === 'error').length;
-        
-        document.getElementById('healthyMachines').textContent = healthy;
-        document.getElementById('warningMachines').textContent = warnings;
-        document.getElementById('errorMachines').textContent = errors;
-    }
-}
-
-function updateTeamsUI(data) {
-    // Update teams list and statistics
-    if (data.data) {
-        const teams = Array.isArray(data.data) ? data.data : [];
-        document.getElementById('totalTeams').textContent = teams.length;
-        
-        // Update teams list in sidebar
-        const teamsList = document.getElementById('teamsList');
-        if (teamsList) {
-            teamsList.innerHTML = teams.map(team => `
-                <div class="team-item" data-team-id="${team.id}">
-                    <div class="team-info">
-                        <h4>${team.name}</h4>
-                        <p>${team.description || 'No description'}</p>
-                        <span class="team-members">${Object.keys(team.members || {}).length} members</span>
-                    </div>
-                </div>
-            `).join('');
-        }
-    }
-}
-
-// Initialize global functions when document loads
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('✅ Global interactive functions loaded');
-    
-    // Store reference to the main app instance
-    if (window.nixaiApp) {
-        console.log('📱 NixAI App instance available globally');
-    }
-});
-
 // ===== BUILDER SPECIFIC GLOBAL FUNCTIONS =====
 // These functions are needed by the builder template
 
@@ -1544,69 +1495,200 @@ window.validateConfig = async function() {
 
 // Builder configuration preview
 window.previewConfig = async function() {
-    try {
-        const modules = window.configModules || [];
-        window.showNotification('Generating configuration preview...', 'info');
-        
-        const response = await fetch('/api/builder/generate', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({modules: modules})
-        });
-        
-        const data = await response.json();
-        if (data.success) {
-            document.getElementById('configCode').textContent = data.configuration;
-            document.getElementById('configPreview').style.display = 'block';
-            
-            // Highlight syntax if Prism.js is available
-            if (window.Prism) {
-                Prism.highlightElement(document.getElementById('configCode'));
-            }
-            window.showNotification('✅ Configuration preview generated!', 'success');
-        } else {
-            window.showNotification('❌ Failed to generate preview', 'error');
+    const modules = window.configModules || [];
+    if (modules.length === 0) {
+        window.showNotification('Add modules to preview configuration', 'warning');
+        return;
+    }
+    
+    // Generate configuration preview
+    const configCode = window.generateConfigurationCode();
+    const codeElement = document.getElementById('configCode');
+    const previewElement = document.getElementById('configPreview');
+    
+    if (codeElement) codeElement.textContent = configCode;
+    if (previewElement) {
+        previewElement.style.display = 'block';
+        previewElement.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    window.showNotification('Configuration preview generated', 'success');
+};
+
+window.generateConfigurationCode = function() {
+    const modules = window.configModules || [];
+    let config = `# Generated NixOS Configuration
+{ config, pkgs, ... }:
+
+{
+  # System configuration
+  system.stateVersion = "25.05";
+  
+`;
+
+    modules.forEach(module => {
+        switch (module.type) {
+            case 'boot':
+                config += `  # Boot configuration
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+  
+`;
+                break;
+            case 'network':
+                config += `  # Network configuration
+  networking.hostName = "nixos-system";
+  networking.networkmanager.enable = true;
+  
+`;
+                break;
+            case 'users':
+                config += `  # User configuration
+  users.users.nixuser = {
+    isNormalUser = true;
+    extraGroups = [ "wheel" "networkmanager" ];
+  };
+  
+`;
+                break;
+            case 'ssh':
+                config += `  # SSH service
+  services.openssh = {
+    enable = true;
+    permitRootLogin = "no";
+  };
+  
+`;
+                break;
+            case 'nginx':
+                config += `  # Nginx web server
+  services.nginx = {
+    enable = true;
+  };
+  
+`;
+                break;
+            case 'docker':
+                config += `  # Docker
+  virtualisation.docker.enable = true;
+  
+`;
+                break;
+            default:
+                if (module.config) {
+                    config += `  # ${module.name}\n`;
+                    Object.entries(module.config).forEach(([key, value]) => {
+                        config += `  ${key} = ${typeof value === 'string' ? `"${value}"` : value};\n`;
+                    });
+                    config += '\n';
+                }
+                break;
         }
-    } catch (error) {
-        window.showNotification('Preview generation failed: ' + error.message, 'error');
+    });
+
+    config += `  # System packages
+  environment.systemPackages = with pkgs; [
+    vim
+    git
+    curl
+    wget
+  ];
+}`;
+
+    return config;
+};
+
+// ===== BUILDER PANEL MANAGEMENT =====
+// Global functions for panel management needed by builder template
+
+window.toggleModulesPanel = function() {
+    const panel = document.getElementById('modulesPanel');
+    const fab = document.querySelector('.fab[onclick="toggleModulesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
     }
 };
 
-// AI Chat for builder
-window.sendAIMessage = async function() {
+window.togglePropertiesPanel = function() {
+    const panel = document.getElementById('propertiesPanel');
+    const fab = document.querySelector('.fab[onclick="togglePropertiesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.toggleAIAssistant = function() {
+    const panel = document.getElementById('aiAssistantPanel');
+    const fab = document.querySelector('.fab[onclick="toggleAIAssistant()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.closeAllPanels = function() {
+    document.querySelectorAll('.modules-panel, .properties-panel, .ai-assistant-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+    document.querySelectorAll('.fab').forEach(fab => {
+        fab.classList.remove('active');
+    });
+};
+
+// AI Chat functionality
+window.sendAIMessage = function() {
     const input = document.getElementById('aiInput');
+    if (!input) return;
+    
     const message = input.value.trim();
     if (!message) return;
 
-    addChatMessage('user', message);
+    // Add user message to chat
+    window.addChatMessage('user', message);
     input.value = '';
 
-    try {
-        const response = await fetch('/api/ai/chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                message: message,
-                context: 'configuration-builder',
-                modules: window.configModules || []
-            })
-        });
-        
-        const data = await response.json();
-        if (data.success) {
-            addChatMessage('assistant', data.response);
-            if (data.suggested_modules) {
-                applySuggestedModules(data.suggested_modules);
-            }
+    // Simulate AI response
+    setTimeout(() => {
+        let response = '';
+        if (message.toLowerCase().includes('web server')) {
+            response = 'I recommend adding an Nginx module for a web server. You can drag the "Nginx" module from the Services category to your canvas.';
+            // Auto-suggest nginx module
+            setTimeout(() => {
+                window.addModuleFromType('nginx');
+            }, 1000);
+        } else if (message.toLowerCase().includes('development')) {
+            response = 'For a development environment, I suggest adding Development Tools and configuring a user account. Let me add these modules for you.';
+            setTimeout(() => {
+                window.addModuleFromType('development');
+            }, 1000);
         } else {
-            addChatMessage('assistant', 'Sorry, I encountered an error processing your request.');
+            response = 'I can help you configure your NixOS system. Try asking about specific components like "web server", "development environment", or "user configuration".';
         }
-    } catch (error) {
-        addChatMessage('assistant', 'Sorry, I encountered an error: ' + error.message);
-    }
+        
+        window.addChatMessage('assistant', response);
+    }, 1000);
 };
 
-// Helper function to add chat messages
 window.addChatMessage = function(role, message) {
     const messagesContainer = document.getElementById('chatMessages');
     if (!messagesContainer) return;
@@ -1627,76 +1709,74 @@ window.addChatMessage = function(role, message) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 };
 
-// Apply AI suggested modules
-window.applySuggestedModules = function(modules) {
-    modules.forEach(module => {
-        addModuleToCanvas(module);
-    });
-    window.previewConfig();
-};
-
-// Copy configuration to clipboard
-window.copyToClipboard = async function() {
-    const configCode = document.getElementById('configCode');
-    if (!configCode) return;
+// Module removal functionality
+window.removeModule = function(button) {
+    const moduleElement = button.closest('.canvas-module');
+    if (!moduleElement) return;
     
-    try {
-        await navigator.clipboard.writeText(configCode.textContent);
-        window.showNotification('✅ Configuration copied to clipboard!', 'success');
-    } catch (error) {
-        window.showNotification('❌ Failed to copy to clipboard', 'error');
+    const moduleId = moduleElement.dataset.moduleId;
+    
+    moduleElement.remove();
+    window.configModules = (window.configModules || []).filter(m => m.id !== moduleId);
+    
+    // Show dropzone if no modules left
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas && canvas.children.length === 0) {
+        canvas.innerHTML = `
+            <div class="canvas-dropzone">
+                <i class="fas fa-plus-circle"></i>
+                <p>Drag modules here to build your configuration</p>
+                <p class="text-muted">or use AI assistance to generate configurations</p>
+            </div>
+        `;
     }
+    
+    window.clearPropertiesPanel();
+    window.showNotification('Module removed', 'info');
 };
 
-// Download configuration file
-window.downloadConfig = function() {
-    const configCode = document.getElementById('configCode');
-    if (!configCode) return;
+window.clearPropertiesPanel = function() {
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
     
-    const blob = new Blob([configCode.textContent], { type: 'text/plain' });
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
+
+// Utility functions for builder
+window.copyToClipboard = function() {
+    const codeElement = document.getElementById('configCode');
+    if (!codeElement) return;
+    
+    const code = codeElement.textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        window.showNotification('Configuration copied to clipboard', 'success');
+    }).catch(() => {
+        window.showNotification('Failed to copy to clipboard', 'error');
+    });
+};
+
+window.downloadConfig = function() {
+    const codeElement = document.getElementById('configCode');
+    if (!codeElement) return;
+    
+    const code = codeElement.textContent;
+    const blob = new Blob([code], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'configuration.nix';
-    document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    window.showNotification('✅ Configuration downloaded!', 'success');
+    window.showNotification('Configuration downloaded', 'success');
 };
 
-// Save configuration to repository
-window.saveToRepo = async function() {
-    const configCode = document.getElementById('configCode');
-    if (!configCode) return;
-    
-    try {
-        const response = await fetch('/api/config/save', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                filename: 'configuration.nix',
-                content: configCode.textContent
-            })
-        });
-        
-        if (response.ok) {
-            window.showNotification('✅ Configuration saved to repository!', 'success');
-        } else {
-            window.showNotification('❌ Failed to save to repository', 'error');
-        }
-    } catch (error) {
-        window.showNotification('Save failed: ' + error.message, 'error');
-    }
-};
-
-// Close modal function
-window.closeModal = function(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.style.display = 'none';
-    }
+window.saveToRepo = function() {
+    window.showNotification('Save to repository functionality will be implemented', 'info');
 };
 
 // Initialize global variables for builder
@@ -2016,8 +2096,6 @@ window.removeSelectedModule = function() {
 
 // Remove module from canvas
 window.removeModule = function(button) {
-    if (!button) return;
-    
     const moduleElement = button.closest('.canvas-module');
     const moduleId = moduleElement.dataset.moduleId;
     
@@ -2042,21 +2120,375 @@ window.removeModule = function(button) {
 
 // Clear properties panel
 window.clearPropertiesPanel = function() {
-    const panel = document.getElementById('propertiesPanel');
-    if (panel) {
-        panel.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-cog"></i>
-                <p>Select a module to configure its properties</p>
-            </div>
-        `;
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
+    
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
+
+// Utility functions for builder
+window.copyToClipboard = function() {
+    const codeElement = document.getElementById('configCode');
+    if (!codeElement) return;
+    
+    const code = codeElement.textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        window.showNotification('Configuration copied to clipboard', 'success');
+    }).catch(() => {
+        window.showNotification('Failed to copy to clipboard', 'error');
+    });
+};
+
+window.downloadConfig = function() {
+    const codeElement = document.getElementById('configCode');
+    if (!codeElement) return;
+    
+    const code = codeElement.textContent;
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'configuration.nix';
+    a.click();
+    URL.revokeObjectURL(url);
+    window.showNotification('Configuration downloaded', 'success');
+};
+
+window.saveToRepo = function() {
+    window.showNotification('Save to repository functionality will be implemented', 'info');
+};
+
+// Initialize global variables for builder
+window.configModules = [];
+window.selectedModule = null;
+
+// ===== VISUAL BUILDER DRAG & DROP FUNCTIONS =====
+// These functions enable the visual drag & drop functionality
+
+// Add module to canvas from drag & drop
+window.addModuleFromType = function(moduleType) {
+    // Module templates based on type
+    const moduleTemplates = {
+        'boot': {
+            name: 'Boot Configuration',
+            icon: 'power-off',
+            description: 'System boot configuration',
+            config: {
+                'boot.loader.systemd-boot.enable': true,
+                'boot.loader.efi.canTouchEfiVariables': true
+            }
+        },
+        'network': {
+            name: 'Network Settings',
+            icon: 'network-wired',
+            description: 'Network interface configuration',
+            config: {
+                'networking.networkmanager.enable': true,
+                'networking.firewall.enable': true
+            }
+        },
+        'users': {
+            name: 'Users & Groups',
+            icon: 'users',
+            description: 'User account management',
+            config: {
+                'users.users.admin.isNormalUser': true,
+                'users.users.admin.extraGroups': ['wheel', 'networkmanager']
+            }
+        },
+        'filesystem': {
+            name: 'File Systems',
+            icon: 'hdd',
+            description: 'File system configuration',
+            config: {
+                'fileSystems."/".fsType': 'ext4'
+            }
+        },
+        'ssh': {
+            name: 'SSH Server',
+            icon: 'terminal',
+            description: 'SSH daemon configuration',
+            config: {
+                'services.openssh.enable': true,
+                'services.openssh.settings.PasswordAuthentication': false
+            }
+        },
+        'nginx': {
+            name: 'Nginx',
+            icon: 'globe',
+            description: 'Nginx web server',
+            config: {
+                'services.nginx.enable': true,
+                'networking.firewall.allowedTCPPorts': [80, 443]
+            }
+        },
+        'docker': {
+            name: 'Docker',
+            icon: 'docker',
+            description: 'Docker container runtime',
+            config: {
+                'virtualisation.docker.enable': true,
+                'users.users.admin.extraGroups': ['docker']
+            }
+        },
+        'postgresql': {
+            name: 'PostgreSQL',
+            icon: 'database',
+            description: 'PostgreSQL database server',
+            config: {
+                'services.postgresql.enable': true,
+                'services.postgresql.package': 'pkgs.postgresql_15'
+            }
+        },
+        'system-packages': {
+            name: 'System Packages',
+            icon: 'cubes',
+            description: 'System-wide packages',
+            config: {
+                'environment.systemPackages': ['wget', 'curl', 'git', 'vim', 'htop']
+            }
+        },
+        'development': {
+            name: 'Development Tools',
+            icon: 'code',
+            description: 'Development environment packages',
+            config: {
+                'environment.systemPackages': ['nodejs', 'python3', 'gcc', 'make']
+            }
+        },
+        'desktop': {
+            name: 'Desktop Environment',
+            icon: 'desktop',
+            description: 'Desktop environment configuration',
+            config: {
+                'services.xserver.enable': true,
+                'services.xserver.desktopManager.gnome.enable': true
+            }
+        }
+    };
+
+    const template = moduleTemplates[moduleType];
+    if (template) {
+        template.id = Date.now();
+        template.type = moduleType;
+        window.addModuleToCanvas(template);
+        window.showNotification(`Added ${template.name} module`, 'success');
     }
 };
 
-// Clear the entire canvas
-window.clearCanvas = function() {
+// Add module to the visual canvas
+window.addModuleToCanvas = function(moduleData) {
     const canvas = document.getElementById('builderCanvas');
-    if (canvas) {
+    if (!canvas) return;
+    
+    const dropzone = canvas.querySelector('.canvas-dropzone');
+    
+    if (dropzone) {
+        dropzone.style.display = 'none';
+    }
+
+    const moduleElement = document.createElement('div');
+    moduleElement.className = 'canvas-module';
+    moduleElement.dataset.moduleId = moduleData.id || Date.now();
+    moduleElement.innerHTML = `
+        <div class="module-header">
+            <i class="fas fa-${moduleData.icon || 'cog'}"></i>
+            <span>${moduleData.name}</span>
+            <button class="module-remove" onclick="removeModule(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="module-body">
+            <p>${moduleData.description || 'Module configuration'}</p>
+            <div class="module-config">
+                ${Object.keys(moduleData.config || {}).slice(0, 2).map(key => 
+                    `<small>${key}</small>`
+                ).join('<br>')}
+                ${Object.keys(moduleData.config || {}).length > 2 ? '<small>... and more</small>' : ''}
+            </div>
+        </div>
+    `;
+
+    moduleElement.onclick = () => window.selectModule(moduleElement, moduleData);
+    canvas.appendChild(moduleElement);
+    
+    window.configModules.push(moduleData);
+    
+    // Add CSS for the module if not already added
+    if (!document.getElementById('builderModuleStyles')) {
+        const styles = document.createElement('style');
+        styles.id = 'builderModuleStyles';
+        styles.textContent = `
+            .canvas-module {
+                background: var(--bg-surface);
+                border: 2px solid var(--border-color);
+                border-radius: var(--radius-md);
+                padding: var(--spacing-md);
+                margin-bottom: var(--spacing-sm);
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            .canvas-module:hover {
+                border-color: var(--primary-color);
+                box-shadow: var(--shadow-md);
+            }
+            .canvas-module.selected {
+                border-color: var(--primary-color);
+                background: rgb(59 130 246 / 0.05);
+            }
+            .module-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                margin-bottom: var(--spacing-sm);
+                font-weight: 600;
+            }
+            .module-header i {
+                margin-right: var(--spacing-sm);
+                color: var(--primary-color);
+            }
+            .module-remove {
+                background: none;
+                border: none;
+                color: var(--text-secondary);
+                cursor: pointer;
+                padding: var(--spacing-xs);
+                border-radius: var(--radius-sm);
+                font-size: 0.875rem;
+            }
+            .module-remove:hover {
+                background: var(--danger-color);
+                color: white;
+            }
+            .module-body {
+                font-size: 0.875rem;
+                color: var(--text-secondary);
+            }
+            .module-config {
+                margin-top: var(--spacing-sm);
+                font-family: monospace;
+                font-size: 0.75rem;
+                color: var(--text-tertiary);
+            }
+            .builder-canvas.drag-over {
+                border: 2px dashed var(--primary-color);
+                background: rgb(59 130 246 / 0.05);
+            }
+        `;
+        document.head.appendChild(styles);
+    }
+};
+
+// Select a module in the canvas
+window.selectModule = function(element, moduleData) {
+    // Remove previous selection
+    document.querySelectorAll('.canvas-module').forEach(m => m.classList.remove('selected'));
+    
+    // Select current module
+    element.classList.add('selected');
+    window.selectedModule = moduleData;
+    
+    // Update properties panel
+    window.updatePropertiesPanel(moduleData);
+    window.showNotification(`Selected ${moduleData.name}`, 'info');
+};
+
+// Update the properties panel with module configuration
+window.updatePropertiesPanel = function(moduleData) {
+    const panel = document.getElementById('propertiesPanel');
+    if (!panel) return;
+    
+    // Generate form based on module configuration
+    const configEntries = Object.entries(moduleData.config || {});
+    
+    panel.innerHTML = `
+        <div class="property-form">
+            <h4>${moduleData.name} Configuration</h4>
+            <div class="form-section">
+                <div class="form-group">
+                    <label>Module Name</label>
+                    <input type="text" value="${moduleData.name}" class="nixai-input" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea class="nixai-input" rows="2" readonly>${moduleData.description}</textarea>
+                </div>
+            </div>
+            <div class="form-section">
+                <h5>Configuration Options</h5>
+                ${configEntries.map(([key, value]) => `
+                    <div class="form-group">
+                        <label>${key}</label>
+                        <input type="text" value="${Array.isArray(value) ? value.join(', ') : value}" 
+                               class="nixai-input" data-config-key="${key}"
+                               onchange="updateModuleConfig('${moduleData.id}', '${key}', this.value)">
+                    </div>
+                `).join('')}
+            </div>
+            <div class="form-actions">
+                <button class="nixai-button nixai-button-primary" onclick="saveModuleConfig('${moduleData.id}')">
+                    Save Changes
+                </button>
+                <button class="nixai-button nixai-button-secondary" onclick="removeSelectedModule()">
+                    Remove Module
+                </button>
+            </div>
+        </div>
+    `;
+};
+
+// Update module configuration
+window.updateModuleConfig = function(moduleId, key, value) {
+    const module = window.configModules.find(m => m.id == moduleId);
+    if (module && module.config) {
+        // Try to parse as JSON for arrays/objects, otherwise use string
+        try {
+            if (value.includes('[') || value.includes('{')) {
+                module.config[key] = JSON.parse(value);
+            } else if (value.includes(',')) {
+                module.config[key] = value.split(',').map(v => v.trim());
+            } else if (value === 'true' || value === 'false') {
+                module.config[key] = value === 'true';
+            } else {
+                module.config[key] = value;
+            }
+        } catch (e) {
+            module.config[key] = value;
+        }
+    }
+};
+
+// Save module configuration
+window.saveModuleConfig = function(moduleId) {
+    window.showNotification('Module configuration saved!', 'success');
+    // Auto-generate preview when config changes
+    window.previewConfig();
+};
+
+// Remove selected module
+window.removeSelectedModule = function() {
+    if (window.selectedModule) {
+        const moduleElement = document.querySelector(`[data-module-id="${window.selectedModule.id}"]`);
+        window.removeModule(moduleElement?.querySelector('.module-remove'));
+    }
+};
+
+// Remove module from canvas
+window.removeModule = function(button) {
+    const moduleElement = button.closest('.canvas-module');
+    const moduleId = moduleElement.dataset.moduleId;
+    
+    moduleElement.remove();
+    window.configModules = window.configModules.filter(m => m.id != moduleId);
+    
+    // Show dropzone if no modules left
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas && canvas.children.length === 0) {
         canvas.innerHTML = `
             <div class="canvas-dropzone">
                 <i class="fas fa-plus-circle"></i>
@@ -2065,402 +2497,1346 @@ window.clearCanvas = function() {
             </div>
         `;
     }
-    window.configModules = [];
+    
     window.clearPropertiesPanel();
-    window.selectedModule = null;
+    window.showNotification('Module removed', 'info');
 };
 
-// ===== INITIALIZE DRAG & DROP FUNCTIONALITY =====
-// Initialize drag and drop when the page loads
-document.addEventListener('DOMContentLoaded', function() {
-    // Wait a bit for the page to fully load
-    setTimeout(() => {
-        // Make module items draggable
-        document.querySelectorAll('.module-item[draggable="true"]').forEach(item => {
-            item.addEventListener('dragstart', function(e) {
-                e.dataTransfer.setData('text/plain', this.dataset.module);
-                this.style.opacity = '0.5';
-            });
-            
-            item.addEventListener('dragend', function(e) {
-                this.style.opacity = '1';
-            });
-        });
+// Clear properties panel
+window.clearPropertiesPanel = function() {
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
+    
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
 
-        // Make canvas a drop target
-        const canvas = document.getElementById('builderCanvas');
-        if (canvas) {
-            canvas.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                this.classList.add('drag-over');
-            });
+// Utility functions for builder
+window.copyToClipboard = function() {
+    const codeElement = document.getElementById('configCode');
+    if (!codeElement) return;
+    
+    const code = codeElement.textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        window.showNotification('Configuration copied to clipboard', 'success');
+    }).catch(() => {
+        window.showNotification('Failed to copy to clipboard', 'error');
+    });
+};
 
-            canvas.addEventListener('dragleave', function(e) {
-                this.classList.remove('drag-over');
-            });
+window.downloadConfig = function() {
+    const codeElement = document.getElementById('configCode');
+    if (!codeElement) return;
+    
+    const code = codeElement.textContent;
+    const blob = new Blob([code], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'configuration.nix';
+    a.click();
+    URL.revokeObjectURL(url);
+    window.showNotification('Configuration downloaded', 'success');
+};
 
-            canvas.addEventListener('drop', function(e) {
-                e.preventDefault();
-                this.classList.remove('drag-over');
-                
-                const moduleType = e.dataTransfer.getData('text/plain');
-                if (moduleType) {
-                    window.addModuleFromType(moduleType);
-                }
-            });
+window.saveToRepo = function() {
+    window.showNotification('Save to repository functionality will be implemented', 'info');
+};
+
+// Initialize global variables for builder
+window.configModules = [];
+window.selectedModule = null;
+
+// ===== VISUAL BUILDER DRAG & DROP FUNCTIONS =====
+// These functions enable the visual drag & drop functionality
+
+// Add module to canvas from drag & drop
+window.addModuleFromType = function(moduleType) {
+    // Module templates based on type
+    const moduleTemplates = {
+        'boot': {
+            name: 'Boot Configuration',
+            icon: 'power-off',
+            description: 'System boot configuration',
+            config: {
+                'boot.loader.systemd-boot.enable': true,
+                'boot.loader.efi.canTouchEfiVariables': true
+            }
+        },
+        'network': {
+            name: 'Network Settings',
+            icon: 'network-wired',
+            description: 'Network interface configuration',
+            config: {
+                'networking.networkmanager.enable': true,
+                'networking.firewall.enable': true
+            }
+        },
+        'users': {
+            name: 'Users & Groups',
+            icon: 'users',
+            description: 'User account management',
+            config: {
+                'users.users.admin.isNormalUser': true,
+                'users.users.admin.extraGroups': ['wheel', 'networkmanager']
+            }
+        },
+        'filesystem': {
+            name: 'File Systems',
+            icon: 'hdd',
+            description: 'File system configuration',
+            config: {
+                'fileSystems."/".fsType': 'ext4'
+            }
+        },
+        'ssh': {
+            name: 'SSH Server',
+            icon: 'terminal',
+            description: 'SSH daemon configuration',
+            config: {
+                'services.openssh.enable': true,
+                'services.openssh.settings.PasswordAuthentication': false
+            }
+        },
+        'nginx': {
+            name: 'Nginx',
+            icon: 'globe',
+            description: 'Nginx web server',
+            config: {
+                'services.nginx.enable': true,
+                'networking.firewall.allowedTCPPorts': [80, 443]
+            }
+        },
+        'docker': {
+            name: 'Docker',
+            icon: 'docker',
+            description: 'Docker container runtime',
+            config: {
+                'virtualisation.docker.enable': true,
+                'users.users.admin.extraGroups': ['docker']
+            }
+        },
+        'postgresql': {
+            name: 'PostgreSQL',
+            icon: 'database',
+            description: 'PostgreSQL database server',
+            config: {
+                'services.postgresql.enable': true,
+                'services.postgresql.package': 'pkgs.postgresql_15'
+            }
+        },
+        'system-packages': {
+            name: 'System Packages',
+            icon: 'cubes',
+            description: 'System-wide packages',
+            config: {
+                'environment.systemPackages': ['wget', 'curl', 'git', 'vim', 'htop']
+            }
+        },
+        'development': {
+            name: 'Development Tools',
+            icon: 'code',
+            description: 'Development environment packages',
+            config: {
+                'environment.systemPackages': ['nodejs', 'python3', 'gcc', 'make']
+            }
+        },
+        'desktop': {
+            name: 'Desktop Environment',
+            icon: 'desktop',
+            description: 'Desktop environment configuration',
+            config: {
+                'services.xserver.enable': true,
+                'services.xserver.desktopManager.gnome.enable': true
+            }
         }
+    };
 
-        // Module category toggles
-        document.querySelectorAll('.module-category-header').forEach(header => {
-            header.addEventListener('click', function() {
-                const category = this.parentElement;
-                const moduleList = category.querySelector('.module-list');
-                const toggleIcon = this.querySelector('.toggle-icon');
-                
-                if (moduleList.style.display === 'none') {
-                    moduleList.style.display = 'block';
-                    toggleIcon.style.transform = 'rotate(0deg)';
-                } else {
-                    moduleList.style.display = 'none';
-                    toggleIcon.style.transform = 'rotate(-90deg)';
-                }
-            });
-        });
-        
-        console.log('✅ Drag & Drop functionality initialized');
-    }, 500);
-});
-
-// ===== ADDITIONAL BUILDER FUNCTIONS =====
-// These functions are called by the builder template
-
-// Functions called by the builder template buttons
-window.createNewConfig = function() {
-    if (confirm('Create a new configuration? This will clear the current canvas.')) {
-        window.clearCanvas();
-        window.showNotification('New configuration started', 'success');
+    const template = moduleTemplates[moduleType];
+    if (template) {
+        template.id = Date.now();
+        template.type = moduleType;
+        window.addModuleToCanvas(template);
+        window.showNotification(`Added ${template.name} module`, 'success');
     }
 };
 
-window.loadTemplate = function() {
-    // Create template selection modal
-    const modal = document.createElement('div');
-    modal.className = 'nixai-modal';
-    modal.style.display = 'flex';
-    modal.innerHTML = `
-        <div class="nixai-modal-content">
-            <div class="nixai-modal-header">
-                <h3>Load Configuration Template</h3>
-                <button class="nixai-modal-close" onclick="closeModal('templateModal')">&times;</button>
-            </div>
-            <div class="nixai-modal-body">
-                <div class="template-grid">
-                    <div class="template-item" onclick="loadTemplateType('minimal')">
-                        <i class="fas fa-cube"></i>
-                        <h4>Minimal System</h4>
-                        <p>Basic NixOS configuration with essential services</p>
-                    </div>
-                    <div class="template-item" onclick="loadTemplateType('desktop')">
-                        <i class="fas fa-desktop"></i>
-                        <h4>Desktop Environment</h4>
-                        <p>Full desktop setup with GNOME and applications</p>
-                    </div>
-                    <div class="template-item" onclick="loadTemplateType('server')">
-                        <i class="fas fa-server"></i>
-                        <h4>Web Server</h4>
-                        <p>Nginx web server with SSL and firewall</p>
-                    </div>
-                    <div class="template-item" onclick="loadTemplateType('development')">
-                        <i class="fas fa-code"></i>
-                        <h4>Development Machine</h4>
-                        <p>Development tools and programming languages</p>
-                    </div>
-                </div>
+// Add module to the visual canvas
+window.addModuleToCanvas = function(moduleData) {
+    const canvas = document.getElementById('builderCanvas');
+    if (!canvas) return;
+    
+    const dropzone = canvas.querySelector('.canvas-dropzone');
+    
+    if (dropzone) {
+        dropzone.style.display = 'none';
+    }
+
+    const moduleElement = document.createElement('div');
+    moduleElement.className = 'canvas-module';
+    moduleElement.dataset.moduleId = moduleData.id || Date.now();
+    moduleElement.innerHTML = `
+        <div class="module-header">
+            <i class="fas fa-${moduleData.icon || 'cog'}"></i>
+            <span>${moduleData.name}</span>
+            <button class="module-remove" onclick="removeModule(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="module-body">
+            <p>${moduleData.description || 'Module configuration'}</p>
+            <div class="module-config">
+                ${Object.keys(moduleData.config || {}).slice(0, 2).map(key => 
+                    `<small>${key}</small>`
+                ).join('<br>')}
+                ${Object.keys(moduleData.config || {}).length > 2 ? '<small>... and more</small>' : ''}
             </div>
         </div>
     `;
-    modal.id = 'templateModal';
-    document.body.appendChild(modal);
+
+    moduleElement.onclick = () => window.selectModule(moduleElement, moduleData);
+    canvas.appendChild(moduleElement);
     
-    // Add styles for template grid
-    if (!document.getElementById('templateStyles')) {
+    window.configModules.push(moduleData);
+    
+    // Add CSS for the module if not already added
+    if (!document.getElementById('builderModuleStyles')) {
         const styles = document.createElement('style');
-        styles.id = 'templateStyles';
+        styles.id = 'builderModuleStyles';
         styles.textContent = `
-            .template-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: var(--spacing-md);
-            }
-            .template-item {
-                padding: var(--spacing-lg);
+            .canvas-module {
+                background: var(--bg-surface);
                 border: 2px solid var(--border-color);
                 border-radius: var(--radius-md);
-                text-align: center;
+                padding: var(--spacing-md);
+                margin-bottom: var(--spacing-sm);
                 cursor: pointer;
                 transition: all 0.2s ease;
             }
-            .template-item:hover {
+            .canvas-module:hover {
                 border-color: var(--primary-color);
-                transform: translateY(-2px);
+                box-shadow: var(--shadow-md);
             }
-            .template-item i {
-                font-size: 2rem;
-                color: var(--primary-color);
+            .canvas-module.selected {
+                border-color: var(--primary-color);
+                background: rgb(59 130 246 / 0.05);
+            }
+            .module-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
                 margin-bottom: var(--spacing-sm);
+                font-weight: 600;
             }
-            .template-item h4 {
-                margin: var(--spacing-sm) 0;
-                color: var(--text-primary);
+            .module-header i {
+                margin-right: var(--spacing-sm);
+                color: var(--primary-color);
             }
-            .template-item p {
+            .module-remove {
+                background: none;
+                border: none;
                 color: var(--text-secondary);
+                cursor: pointer;
+                padding: var(--spacing-xs);
+                border-radius: var(--radius-sm);
                 font-size: 0.875rem;
+            }
+            .module-remove:hover {
+                background: var(--danger-color);
+                color: white;
+            }
+            .module-body {
+                font-size: 0.875rem;
+                color: var(--text-secondary);
+            }
+            .module-config {
+                margin-top: var(--spacing-sm);
+                font-family: monospace;
+                font-size: 0.75rem;
+                color: var(--text-tertiary);
+            }
+            .builder-canvas.drag-over {
+                border: 2px dashed var(--primary-color);
+                background: rgb(59 130 246 / 0.05);
             }
         `;
         document.head.appendChild(styles);
     }
 };
 
-window.loadTemplateType = function(templateType) {
-    window.clearCanvas();
+// Select a module in the canvas
+window.selectModule = function(element, moduleData) {
+    // Remove previous selection
+    document.querySelectorAll('.canvas-module').forEach(m => m.classList.remove('selected'));
     
-    const templates = {
-        minimal: ['boot', 'network', 'users'],
-        desktop: ['boot', 'network', 'users', 'desktop', 'system-packages'],
-        server: ['boot', 'network', 'users', 'ssh', 'nginx'],
-        development: ['boot', 'network', 'users', 'development', 'docker']
-    };
+    // Select current module
+    element.classList.add('selected');
+    window.selectedModule = moduleData;
     
-    const modules = templates[templateType] || [];
-    modules.forEach(moduleType => {
-        setTimeout(() => window.addModuleFromType(moduleType), 100);
-    });
-    
-    window.closeModal('templateModal');
-    window.showNotification(`${templateType.charAt(0).toUpperCase() + templateType.slice(1)} template loaded!`, 'success');
-    
-    // Generate preview after loading
-    setTimeout(() => window.previewConfig(), 500);
+    // Update properties panel
+    window.updatePropertiesPanel(moduleData);
+    window.showNotification(`Selected ${moduleData.name}`, 'info');
 };
 
-window.importConfig = function() {
-    // Create file input for importing configurations
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.nix,.conf';
-    input.onchange = function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                window.parseImportedConfig(e.target.result);
-            };
-            reader.readAsText(file);
-        }
-    };
-    input.click();
+// Update the properties panel with module configuration
+window.updatePropertiesPanel = function(moduleData) {
+    const panel = document.getElementById('propertiesPanel');
+    if (!panel) return;
+    
+    // Generate form based on module configuration
+    const configEntries = Object.entries(moduleData.config || {});
+    
+    panel.innerHTML = `
+        <div class="property-form">
+            <h4>${moduleData.name} Configuration</h4>
+            <div class="form-section">
+                <div class="form-group">
+                    <label>Module Name</label>
+                    <input type="text" value="${moduleData.name}" class="nixai-input" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea class="nixai-input" rows="2" readonly>${moduleData.description}</textarea>
+                </div>
+            </div>
+            <div class="form-section">
+                <h5>Configuration Options</h5>
+                ${configEntries.map(([key, value]) => `
+                    <div class="form-group">
+                        <label>${key}</label>
+                        <input type="text" value="${Array.isArray(value) ? value.join(', ') : value}" 
+                               class="nixai-input" data-config-key="${key}"
+                               onchange="updateModuleConfig('${moduleData.id}', '${key}', this.value)">
+                    </div>
+                `).join('')}
+            </div>
+            <div class="form-actions">
+                <button class="nixai-button nixai-button-primary" onclick="saveModuleConfig('${moduleData.id}')">
+                    Save Changes
+                </button>
+                <button class="nixai-button nixai-button-secondary" onclick="removeSelectedModule()">
+                    Remove Module
+                </button>
+            </div>
+        </div>
+    `;
 };
 
-window.parseImportedConfig = function(configContent) {
-    // Simple parser to extract common NixOS configurations
-    window.clearCanvas();
-    
-    // Look for common service patterns
-    const servicePatterns = [
-        { pattern: /services\.openssh\.enable\s*=\s*true/i, module: 'ssh' },
-        { pattern: /services\.nginx\.enable\s*=\s*true/i, module: 'nginx' },
-        { pattern: /virtualisation\.docker\.enable\s*=\s*true/i, module: 'docker' },
-        { pattern: /services\.postgresql\.enable\s*=\s*true/i, module: 'postgresql' },
-               { pattern: /services\.xserver\.enable\s*=\s*true/i, module: 'desktop' }
-    ];
-    
-    let foundModules = [];
-    servicePatterns.forEach(({ pattern, module }) => {
-        if (pattern.test(configContent)) {
-            foundModules.push(module);
+// Update module configuration
+window.updateModuleConfig = function(moduleId, key, value) {
+    const module = window.configModules.find(m => m.id == moduleId);
+    if (module && module.config) {
+        // Try to parse as JSON for arrays/objects, otherwise use string
+        try {
+            if (value.includes('[') || value.includes('{')) {
+                module.config[key] = JSON.parse(value);
+            } else if (value.includes(',')) {
+                module.config[key] = value.split(',').map(v => v.trim());
+            } else if (value === 'true' || value === 'false') {
+                module.config[key] = value === 'true';
+            } else {
+                module.config[key] = value;
+            }
+        } catch (e) {
+            module.config[key] = value;
         }
-    });
-    
-    // Always add basic modules
-    ['boot', 'network', 'users'].forEach(module => {
-        if (!foundModules.includes(module)) {
-            foundModules.unshift(module);
-        }
-    });
-    
-    // Add detected modules to canvas
-    foundModules.forEach((moduleType, index) => {
-        setTimeout(() => window.addModuleFromType(moduleType), index * 100);
-    });
-    
-    window.showNotification(`Imported configuration with ${foundModules.length} modules`, 'success');
-    setTimeout(() => window.previewConfig(), 1000);
+    }
 };
 
-// Modal close function that handles both ID and element
-window.closeModal = function(modalId) {
-    let modal;
-    if (typeof modalId === 'string') {
-        modal = document.getElementById(modalId);
+// Save module configuration
+window.saveModuleConfig = function(moduleId) {
+    window.showNotification('Module configuration saved!', 'success');
+    // Auto-generate preview when config changes
+    window.previewConfig();
+};
+
+// Remove selected module
+window.removeSelectedModule = function() {
+    if (window.selectedModule) {
+        const moduleElement = document.querySelector(`[data-module-id="${window.selectedModule.id}"]`);
+        window.removeModule(moduleElement?.querySelector('.module-remove'));
+    }
+};
+
+// Remove module from canvas
+window.removeModule = function(button) {
+    const moduleElement = button.closest('.canvas-module');
+    const moduleId = moduleElement.dataset.moduleId;
+    
+    moduleElement.remove();
+    window.configModules = window.configModules.filter(m => m.id != moduleId);
+    
+    // Show dropzone if no modules left
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas && canvas.children.length === 0) {
+        canvas.innerHTML = `
+            <div class="canvas-dropzone">
+                <i class="fas fa-plus-circle"></i>
+                <p>Drag modules here to build your configuration</p>
+                <p class="text-muted">or use AI assistance to generate configurations</p>
+            </div>
+        `;
+    }
+    
+    window.clearPropertiesPanel();
+    window.showNotification('Module removed', 'info');
+};
+
+// Clear properties panel
+window.clearPropertiesPanel = function() {
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
+    
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
+
+// ===== BUILDER PANEL MANAGEMENT =====
+// Global functions for panel management needed by builder template
+
+window.toggleModulesPanel = function() {
+    const panel = document.getElementById('modulesPanel');
+    const fab = document.querySelector('.fab[onclick="toggleModulesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
     } else {
-        modal = modalId; // assume it's already an element
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
     }
+};
+
+window.togglePropertiesPanel = function() {
+    const panel = document.getElementById('propertiesPanel');
+    const fab = document.querySelector('.fab[onclick="togglePropertiesPanel()"]');
     
-    if (modal) {
-        modal.remove();
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
     }
+};
+
+window.toggleAIAssistant = function() {
+    const panel = document.getElementById('aiAssistantPanel');
+    const fab = document.querySelector('.fab[onclick="toggleAIAssistant()"]');
     
-    // Also close any modals that might be open
-    document.querySelectorAll('.nixai-modal').forEach(m => {
-        if (m.style.display === 'flex' || m.style.display === 'block') {
-            m.remove();
-        }
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.closeAllPanels = function() {
+    document.querySelectorAll('.modules-panel, .properties-panel, .ai-assistant-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+    document.querySelectorAll('.fab').forEach(fab => {
+        fab.classList.remove('active');
     });
 };
 
-// Enhanced AI assistant with better module suggestions
-window.sendAIMessage = async function() {
+// AI Chat functionality
+window.sendAIMessage = function() {
     const input = document.getElementById('aiInput');
+    if (!input) return;
+    
     const message = input.value.trim();
     if (!message) return;
 
+    // Add user message to chat
     window.addChatMessage('user', message);
     input.value = '';
 
-    try {
-        window.addChatMessage('assistant', '🤔 Thinking...');
-        
-        const response = await fetch('/api/ai/chat', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                message: message,
-                context: 'configuration-builder',
-                modules: window.configModules || []
-            })
-        });
-        
-        const data = await response.json();
-        
-        // Remove thinking message
-        const messages = document.getElementById('chatMessages');
-        if (messages && messages.lastElementChild) {
-            messages.removeChild(messages.lastElementChild);
-        }
-        
-        if (data.success) {
-            window.addChatMessage('assistant', data.response);
-            
-            // Check if the AI response suggests adding modules
-            const suggestedModules = window.extractModuleSuggestions(message, data.response);
-            if (suggestedModules.length > 0) {
-                window.showModuleSuggestions(suggestedModules);
-            }
+    // Simulate AI response
+    setTimeout(() => {
+        let response = '';
+        if (message.toLowerCase().includes('web server')) {
+            response = 'I recommend adding an Nginx module for a web server. You can drag the "Nginx" module from the Services category to your canvas.';
+            // Auto-suggest nginx module
+            setTimeout(() => {
+                window.addModuleFromType('nginx');
+            }, 1000);
+        } else if (message.toLowerCase().includes('development')) {
+            response = 'For a development environment, I suggest adding Development Tools and configuring a user account. Let me add these modules for you.';
+            setTimeout(() => {
+                window.addModuleFromType('development');
+            }, 1000);
         } else {
-            window.addChatMessage('assistant', 'Sorry, I encountered an error processing your request.');
+            response = 'I can help you configure your NixOS system. Try asking about specific components like "web server", "development environment", or "user configuration".';
         }
-    } catch (error) {
-        // Remove thinking message
-        const messages = document.getElementById('chatMessages');
-        if (messages && messages.lastElementChild) {
-            messages.removeChild(messages.lastElementChild);
-        }
-        window.addChatMessage('assistant', 'Sorry, I encountered an error: ' + error.message);
-    }
+        
+        window.addChatMessage('assistant', response);
+    }, 1000);
 };
 
-// Extract module suggestions from AI response
-window.extractModuleSuggestions = function(userMessage, aiResponse) {
-    const suggestions = [];
-    const lowerMessage = userMessage.toLowerCase();
-    const lowerResponse = aiResponse.toLowerCase();
+window.addChatMessage = function(role, message) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) return;
     
-    // Check for service mentions
-    const serviceKeywords = {
-        'web server': 'nginx',
-        'nginx': 'nginx',
-        'ssh': 'ssh',
-        'docker': 'docker',
-        'database': 'postgresql',
-        'postgres': 'postgresql',
-        'desktop': 'desktop',
-        'gnome': 'desktop',
-        'development': 'development',
-        'dev tools': 'development'
-    };
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
     
-    Object.entries(serviceKeywords).forEach(([keyword, module]) => {
-        if (lowerMessage.includes(keyword) || lowerResponse.includes(keyword)) {
-            if (!window.configModules.find(m => m.type === module)) {
-                suggestions.push(module);
-            }
-        }
-    });
-    
-    return [...new Set(suggestions)]; // Remove duplicates
-};
-
-// Show module suggestions from AI
-window.showModuleSuggestions = function(suggestions) {
-    if (suggestions.length === 0) return;
-    
-    const suggestionHTML = suggestions.map(module => 
-        `<button class="nixai-button nixai-button-small nixai-button-primary" 
-                 onclick="addModuleFromType('${module}'); this.parentElement.remove();">
-            Add ${module.charAt(0).toUpperCase() + module.slice(1)}
-         </button>`
-    ).join(' ');
-    
-    const suggestionDiv = document.createElement('div');
-    suggestionDiv.className = 'ai-suggestions';
-    suggestionDiv.innerHTML = `
-        <div class="suggestion-header">
-            <small>💡 Suggested modules:</small>
+    messageDiv.innerHTML = `
+        <div class="chat-avatar">
+            <i class="fas fa-${role === 'user' ? 'user' : 'robot'}"></i>
         </div>
-        <div class="suggestion-buttons">
-            ${suggestionHTML}
-            <button class="nixai-button nixai-button-small nixai-button-secondary" 
-                    onclick="this.parentElement.parentElement.remove();">
-                Dismiss
-            </button>
+        <div class="chat-content">
+            <p>${message}</p>
         </div>
     `;
     
-    // Add to chat
-    const messagesContainer = document.getElementById('chatMessages');
-    if (messagesContainer) {
-        messagesContainer.appendChild(suggestionDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+};
+
+// Module removal functionality
+window.removeModule = function(button) {
+    const moduleElement = button.closest('.canvas-module');
+    if (!moduleElement) return;
+    
+    const moduleId = moduleElement.dataset.moduleId;
+    
+    moduleElement.remove();
+    window.configModules = (window.configModules || []).filter(m => m.id !== moduleId);
+    
+    // Show dropzone if no modules left
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas && canvas.children.length === 0) {
+        canvas.innerHTML = `
+            <div class="canvas-dropzone">
+                <i class="fas fa-plus-circle"></i>
+                <p>Drag modules here to build your configuration</p>
+                <p class="text-muted">or use AI assistance to generate configurations</p>
+            </div>
+        `;
     }
     
-    // Add styles for suggestions
-    if (!document.getElementById('suggestionStyles')) {
-        const styles = document.createElement('style');
-        styles.id = 'suggestionStyles';
-        styles.textContent = `
-            .ai-suggestions {
-                margin: var(--spacing-sm) 0;
-                padding: var(--spacing-sm);
-                background: rgb(59 130 246 / 0.1);
-                border-radius: var(--radius-sm);
-                border-left: 3px solid var(--primary-color);
-            }
-            .suggestion-header {
-                margin-bottom: var(--spacing-xs);
-                color: var(--text-secondary);
-            }
-            .suggestion-buttons {
-                display: flex;
-                gap: var(--spacing-xs);
-                flex-wrap: wrap;
-            }
-            .nixai-button-small {
-                padding: var(--spacing-xs) var(--spacing-sm);
-                font-size: 0.75rem;
-                border-radius: var(--radius-sm);
-            }
-        `;
-        document.head.appendChild(styles);
+    window.clearPropertiesPanel();
+    window.showNotification('Module removed', 'info');
+};
+
+// Clear properties panel
+window.clearPropertiesPanel = function() {
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
+    
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
+
+// ===== BUILDER PANEL MANAGEMENT =====
+// Global functions for panel management needed by builder template
+
+window.toggleModulesPanel = function() {
+    const panel = document.getElementById('modulesPanel');
+    const fab = document.querySelector('.fab[onclick="toggleModulesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
     }
 };
+
+window.togglePropertiesPanel = function() {
+    const panel = document.getElementById('propertiesPanel');
+    const fab = document.querySelector('.fab[onclick="togglePropertiesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.toggleAIAssistant = function() {
+    const panel = document.getElementById('aiAssistantPanel');
+    const fab = document.querySelector('.fab[onclick="toggleAIAssistant()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.closeAllPanels = function() {
+    document.querySelectorAll('.modules-panel, .properties-panel, .ai-assistant-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+    document.querySelectorAll('.fab').forEach(fab => {
+        fab.classList.remove('active');
+    });
+};
+
+// AI Chat functionality
+window.sendAIMessage = function() {
+    const input = document.getElementById('aiInput');
+    if (!input) return;
+    
+    const message = input.value.trim();
+    if (!message) return;
+
+    // Add user message to chat
+    window.addChatMessage('user', message);
+    input.value = '';
+
+    // Simulate AI response
+    setTimeout(() => {
+        let response = '';
+        if (message.toLowerCase().includes('web server')) {
+            response = 'I recommend adding an Nginx module for a web server. You can drag the "Nginx" module from the Services category to your canvas.';
+            // Auto-suggest nginx module
+            setTimeout(() => {
+                window.addModuleFromType('nginx');
+            }, 1000);
+        } else if (message.toLowerCase().includes('development')) {
+            response = 'For a development environment, I suggest adding Development Tools and configuring a user account. Let me add these modules for you.';
+            setTimeout(() => {
+                window.addModuleFromType('development');
+            }, 1000);
+        } else {
+            response = 'I can help you configure your NixOS system. Try asking about specific components like "web server", "development environment", or "user configuration".';
+        }
+        
+        window.addChatMessage('assistant', response);
+    }, 1000);
+};
+
+window.addChatMessage = function(role, message) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
+    
+    messageDiv.innerHTML = `
+        <div class="chat-avatar">
+            <i class="fas fa-${role === 'user' ? 'user' : 'robot'}"></i>
+        </div>
+        <div class="chat-content">
+            <p>${message}</p>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+};
+
+// Module removal functionality
+window.removeModule = function(button) {
+    const moduleElement = button.closest('.canvas-module');
+    if (!moduleElement) return;
+    
+    const moduleId = moduleElement.dataset.moduleId;
+    
+    moduleElement.remove();
+    window.configModules = (window.configModules || []).filter(m => m.id !== moduleId);
+    
+    // Show dropzone if no modules left
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas && canvas.children.length === 0) {
+        canvas.innerHTML = `
+            <div class="canvas-dropzone">
+                <i class="fas fa-plus-circle"></i>
+                <p>Drag modules here to build your configuration</p>
+                <p class="text-muted">or use AI assistance to generate configurations</p>
+            </div>
+        `;
+    }
+    
+    window.clearPropertiesPanel();
+    window.showNotification('Module removed', 'info');
+};
+
+// Clear properties panel
+window.clearPropertiesPanel = function() {
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
+    
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
+
+// ===== BUILDER PANEL MANAGEMENT =====
+// Global functions for panel management needed by builder template
+
+window.toggleModulesPanel = function() {
+    const panel = document.getElementById('modulesPanel');
+    const fab = document.querySelector('.fab[onclick="toggleModulesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.togglePropertiesPanel = function() {
+    const panel = document.getElementById('propertiesPanel');
+    const fab = document.querySelector('.fab[onclick="togglePropertiesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.toggleAIAssistant = function() {
+    const panel = document.getElementById('aiAssistantPanel');
+    const fab = document.querySelector('.fab[onclick="toggleAIAssistant()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.closeAllPanels = function() {
+    document.querySelectorAll('.modules-panel, .properties-panel, .ai-assistant-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+    document.querySelectorAll('.fab').forEach(fab => {
+        fab.classList.remove('active');
+    });
+};
+
+// AI Chat functionality
+window.sendAIMessage = function() {
+    const input = document.getElementById('aiInput');
+    if (!input) return;
+    
+    const message = input.value.trim();
+    if (!message) return;
+
+    // Add user message to chat
+    window.addChatMessage('user', message);
+    input.value = '';
+
+    // Simulate AI response
+    setTimeout(() => {
+        let response = '';
+        if (message.toLowerCase().includes('web server')) {
+            response = 'I recommend adding an Nginx module for a web server. You can drag the "Nginx" module from the Services category to your canvas.';
+            // Auto-suggest nginx module
+            setTimeout(() => {
+                window.addModuleFromType('nginx');
+            }, 1000);
+        } else if (message.toLowerCase().includes('development')) {
+            response = 'For a development environment, I suggest adding Development Tools and configuring a user account. Let me add these modules for you.';
+            setTimeout(() => {
+                window.addModuleFromType('development');
+            }, 1000);
+        } else {
+            response = 'I can help you configure your NixOS system. Try asking about specific components like "web server", "development environment", or "user configuration".';
+        }
+        
+        window.addChatMessage('assistant', response);
+    }, 1000);
+};
+
+window.addChatMessage = function(role, message) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
+    
+    messageDiv.innerHTML = `
+        <div class="chat-avatar">
+            <i class="fas fa-${role === 'user' ? 'user' : 'robot'}"></i>
+        </div>
+        <div class="chat-content">
+            <p>${message}</p>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+};
+
+// Module removal functionality
+window.removeModule = function(button) {
+    const moduleElement = button.closest('.canvas-module');
+    if (!moduleElement) return;
+    
+    const moduleId = moduleElement.dataset.moduleId;
+    
+    moduleElement.remove();
+    window.configModules = (window.configModules || []).filter(m => m.id !== moduleId);
+    
+    // Show dropzone if no modules left
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas && canvas.children.length === 0) {
+        canvas.innerHTML = `
+            <div class="canvas-dropzone">
+                <i class="fas fa-plus-circle"></i>
+                <p>Drag modules here to build your configuration</p>
+                <p class="text-muted">or use AI assistance to generate configurations</p>
+            </div>
+        `;
+    }
+    
+    window.clearPropertiesPanel();
+    window.showNotification('Module removed', 'info');
+};
+
+// Clear properties panel
+window.clearPropertiesPanel = function() {
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
+    
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
+
+// ===== BUILDER PANEL MANAGEMENT =====
+// Global functions for panel management needed by builder template
+
+window.toggleModulesPanel = function() {
+    const panel = document.getElementById('modulesPanel');
+    const fab = document.querySelector('.fab[onclick="toggleModulesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.togglePropertiesPanel = function() {
+    const panel = document.getElementById('propertiesPanel');
+    const fab = document.querySelector('.fab[onclick="togglePropertiesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.toggleAIAssistant = function() {
+    const panel = document.getElementById('aiAssistantPanel');
+    const fab = document.querySelector('.fab[onclick="toggleAIAssistant()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.closeAllPanels = function() {
+    document.querySelectorAll('.modules-panel, .properties-panel, .ai-assistant-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+    document.querySelectorAll('.fab').forEach(fab => {
+        fab.classList.remove('active');
+    });
+};
+
+// AI Chat functionality
+window.sendAIMessage = function() {
+    const input = document.getElementById('aiInput');
+    if (!input) return;
+    
+    const message = input.value.trim();
+    if (!message) return;
+
+    // Add user message to chat
+    window.addChatMessage('user', message);
+    input.value = '';
+
+    // Simulate AI response
+    setTimeout(() => {
+        let response = '';
+        if (message.toLowerCase().includes('web server')) {
+            response = 'I recommend adding an Nginx module for a web server. You can drag the "Nginx" module from the Services category to your canvas.';
+            // Auto-suggest nginx module
+            setTimeout(() => {
+                window.addModuleFromType('nginx');
+            }, 1000);
+        } else if (message.toLowerCase().includes('development')) {
+            response = 'For a development environment, I suggest adding Development Tools and configuring a user account. Let me add these modules for you.';
+            setTimeout(() => {
+                window.addModuleFromType('development');
+            }, 1000);
+        } else {
+            response = 'I can help you configure your NixOS system. Try asking about specific components like "web server", "development environment", or "user configuration".';
+        }
+        
+        window.addChatMessage('assistant', response);
+    }, 1000);
+};
+
+window.addChatMessage = function(role, message) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
+    
+    messageDiv.innerHTML = `
+        <div class="chat-avatar">
+            <i class="fas fa-${role === 'user' ? 'user' : 'robot'}"></i>
+        </div>
+        <div class="chat-content">
+            <p>${message}</p>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+};
+
+// Module removal functionality
+window.removeModule = function(button) {
+    const moduleElement = button.closest('.canvas-module');
+    if (!moduleElement) return;
+    
+    const moduleId = moduleElement.dataset.moduleId;
+    
+    moduleElement.remove();
+    window.configModules = (window.configModules || []).filter(m => m.id !== moduleId);
+    
+    // Show dropzone if no modules left
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas && canvas.children.length === 0) {
+        canvas.innerHTML = `
+            <div class="canvas-dropzone">
+                <i class="fas fa-plus-circle"></i>
+                <p>Drag modules here to build your configuration</p>
+                <p class="text-muted">or use AI assistance to generate configurations</p>
+            </div>
+        `;
+    }
+    
+    window.clearPropertiesPanel();
+    window.showNotification('Module removed', 'info');
+};
+
+// Clear properties panel
+window.clearPropertiesPanel = function() {
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
+    
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
+
+// ===== BUILDER PANEL MANAGEMENT =====
+// Global functions for panel management needed by builder template
+
+window.toggleModulesPanel = function() {
+    const panel = document.getElementById('modulesPanel');
+    const fab = document.querySelector('.fab[onclick="toggleModulesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.togglePropertiesPanel = function() {
+    const panel = document.getElementById('propertiesPanel');
+    const fab = document.querySelector('.fab[onclick="togglePropertiesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.toggleAIAssistant = function() {
+    const panel = document.getElementById('aiAssistantPanel');
+    const fab = document.querySelector('.fab[onclick="toggleAIAssistant()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.closeAllPanels = function() {
+    document.querySelectorAll('.modules-panel, .properties-panel, .ai-assistant-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+    document.querySelectorAll('.fab').forEach(fab => {
+        fab.classList.remove('active');
+    });
+};
+
+// AI Chat functionality
+window.sendAIMessage = function() {
+    const input = document.getElementById('aiInput');
+    if (!input) return;
+    
+    const message = input.value.trim();
+    if (!message) return;
+
+    // Add user message to chat
+    window.addChatMessage('user', message);
+    input.value = '';
+
+    // Simulate AI response
+    setTimeout(() => {
+        let response = '';
+        if (message.toLowerCase().includes('web server')) {
+            response = 'I recommend adding an Nginx module for a web server. You can drag the "Nginx" module from the Services category to your canvas.';
+            // Auto-suggest nginx module
+            setTimeout(() => {
+                window.addModuleFromType('nginx');
+            }, 1000);
+        } else if (message.toLowerCase().includes('development')) {
+            response = 'For a development environment, I suggest adding Development Tools and configuring a user account. Let me add these modules for you.';
+            setTimeout(() => {
+                window.addModuleFromType('development');
+            }, 1000);
+        } else {
+            response = 'I can help you configure your NixOS system. Try asking about specific components like "web server", "development environment", or "user configuration".';
+        }
+        
+        window.addChatMessage('assistant', response);
+    }, 1000);
+};
+
+window.addChatMessage = function(role, message) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
+    
+    messageDiv.innerHTML = `
+        <div class="chat-avatar">
+            <i class="fas fa-${role === 'user' ? 'user' : 'robot'}"></i>
+        </div>
+        <div class="chat-content">
+            <p>${message}</p>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+};
+
+// Module removal functionality
+window.removeModule = function(button) {
+    const moduleElement = button.closest('.canvas-module');
+    if (!moduleElement) return;
+    
+    const moduleId = moduleElement.dataset.moduleId;
+    
+    moduleElement.remove();
+    window.configModules = (window.configModules || []).filter(m => m.id !== moduleId);
+    
+    // Show dropzone if no modules left
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas && canvas.children.length === 0) {
+        canvas.innerHTML = `
+            <div class="canvas-dropzone">
+                <i class="fas fa-plus-circle"></i>
+                <p>Drag modules here to build your configuration</p>
+                <p class="text-muted">or use AI assistance to generate configurations</p>
+            </div>
+        `;
+    }
+    
+    window.clearPropertiesPanel();
+    window.showNotification('Module removed', 'info');
+};
+
+// Clear properties panel
+window.clearPropertiesPanel = function() {
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
+    
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
+
+// ===== BUILDER PANEL MANAGEMENT =====
+// Global functions for panel management needed by builder template
+
+window.toggleModulesPanel = function() {
+    const panel = document.getElementById('modulesPanel');
+    const fab = document.querySelector('.fab[onclick="toggleModulesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.togglePropertiesPanel = function() {
+    const panel = document.getElementById('propertiesPanel');
+    const fab = document.querySelector('.fab[onclick="togglePropertiesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.toggleAIAssistant = function() {
+    const panel = document.getElementById('aiAssistantPanel');
+    const fab = document.querySelector('.fab[onclick="toggleAIAssistant()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.closeAllPanels = function() {
+    document.querySelectorAll('.modules-panel, .properties-panel, .ai-assistant-panel').forEach(panel => {
+        panel.classList.remove('active');
+    });
+    document.querySelectorAll('.fab').forEach(fab => {
+        fab.classList.remove('active');
+    });
+};
+
+// AI Chat functionality
+window.sendAIMessage = function() {
+    const input = document.getElementById('aiInput');
+    if (!input) return;
+    
+    const message = input.value.trim();
+    if (!message) return;
+
+    // Add user message to chat
+    window.addChatMessage('user', message);
+    input.value = '';
+
+    // Simulate AI response
+    setTimeout(() => {
+        let response = '';
+        if (message.toLowerCase().includes('web server')) {
+            response = 'I recommend adding an Nginx module for a web server. You can drag the "Nginx" module from the Services category to your canvas.';
+            // Auto-suggest nginx module
+            setTimeout(() => {
+                window.addModuleFromType('nginx');
+            }, 1000);
+        } else if (message.toLowerCase().includes('development')) {
+            response = 'For a development environment, I suggest adding Development Tools and configuring a user account. Let me add these modules for you.';
+            setTimeout(() => {
+                window.addModuleFromType('development');
+            }, 1000);
+        } else {
+            response = 'I can help you configure your NixOS system. Try asking about specific components like "web server", "development environment", or "user configuration".';
+        }
+        
+        window.addChatMessage('assistant', response);
+    }, 1000);
+};
+
+window.addChatMessage = function(role, message) {
+    const messagesContainer = document.getElementById('chatMessages');
+    if (!messagesContainer) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${role}`;
+    
+    messageDiv.innerHTML = `
+        <div class="chat-avatar">
+            <i class="fas fa-${role === 'user' ? 'user' : 'robot'}"></i>
+        </div>
+        <div class="chat-content">
+            <p>${message}</p>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+};
+
+// Module removal functionality
+window.removeModule = function(button) {
+    const moduleElement = button.closest('.canvas-module');
+    if (!moduleElement) return;
+    
+    const moduleId = moduleElement.dataset.moduleId;
+    
+    moduleElement.remove();
+    window.configModules = (window.configModules || []).filter(m => m.id !== moduleId);
+    
+    // Show dropzone if no modules left
+    const canvas = document.getElementById('builderCanvas');
+    if (canvas && canvas.children.length === 0) {
+        canvas.innerHTML = `
+            <div class="canvas-dropzone">
+                <i class="fas fa-plus-circle"></i>
+                <p>Drag modules here to build your configuration</p>
+                <p class="text-muted">or use AI assistance to generate configurations</p>
+            </div>
+        `;
+    }
+    
+    window.clearPropertiesPanel();
+    window.showNotification('Module removed', 'info');
+};
+
+// Clear properties panel
+window.clearPropertiesPanel = function() {
+    const panel = document.querySelector('.properties-panel-content');
+    if (!panel) return;
+    
+    panel.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-cog"></i>
+            <p>Select a module to configure its properties</p>
+        </div>
+    `;
+};
+
+// ===== BUILDER PANEL MANAGEMENT =====
+// Global functions for panel management needed by builder template
+
+window.toggleModulesPanel = function() {
+    const panel = document.getElementById('modulesPanel');
+    const fab = document.querySelector('.fab[onclick="toggleModulesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.togglePropertiesPanel = function() {
+    const panel = document.getElementById('propertiesPanel');
+    const fab = document.querySelector('.fab[onclick="togglePropertiesPanel()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {
+        // Close other panels
+        window.closeAllPanels();
+        if (panel) panel.classList.add('active');
+        if (fab) fab.classList.add('active');
+    }
+};
+
+window.toggleAIAssistant = function() {
+    const panel = document.getElementById('aiAssistantPanel');
+    const fab = document.querySelector('.fab[onclick="toggleAIAssistant()"]');
+    
+    if (panel && panel.classList.contains('active')) {
+        panel.classList.remove('active');
+        if (fab) fab.classList.remove('active');
+    } else {

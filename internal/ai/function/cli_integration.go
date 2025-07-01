@@ -272,7 +272,7 @@ func CreateSampleCall() FunctionCall {
 		"include_steps":      true,
 		"include_prevention": true,
 		"system_info": map[string]interface{}{
-			"nixos_version":   "23.11",
+			"nixos_version":   "25.05",
 			"nix_version":     "2.18.1",
 			"is_flake_system": true,
 		},

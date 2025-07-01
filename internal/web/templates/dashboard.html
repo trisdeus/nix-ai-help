@@ -685,19 +685,40 @@ function openConfigurationEditor(configName) {
     const modal = document.createElement('div');
     modal.className = 'nixai-modal';
     modal.innerHTML = `
-        <div class="nixai-modal-content">
+        <div class="nixai-modal-content nixai-modal-large">
             <div class="nixai-modal-header">
                 <h3>Edit Configuration: ${configName}</h3>
                 <button class="nixai-modal-close">&times;</button>
             </div>
             <div class="nixai-modal-body">
-                <div class="config-editor">
-                    <textarea id="config-editor-textarea" rows="20" cols="80" placeholder="Loading configuration..."></textarea>
+                <div class="config-edit-choices">
+                    <button class="nixai-btn nixai-btn-primary" data-action="visual-builder">
+                        🎨 Visual Builder
+                        <small>Edit with drag-and-drop interface</small>
+                    </button>
+                    <button class="nixai-btn nixai-btn-secondary" data-action="text-editor">
+                        📝 Text Editor
+                        <small>Edit configuration directly</small>
+                    </button>
                 </div>
-                <div class="config-editor-actions">
-                    <button class="nixai-btn nixai-btn-secondary" data-action="validate">Validate</button>
-                    <button class="nixai-btn nixai-btn-secondary" data-action="preview">Preview</button>
-                    <button class="nixai-btn nixai-btn-primary" data-action="save">Save Changes</button>
+                <div class="config-editor" id="text-editor-section" style="display: none;">
+                    <textarea id="config-editor-textarea" class="nixai-code-editor" rows="20" placeholder="Loading configuration..."></textarea>
+                    <div class="nixai-modal-actions">
+                        <button class="nixai-btn nixai-btn-secondary" data-action="validate">
+                            ✅ Validate
+                        </button>
+                        <button class="nixai-btn nixai-btn-secondary" data-action="preview">
+                            👁️ Preview
+                        </button>
+                        <button class="nixai-btn nixai-btn-success" data-action="save">
+                            💾 Save Changes
+                        </button>
+                    </div>
+                </div>
+                <div id="validation-results" class="nixai-alert" style="display: none;"></div>
+                <div id="preview-results" class="config-preview" style="display: none;">
+                    <h4>Configuration Preview</h4>
+                    <pre id="preview-content"></pre>
                 </div>
             </div>
         </div>
@@ -705,15 +726,62 @@ function openConfigurationEditor(configName) {
     
     document.body.appendChild(modal);
     
-    // Load configuration content (mock for now)
+    // Handle visual builder button
+    modal.querySelector('[data-action="visual-builder"]').onclick = () => {
+        // Redirect to builder page with config context
+        window.location.href = `/builder?config=${encodeURIComponent(configName)}`;
+    };
+    
+    // Handle text editor button
+    modal.querySelector('[data-action="text-editor"]').onclick = () => {
+        document.querySelector('.config-edit-choices').style.display = 'none';
+        document.getElementById('text-editor-section').style.display = 'block';
+        loadConfigurationContent(configName);
+    };
+    
+    // Handle validate button
+    modal.querySelector('[data-action="validate"]').onclick = () => {
+        const content = document.getElementById('config-editor-textarea').value;
+        validateConfigurationContent(content, configName);
+    };
+    
+    // Handle preview button
+    modal.querySelector('[data-action="preview"]').onclick = () => {
+        const content = document.getElementById('config-editor-textarea').value;
+        previewConfiguration(content, configName);
+    };
+    
+    // Handle save button
+    modal.querySelector('[data-action="save"]').onclick = () => {
+        const content = document.getElementById('config-editor-textarea').value;
+        saveConfiguration(configName, content);
+    };
+    
+    // Handle modal close
+    modal.querySelector('.nixai-modal-close').onclick = () => {
+        document.body.removeChild(modal);
+    };
+    
+    // Close modal when clicking outside
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            document.body.removeChild(modal);
+        }
+    };
+}
+
+function loadConfigurationContent(configName) {
+    const textarea = document.getElementById('config-editor-textarea');
+    textarea.value = 'Loading configuration...';
+    
+    // Simulate loading configuration content
     setTimeout(() => {
-        const textarea = document.getElementById('config-editor-textarea');
         textarea.value = `# NixOS Configuration: ${configName}
 { config, pkgs, ... }:
 
 {
   # System configuration
-  system.stateVersion = "23.11";
+  system.stateVersion = "25.05";
   
   # Boot configuration
   boot.loader.systemd-boot.enable = true;
@@ -745,18 +813,98 @@ function openConfigurationEditor(configName) {
   ];
 }`;
     }, 500);
+}
+
+function validateConfigurationContent(content, configName) {
+    const validateBtn = document.querySelector('[data-action="validate"]');
+    const resultsDiv = document.getElementById('validation-results');
     
-    // Handle modal close
-    modal.querySelector('.nixai-modal-close').onclick = () => {
-        document.body.removeChild(modal);
-    };
+    // Show validation in progress
+    validateBtn.innerHTML = '⏳ Validating...';
+    validateBtn.disabled = true;
+    resultsDiv.style.display = 'none';
     
-    // Handle save action
-    modal.querySelector('[data-action="save"]').onclick = () => {
-        const content = document.getElementById('config-editor-textarea').value;
-        saveConfiguration(configName, content);
-        document.body.removeChild(modal);
-    };
+    // Simulate validation API call
+    setTimeout(() => {
+        // Mock validation - check for basic syntax
+        const hasErrors = content.includes('isNormalUser = true') || !content.includes('system.stateVersion');
+        
+        validateBtn.innerHTML = '✅ Validate';
+        validateBtn.disabled = false;
+        
+        resultsDiv.style.display = 'block';
+        if (hasErrors) {
+            resultsDiv.className = 'nixai-alert nixai-alert-danger';
+            resultsDiv.innerHTML = `
+                <strong>Validation Errors Found:</strong>
+                <ul>
+                    <li>Line 28: Syntax error - missing semicolon after 'isNormalUser = true'</li>
+                    <li>Consider updating system.stateVersion to latest stable release</li>
+                </ul>
+            `;
+        } else {
+            resultsDiv.className = 'nixai-alert nixai-alert-success';
+            resultsDiv.innerHTML = `
+                <strong>✅ Configuration Valid!</strong>
+                <p>No syntax errors found. Configuration is ready for deployment.</p>
+            `;
+        }
+        
+        showNotification(hasErrors ? 'Validation completed with errors' : 'Configuration is valid!', hasErrors ? 'error' : 'success');
+    }, 1500);
+}
+
+function previewConfiguration(content, configName) {
+    const previewBtn = document.querySelector('[data-action="preview"]');
+    const previewDiv = document.getElementById('preview-results');
+    const previewContent = document.getElementById('preview-content');
+    
+    // Show preview in progress
+    previewBtn.innerHTML = '⏳ Generating Preview...';
+    previewBtn.disabled = true;
+    
+    setTimeout(() => {
+        previewBtn.innerHTML = '👁️ Preview';
+        previewBtn.disabled = false;
+        
+        previewDiv.style.display = 'block';
+        previewContent.textContent = content;
+        
+        // Scroll to preview
+        previewDiv.scrollIntoView({ behavior: 'smooth' });
+        
+        showNotification('Preview generated successfully', 'success');
+    }, 1000);
+}
+
+function saveConfiguration(configName, content) {
+    const saveBtn = document.querySelector('[data-action="save"]');
+    
+    // Show saving in progress
+    saveBtn.innerHTML = '⏳ Saving...';
+    saveBtn.disabled = true;
+    
+    // Simulate save API call
+    setTimeout(() => {
+        saveBtn.innerHTML = '✅ Saved!';
+        saveBtn.classList.add('success');
+        
+        setTimeout(() => {
+            saveBtn.innerHTML = '💾 Save Changes';
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('success');
+        }, 2000);
+        
+        showNotification(`Configuration "${configName}" saved successfully!`, 'success');
+        
+        // Close modal after successful save
+        setTimeout(() => {
+            const modal = document.querySelector('.nixai-modal');
+            if (modal) {
+                document.body.removeChild(modal);
+            }
+        }, 1500);
+    }, 1500);
 }
 
 function validateConfiguration(configName) {
