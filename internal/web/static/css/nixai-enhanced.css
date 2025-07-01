@@ -462,23 +462,22 @@ a:hover {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   z-index: 1000;
-  animation: fadeIn 0.2s ease-out;
 }
 
 .nixai-modal-content {
-  background: var(--bg-surface);
+  background: var(--bg-primary);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  max-width: 500px;
-  width: 90%;
+  max-width: 80vw;
   max-height: 80vh;
-  overflow-y: auto;
-  animation: slideIn 0.3s ease-out;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .nixai-modal-header {
@@ -492,129 +491,83 @@ a:hover {
 .nixai-modal-header h3 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 1.25rem;
-  font-weight: 600;
 }
 
 .nixai-modal-close {
   background: none;
   border: none;
   font-size: 1.5rem;
-  color: var(--text-secondary);
   cursor: pointer;
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-md);
-  transition: all 0.2s;
+  color: var(--text-secondary);
+  padding: var(--spacing-xs);
 }
 
 .nixai-modal-close:hover {
-  background-color: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
 .nixai-modal-body {
   padding: var(--spacing-lg);
+  overflow-y: auto;
 }
 
-/* Form Styles */
-.nixai-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
+.config-editor {
+  margin-bottom: var(--spacing-lg);
 }
 
-.nixai-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.nixai-field label {
-  font-weight: 500;
-  color: var(--text-primary);
+.config-editor textarea {
+  width: 100%;
+  min-height: 400px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 0.875rem;
-}
-
-.nixai-input,
-.nixai-select,
-.nixai-textarea {
-  padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 0.875rem;
-  transition: all 0.2s;
-}
-
-.nixai-input:focus,
-.nixai-select:focus,
-.nixai-textarea:focus {
-  outline: none;
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
-}
-
-.nixai-textarea {
-  min-height: 80px;
+  padding: var(--spacing-md);
   resize: vertical;
 }
 
-.nixai-checkbox {
-  width: 16px;
-  height: 16px;
-  margin-right: var(--spacing-sm);
-}
-
-/* Button Styles */
-.nixai-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-}
-
-.nixai-button-primary {
-  background-color: var(--primary-color);
-  color: white;
-}
-
-.nixai-button-primary:hover {
-  background-color: var(--primary-dark);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.nixai-button-secondary {
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.nixai-button-secondary:hover {
-  background-color: var(--bg-secondary);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
-}
-
-.nixai-button-small {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: 0.75rem;
-}
-
-/* Actions Container */
-.nixai-actions {
+.config-editor-actions {
   display: flex;
   gap: var(--spacing-sm);
   justify-content: flex-end;
-  margin-top: var(--spacing-md);
+}
+
+/* Notification Styles */
+.nixai-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: 1001;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+}
+
+.nixai-notification.show {
+  transform: translateX(0);
+}
+
+.nixai-notification-success {
+  background: var(--success-color);
+  color: white;
+}
+
+.nixai-notification-error {
+  background: var(--danger-color);
+  color: white;
+}
+
+.nixai-notification-info {
+  background: var(--primary-color);
+  color: white;
+}
+
+/* Button success state */
+.nixai-btn.success {
+  background: var(--success-color) !important;
+  color: white !important;
 }
 
 /* Animation Keyframes */
@@ -636,6 +589,99 @@ a:hover {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
+}
+
+/* Chart Container Styles */
+.chart-container {
+  margin-bottom: var(--spacing-lg);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  height: 250px;
+  position: relative;
+}
+
+.chart-container canvas {
+  max-height: 100%;
+}
+
+.sidebar-items {
+  border-top: 1px solid var(--border-color);
+  padding-top: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.sidebar-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-item:last-child {
+  border-bottom: none;
+}
+
+.sidebar-item-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.sidebar-item-value {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+/* Modal Enhancements for Configuration Editing */
+.nixai-modal-large .nixai-modal-content {
+  max-width: 80vw;
+  max-height: 80vh;
+}
+
+.nixai-code-editor {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.config-edit-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+}
+
+.config-edit-choices .nixai-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-lg);
+  text-align: center;
+  height: auto;
+}
+
+.config-edit-choices .nixai-btn small {
+  margin-top: var(--spacing-xs);
+  font-size: 0.75rem;
+  opacity: 0.8;
+  font-weight: normal;
+}
+
+.nixai-modal-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  justify-content: flex-end;
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
 }
 
 /* Responsive Design */

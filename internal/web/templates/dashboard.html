@@ -23,6 +23,41 @@
         </div>
     </div>
 
+    <!-- Charts Section -->
+    <div class="dashboard-charts-grid">
+        <div class="nixai-card">
+            <div class="nixai-card-header">
+                <h3 class="nixai-card-title">System Health Overview</h3>
+                <div class="chart-controls">
+                    <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" data-chart-period="1h">1H</button>
+                    <button class="nixai-btn nixai-btn-sm nixai-btn-secondary active" data-chart-period="24h">24H</button>
+                    <button class="nixai-btn nixai-btn-sm nixai-btn-secondary" data-chart-period="7d">7D</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="systemHealthChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <div class="nixai-card">
+            <div class="nixai-card-header">
+                <h3 class="nixai-card-title">Fleet Status Distribution</h3>
+            </div>
+            <div class="chart-container">
+                <canvas id="fleetStatusChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <div class="nixai-card">
+            <div class="nixai-card-header">
+                <h3 class="nixai-card-title">Configuration Changes</h3>
+            </div>
+            <div class="chart-container">
+                <canvas id="configChangesChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Dashboard Content -->
     <div class="dashboard-main-grid">
         <!-- Activity Feed -->
@@ -368,6 +403,81 @@
     background: var(--bg-secondary);
 }
 
+/* Chart Styles */
+.dashboard-charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-lg);
+}
+
+.dashboard-charts-grid .nixai-card:nth-child(1) {
+    grid-column: 1 / -1;
+}
+
+.chart-container {
+    padding: var(--spacing-md);
+    position: relative;
+    height: 200px;
+}
+
+.chart-controls {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.chart-controls .nixai-btn.active {
+    background: var(--primary-color);
+    color: white;
+}
+
+/* Configuration Item Styles */
+.config-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacing-sm);
+    transition: all 0.2s ease;
+}
+
+.config-item:hover {
+    border-color: var(--primary-color);
+    background: var(--bg-hover);
+}
+
+.config-item-info {
+    flex: 1;
+}
+
+.config-item-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.config-item-details {
+    display: flex;
+    gap: var(--spacing-md);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.config-item-branch {
+    background: var(--bg-secondary);
+    padding: 0.125rem var(--spacing-xs);
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.config-item-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
 .ai-suggestion-icon {
     font-size: 1.5rem;
     width: 32px;
@@ -417,4 +527,256 @@
     }
 }
 </style>
+
+<script>
+// Dashboard Chart Initialization
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDashboardCharts();
+    initializeConfigurationEditing();
+});
+
+function initializeDashboardCharts() {
+    // System Health Chart
+    const systemHealthCtx = document.getElementById('systemHealthChart');
+    if (systemHealthCtx) {
+        new Chart(systemHealthCtx, {
+            type: 'line',
+            data: {
+                labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00', '24:00'],
+                datasets: [{
+                    label: 'CPU Usage (%)',
+                    data: [25, 30, 45, 55, 40, 35, 20],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4
+                }, {
+                    label: 'Memory Usage (%)',
+                    data: [60, 65, 70, 75, 70, 68, 62],
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                }
+            }
+        });
+    }
+
+    // Fleet Status Chart
+    const fleetStatusCtx = document.getElementById('fleetStatusChart');
+    if (fleetStatusCtx) {
+        new Chart(fleetStatusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Online', 'Offline', 'Maintenance'],
+                datasets: [{
+                    data: [{{.Stats.HealthyMachines}}, {{.Stats.OfflineMachines}}, 0],
+                    backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+
+    // Configuration Changes Chart
+    const configChangesCtx = document.getElementById('configChangesChart');
+    if (configChangesCtx) {
+        new Chart(configChangesCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Configuration Changes',
+                    data: [3, 5, 2, 8, 4, 1, 2],
+                    backgroundColor: 'rgba(139, 92, 246, 0.8)',
+                    borderColor: '#8b5cf6',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+}
+
+function initializeConfigurationEditing() {
+    // Handle configuration edit buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('[data-action="edit-config"]')) {
+            const configName = e.target.closest('[data-action="edit-config"]').dataset.config;
+            openConfigurationEditor(configName);
+        }
+        
+        if (e.target.closest('[data-action="validate-config"]')) {
+            const configName = e.target.closest('[data-action="validate-config"]').dataset.config;
+            validateConfiguration(configName);
+        }
+    });
+}
+
+function openConfigurationEditor(configName) {
+    // Create a modal for configuration editing
+    const modal = document.createElement('div');
+    modal.className = 'nixai-modal';
+    modal.innerHTML = `
+        <div class="nixai-modal-content">
+            <div class="nixai-modal-header">
+                <h3>Edit Configuration: ${configName}</h3>
+                <button class="nixai-modal-close">&times;</button>
+            </div>
+            <div class="nixai-modal-body">
+                <div class="config-editor">
+                    <textarea id="config-editor-textarea" rows="20" cols="80" placeholder="Loading configuration..."></textarea>
+                </div>
+                <div class="config-editor-actions">
+                    <button class="nixai-btn nixai-btn-secondary" data-action="validate">Validate</button>
+                    <button class="nixai-btn nixai-btn-secondary" data-action="preview">Preview</button>
+                    <button class="nixai-btn nixai-btn-primary" data-action="save">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Load configuration content (mock for now)
+    setTimeout(() => {
+        const textarea = document.getElementById('config-editor-textarea');
+        textarea.value = `# NixOS Configuration: ${configName}
+{ config, pkgs, ... }:
+
+{
+  # System configuration
+  system.stateVersion = "23.11";
+  
+  # Boot configuration
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+  
+  # Networking
+  networking.hostName = "nixos-desktop";
+  networking.networkmanager.enable = true;
+  
+  # User configuration
+  users.users.nixuser = {
+    isNormalUser = true;
+    extraGroups = [ "wheel" "networkmanager" ];
+  };
+  
+  # Desktop environment
+  services.xserver = {
+    enable = true;
+    displayManager.gdm.enable = true;
+    desktopManager.gnome.enable = true;
+  };
+  
+  # Development tools
+  environment.systemPackages = with pkgs; [
+    vim
+    git
+    vscode
+    firefox
+  ];
+}`;
+    }, 500);
+    
+    // Handle modal close
+    modal.querySelector('.nixai-modal-close').onclick = () => {
+        document.body.removeChild(modal);
+    };
+    
+    // Handle save action
+    modal.querySelector('[data-action="save"]').onclick = () => {
+        const content = document.getElementById('config-editor-textarea').value;
+        saveConfiguration(configName, content);
+        document.body.removeChild(modal);
+    };
+}
+
+function validateConfiguration(configName) {
+    // Show validation in progress
+    const button = document.querySelector(`[data-action="validate-config"][data-config="${configName}"]`);
+    const originalText = button.innerHTML;
+    button.innerHTML = '⏳ Validating...';
+    button.disabled = true;
+    
+    // Simulate validation
+    setTimeout(() => {
+        button.innerHTML = '✅ Valid';
+        button.classList.add('success');
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.disabled = false;
+            button.classList.remove('success');
+        }, 2000);
+    }, 1500);
+}
+
+function saveConfiguration(configName, content) {
+    console.log(`Saving configuration: ${configName}`);
+    console.log('Content:', content);
+    
+    // Show success notification
+    showNotification(`Configuration "${configName}" saved successfully!`, 'success');
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `nixai-notification nixai-notification-${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 100);
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 300);
+    }, 3000);
+}
+
+// Chart.js template helper for subtraction
+Chart.helpers.sub = function(a, b) {
+    return a - b;
+};
+</script>
 {{end}}

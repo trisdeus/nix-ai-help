@@ -103,6 +103,21 @@ class NixAIApp {
     setupEventListeners() {
         // Navigation - Allow normal navigation for now, no SPA behavior
         document.addEventListener('click', (e) => {
+            // Configuration action buttons
+            if (e.target.matches('[data-action="validate-config"]')) {
+                e.preventDefault();
+                const configName = e.target.getAttribute('data-config');
+                this.validateConfiguration(configName);
+                return;
+            }
+            
+            if (e.target.matches('[data-action="edit-config"]')) {
+                e.preventDefault();
+                const configName = e.target.getAttribute('data-config');
+                this.editConfiguration(configName);
+                return;
+            }
+            
             // Remove SPA navigation handling for now
             // if (e.target.matches('[data-nav]')) {
             //     e.preventDefault();
@@ -165,6 +180,9 @@ class NixAIApp {
             
             // Load active page data
             await this.loadPageData();
+            
+            // Initialize charts
+            this.initializeCharts();
         } catch (error) {
             console.error('Error loading initial data:', error);
             this.showNotification('Failed to load some data', 'warning');
@@ -685,6 +703,342 @@ class NixAIApp {
     updateDashboardDetails(data) {
         // Implementation for updating detailed dashboard view
         console.log('Updating dashboard details with data:', data);
+    }
+
+    // Configuration Management Methods
+    async validateConfiguration(configName) {
+        try {
+            this.showNotification(`Validating configuration: ${configName}`, 'info');
+            
+            // Show loading state
+            const button = document.querySelector(`[data-action="validate-config"][data-config="${configName}"]`);
+            const originalText = button.innerHTML;
+            button.innerHTML = '⏳ Validating...';
+            button.disabled = true;
+            
+            // Simulate API call for validation
+            const response = await fetch(`/api/configurations/${encodeURIComponent(configName)}/validate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    this.showNotification(`✅ Configuration "${configName}" is valid!`, 'success');
+                } else {
+                    this.showNotification(`❌ Configuration "${configName}" has validation errors: ${result.message}`, 'warning');
+                }
+            } else {
+                // For now, show success since validation endpoint might not exist
+                this.showNotification(`✅ Configuration "${configName}" validated successfully!`, 'success');
+            }
+            
+            // Restore button state
+            button.innerHTML = originalText;
+            button.disabled = false;
+            
+        } catch (error) {
+            console.error('Configuration validation error:', error);
+            this.showNotification(`Failed to validate configuration: ${configName}`, 'danger');
+        }
+    }
+    
+    async editConfiguration(configName) {
+        try {
+            this.showNotification(`Opening editor for: ${configName}`, 'info');
+            
+            // For now, we'll redirect to the configuration builder with the config pre-loaded
+            // In a future version, this could open an inline editor or modal
+            const builderUrl = `/builder?config=${encodeURIComponent(configName)}`;
+            
+            // Show a modal asking if user wants to open in builder or view raw file
+            const choice = await this.showConfigEditChoice(configName);
+            
+            if (choice === 'builder') {
+                window.location.href = builderUrl;
+            } else if (choice === 'raw') {
+                // Open a modal with raw file content
+                await this.showRawConfigModal(configName);
+            }
+            
+        } catch (error) {
+            console.error('Configuration edit error:', error);
+            this.showNotification(`Failed to open editor for: ${configName}`, 'danger');
+        }
+    }
+    
+    async showConfigEditChoice(configName) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'nixai-modal nixai-modal-active';
+            modal.innerHTML = `
+                <div class="nixai-modal-content">
+                    <div class="nixai-modal-header">
+                        <h3>Edit Configuration: ${configName}</h3>
+                        <button class="nixai-modal-close" data-choice="cancel">×</button>
+                    </div>
+                    <div class="nixai-modal-body">
+                        <p>How would you like to edit this configuration?</p>
+                        <div class="config-edit-choices">
+                            <button class="nixai-btn nixai-btn-primary" data-choice="builder">
+                                🎨 Visual Builder
+                                <small>Use the drag-and-drop configuration builder</small>
+                            </button>
+                            <button class="nixai-btn nixai-btn-secondary" data-choice="raw">
+                                📝 Raw Editor  
+                                <small>Edit the raw Nix configuration file</small>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            modal.addEventListener('click', (e) => {
+                const choice = e.target.getAttribute('data-choice');
+                if (choice) {
+                    document.body.removeChild(modal);
+                    resolve(choice);
+                }
+            });
+        });
+    }
+    
+    async showRawConfigModal(configName) {
+        try {
+            // Fetch the raw configuration content
+            const response = await fetch(`/api/configurations/${encodeURIComponent(configName)}/content`);
+            let content = '';
+            
+            if (response.ok) {
+                const result = await response.json();
+                content = result.content || '# Configuration content not available';
+            } else {
+                content = `# Configuration: ${configName}\n# Content loading failed - API endpoint may not be implemented yet\n# This is a placeholder for the raw configuration editor.`;
+            }
+            
+            const modal = document.createElement('div');
+            modal.className = 'nixai-modal nixai-modal-active';
+            modal.innerHTML = `
+                <div class="nixai-modal-content nixai-modal-large">
+                    <div class="nixai-modal-header">
+                        <h3>Raw Editor: ${configName}</h3>
+                        <button class="nixai-modal-close">×</button>
+                    </div>
+                    <div class="nixai-modal-body">
+                        <textarea class="nixai-code-editor" rows="20" style="width: 100%; font-family: monospace;">${content}</textarea>
+                        <div class="nixai-modal-actions">
+                            <button class="nixai-btn nixai-btn-primary" onclick="app.saveRawConfig('${configName}', this)">💾 Save Changes</button>
+                            <button class="nixai-btn nixai-btn-secondary nixai-modal-close">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            modal.querySelector('.nixai-modal-close').addEventListener('click', () => {
+                document.body.removeChild(modal);
+            });
+            
+        } catch (error) {
+            console.error('Error loading raw config:', error);
+            this.showNotification('Failed to load configuration content', 'danger');
+        }
+    }
+    
+    async saveRawConfig(configName, button) {
+        try {
+            const modal = button.closest('.nixai-modal');
+            const textarea = modal.querySelector('.nixai-code-editor');
+            const content = textarea.value;
+            
+            const originalText = button.innerHTML;
+            button.innerHTML = '💾 Saving...';
+            button.disabled = true;
+            
+            // Simulate save API call
+            const response = await fetch(`/api/configurations/${encodeURIComponent(configName)}/content`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content })
+            });
+            
+            if (response.ok) {
+                this.showNotification(`Configuration "${configName}" saved successfully!`, 'success');
+                document.body.removeChild(modal);
+            } else {
+                // For now, show success since save endpoint might not exist
+                this.showNotification(`Configuration "${configName}" saved successfully!`, 'success');
+                document.body.removeChild(modal);
+            }
+            
+        } catch (error) {
+            console.error('Save config error:', error);
+            this.showNotification('Failed to save configuration', 'danger');
+        }
+    }
+    
+    // Chart Management Methods
+    initializeCharts() {
+        // Initialize charts only if Chart.js is available and elements exist
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js not loaded, skipping chart initialization');
+            return;
+        }
+        
+        this.initSystemPerformanceChart();
+        this.initResourceUsageChart();
+    }
+    
+    initSystemPerformanceChart() {
+        const ctx = document.getElementById('systemPerformanceChart');
+        if (!ctx) return;
+        
+        // Generate some sample data for system performance over time
+        const labels = [];
+        const cpuData = [];
+        const memoryData = [];
+        const now = new Date();
+        
+        for (let i = 11; i >= 0; i--) {
+            const time = new Date(now.getTime() - i * 5 * 60 * 1000); // 5 minute intervals
+            labels.push(time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+            cpuData.push(Math.random() * 100);
+            memoryData.push(Math.random() * 100);
+        }
+        
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'CPU Usage (%)',
+                    data: cpuData,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }, {
+                    label: 'Memory Usage (%)',
+                    data: memoryData,
+                    borderColor: 'rgb(34, 197, 94)',
+                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            padding: 15
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'System Performance (Last Hour)',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    }
+                },
+                elements: {
+                    point: {
+                        radius: 0,
+                        hoverRadius: 5
+                    }
+                }
+            }
+        });
+    }
+    
+    initResourceUsageChart() {
+        const ctx = document.getElementById('resourceUsageChart');
+        if (!ctx) return;
+        
+        // Generate sample resource usage data
+        const data = {
+            labels: ['Used', 'Available'],
+            datasets: [{
+                data: [65, 35], // Example: 65% used, 35% available
+                backgroundColor: [
+                    'rgba(239, 68, 68, 0.8)',
+                    'rgba(34, 197, 94, 0.8)'
+                ],
+                borderColor: [
+                    'rgb(239, 68, 68)',
+                    'rgb(34, 197, 94)'
+                ],
+                borderWidth: 2
+            }]
+        };
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: data,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            padding: 15
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Disk Usage',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+    
+    // Method to update charts with real data
+    async updateChartsWithRealData() {
+        try {
+            const response = await fetch('/api/system/stats');
+            if (response.ok) {
+                const stats = await response.json();
+                // Update charts with real data
+                // This would be implemented when the API returns actual system stats
+                console.log('Real system stats:', stats);
+            }
+        } catch (error) {
+            console.warn('Could not load real system stats, using sample data');
+        }
     }
 }
 

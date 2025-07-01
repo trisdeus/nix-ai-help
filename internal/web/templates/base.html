@@ -14,6 +14,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <!-- Styles -->
     <link rel="stylesheet" href="/static/css/nixai-enhanced.css">
     
@@ -128,12 +131,25 @@
                     </div>
                     
                     <div class="sidebar-content">
-                        {{range .SidebarData.Items}}
-                        <div class="sidebar-item">
-                            <span class="sidebar-item-label">{{.Label}}</span>
-                            <span class="sidebar-item-value">{{.Value}}</span>
+                        <!-- System Performance Chart -->
+                        <div class="chart-container">
+                            <canvas id="systemPerformanceChart" width="300" height="200"></canvas>
                         </div>
-                        {{end}}
+                        
+                        <!-- Resource Usage Doughnut -->
+                        <div class="chart-container">
+                            <canvas id="resourceUsageChart" width="300" height="200"></canvas>
+                        </div>
+                        
+                        <!-- Traditional sidebar items for non-chart data -->
+                        <div class="sidebar-items">
+                            {{range .SidebarData.Items}}
+                            <div class="sidebar-item">
+                                <span class="sidebar-item-label">{{.Label}}</span>
+                                <span class="sidebar-item-value">{{.Value}}</span>
+                            </div>
+                            {{end}}
+                        </div>
                     </div>
                 </div>
                 {{end}}

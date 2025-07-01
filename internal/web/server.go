@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -201,18 +202,8 @@ func (s *Server) setupRoutes() {
 		s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 	}
 
-	// Health check endpoint
-	s.router.HandleFunc("/health", s.handleHealth).Methods("GET")
-
 	// Basic routes - these will be enhanced by EnhancedServer
 	s.router.HandleFunc("/", s.handleIndex).Methods("GET")
-}
-
-// handleHealth provides a simple health check endpoint
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status":"ok","timestamp":"%s"}`, time.Now().Format(time.RFC3339))
 }
 
 // handleIndex provides a basic index page
@@ -231,4 +222,60 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 </body>
 </html>
 `)
+}
+
+// Helper methods for Server
+
+// sendJSON sends raw JSON data
+func (s *Server) sendJSON(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to encode JSON response: %v", err))
+	}
+}
+
+// sendError sends an error JSON response
+func (s *Server) sendError(w http.ResponseWriter, message string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.WriteHeader(code)
+
+	response := map[string]interface{}{
+		"success": false,
+		"error":   message,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to encode error response: %v", err))
+	}
+}
+
+// renderTemplate provides a basic template rendering (placeholder)
+func (s *Server) renderTemplate(w http.ResponseWriter, templateName string, data map[string]interface{}) {
+	// Basic fallback - just return a simple HTML page
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NixAI - %s</title>
+</head>
+<body>
+    <h1>NixAI Basic Server</h1>
+    <p>Template: %s</p>
+    <p>This is the basic server implementation. For enhanced features, use the EnhancedServer.</p>
+</body>
+</html>
+`, data["Title"], templateName)
+}
+
+// getServiceStatus returns a service status string
+func (s *Server) getServiceStatus(available bool) string {
+	if available {
+		return "healthy"
+	}
+	return "unavailable"
 }

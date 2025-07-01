@@ -373,13 +373,14 @@ func (s *EnhancedServer) handleEnhancedDashboard(w http.ResponseWriter, r *http.
 		"Stats": map[string]interface{}{
 			"TotalMachines":   totalMachines,
 			"HealthyMachines": healthyMachines,
+			"OfflineMachines": totalMachines - healthyMachines,
 			"TotalConfigs":    s.getTotalConfigs(),
 			"ActiveTeams":     1, // Default
 		},
 		"Activities":    activities,
 		"FleetStatus":   s.generateFleetStatus(machines),
 		"Alerts":        alerts,
-		"ConfigStatus":  []interface{}{},
+		"ConfigStatus":  s.generateConfigurationStatus(),
 		"TeamActivity":  []interface{}{},
 		"AISuggestions": aiSuggestions,
 		"SidebarData": map[string]interface{}{
@@ -3156,4 +3157,79 @@ func (s *EnhancedServer) generateFleetStatus(machines []*fleet.Machine) []map[st
 	}
 
 	return status
+}
+
+// generateConfigurationStatus generates sample configuration data for the dashboard
+func (s *EnhancedServer) generateConfigurationStatus() []map[string]interface{} {
+	configs := []map[string]interface{}{
+		{
+			"id":           "nixos-desktop",
+			"Name":         "Desktop Configuration",
+			"path":         "/etc/nixos/configuration.nix",
+			"status":       "active",
+			"LastModified": time.Now().Add(-2 * time.Hour).Format("2006-01-02 15:04"),
+			"Branch":       "main",
+			"changes":      3,
+			"description":  "Main desktop configuration with GNOME and development tools",
+			"type":         "system",
+			"editable":     true,
+		},
+		{
+			"id":           "home-manager",
+			"Name":         "Home Manager Config",
+			"path":         "~/.config/nixpkgs/home.nix",
+			"status":       "modified",
+			"LastModified": time.Now().Add(-30 * time.Minute).Format("2006-01-02 15:04"),
+			"Branch":       "feature/dotfiles",
+			"changes":      1,
+			"description":  "User-specific environment and applications",
+			"type":         "user",
+			"editable":     true,
+		},
+		{
+			"id":           "flake-config",
+			"Name":         "Flake Configuration",
+			"path":         "/etc/nixos/flake.nix",
+			"status":       "synced",
+			"LastModified": time.Now().Add(-1 * time.Hour).Format("2006-01-02 15:04"),
+			"Branch":       "main",
+			"changes":      0,
+			"description":  "Flake-based system configuration with inputs",
+			"type":         "flake",
+			"editable":     true,
+		},
+		{
+			"id":           "server-config",
+			"Name":         "Server Configuration",
+			"path":         "/etc/nixos/machines/server.nix",
+			"status":       "pending",
+			"LastModified": time.Now().Add(-45 * time.Minute).Format("2006-01-02 15:04"),
+			"Branch":       "deploy/production",
+			"changes":      2,
+			"description":  "Web server configuration with nginx and SSL",
+			"type":         "machine",
+			"editable":     true,
+		},
+	}
+
+	// Add configurations from nixos repository if available
+	if s.nixosRepo != nil {
+		repoConfigs := s.nixosRepo.GetConfigurations()
+		for _, config := range repoConfigs {
+			configs = append(configs, map[string]interface{}{
+				"id":           config.Name,
+				"Name":         config.Name,
+				"path":         config.Path,
+				"status":       "repository",
+				"LastModified": time.Now().Format("2006-01-02 15:04"),
+				"Branch":       "main",
+				"changes":      0,
+				"description":  fmt.Sprintf("Configuration from repository: %s", config.Path),
+				"type":         "repository",
+				"editable":     true,
+			})
+		}
+	}
+
+	return configs
 }
