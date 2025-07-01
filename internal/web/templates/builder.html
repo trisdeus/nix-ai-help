@@ -1,26 +1,7 @@
 {{define "title"}}Configuration Builder - nixai{{end}}
 
 {{define "content"}}
-<div class="nixai-container">
-    <!-- Builder Header -->
-    <div class="nixai-header">
-        <h1 class="nixai-title">Visual Configuration Builder</h1>
-        <p class="nixai-subtitle">Build NixOS configurations with visual tools and AI assistance</p>
-        
-        <div class="nixai-actions">
-            <button class="nixai-button nixai-button-primary" onclick="createNewConfig()">
-                <i class="fas fa-plus"></i> New Configuration
-            </button>
-            <button class="nixai-button nixai-button-secondary" onclick="loadTemplate()">
-                <i class="fas fa-file-code"></i> Load Template
-            </button>
-            <button class="nixai-button nixai-button-secondary" onclick="importConfig()">
-                <i class="fas fa-upload"></i> Import Existing
-            </button>
-        </div>
-    </div>
-
-    <!-- Builder Content -->
+<!-- Builder Content -->
     <div class="nixai-grid nixai-grid-cols-12 nixai-gap">
         <!-- Sidebar -->
         <div class="nixai-grid-span-3">
@@ -204,7 +185,6 @@
             <pre><code id="configCode" class="language-nix"></code></pre>
         </div>
     </div>
-</div>
 
 <!-- Module Configuration Modal -->
 <div id="moduleConfigModal" class="nixai-modal">
