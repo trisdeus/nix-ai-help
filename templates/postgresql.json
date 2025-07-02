@@ -1,0 +1,5 @@
+{
+  "name": "postgresql",
+  "description": "PostgreSQL database template",
+  "file": "postgresql.nix"
+}

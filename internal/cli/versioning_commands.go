@@ -7,15 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"nix-ai-help/internal/collaboration/team"
-	"nix-ai-help/internal/fleet"
-	nixosrepo "nix-ai-help/internal/repository"
 	"nix-ai-help/internal/versioning/repository"
-	"nix-ai-help/internal/web"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
-
-	"github.com/spf13/cobra"
 )
 
 // AddVersioningCommands adds versioning-related commands to the CLI
@@ -318,100 +315,6 @@ func AddCollaborationCommands(rootCmd *cobra.Command, logger *logger.Logger) {
 
 	teamCmd.AddCommand(teamCreateCmd, teamListCmd)
 	rootCmd.AddCommand(teamCmd)
-}
-
-// AddWebInterfaceCommands adds web interface commands
-func AddWebInterfaceCommands(rootCmd *cobra.Command, logger *logger.Logger) {
-	// Web interface command
-	webCmd := &cobra.Command{
-		Use:   "web",
-		Short: "Start web interface",
-		Long:  "Start the comprehensive web-based configuration management interface with real-time collaboration features",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			port, _ := cmd.Flags().GetInt("port")
-			repoPath, _ := cmd.Flags().GetString("repo")
-
-			if repoPath == "" {
-				repoPath = "."
-			}
-
-			logger.Info("Starting nixai web interface...")
-
-			// Initialize fleet manager
-			fleetManager := fleet.NewFleetManager(logger)
-
-			// Initialize repository parser if repo path provided
-			var nixosRepo *nixosrepo.NixOSRepository
-			if repoPath != "" && repoPath != "." {
-				logger.Info(fmt.Sprintf("Analyzing NixOS repository: %s", repoPath))
-
-				repo, err := nixosrepo.NewNixOSRepository(repoPath, logger)
-				if err != nil {
-					return fmt.Errorf("failed to initialize repository: %w", err)
-				}
-
-				if err := repo.ScanRepository(); err != nil {
-					return fmt.Errorf("failed to scan repository: %w", err)
-				}
-
-				nixosRepo = repo
-
-				// Extract machine definitions from repository and add to fleet
-				machines, err := repo.GetMachineDefinitions()
-				if err != nil {
-					logger.Warn(fmt.Sprintf("Failed to extract machine definitions: %v", err))
-				} else {
-					ctx := context.Background()
-					for _, machine := range machines {
-						if err := fleetManager.AddRepositoryMachine(ctx, machine); err != nil {
-							logger.Warn(fmt.Sprintf("Failed to add machine %s to fleet: %v", machine.ID, err))
-						} else {
-							logger.Info(fmt.Sprintf("Added machine %s to fleet from repository", machine.ID))
-						}
-					}
-				}
-			}
-
-			// Initialize components
-			configRepo, err := repository.NewConfigRepository("/tmp/nixai-configs", logger)
-			if err != nil {
-				logger.Warn(fmt.Sprintf("Failed to create config repository: %v", err))
-			}
-
-			teamManager := team.NewTeamManager(logger)
-
-			// Create enhanced server with repository support
-			var server *web.EnhancedServer
-			if nixosRepo != nil {
-				server, err = web.NewEnhancedServerWithFleetAndRepository(port, teamManager, configRepo, fleetManager, nixosRepo, logger)
-			} else {
-				server, err = web.NewEnhancedServerWithFleetAndRepository(port, teamManager, configRepo, fleetManager, nil, logger)
-			}
-
-			if err != nil {
-				return fmt.Errorf("failed to create enhanced web server: %w", err)
-			}
-
-			fmt.Printf("🌐 Starting enhanced web interface on port %d\n", port)
-			fmt.Printf("📂 Repository: %s\n", repoPath)
-			fmt.Printf("🔗 Open: http://localhost:%d\n", port)
-			fmt.Printf("📊 Dashboard: http://localhost:%d/dashboard\n", port)
-			fmt.Printf("🎨 Configuration Builder: http://localhost:%d/builder\n", port)
-			fmt.Printf("🚀 Fleet Management: http://localhost:%d/fleet\n", port)
-			fmt.Printf("👥 Team Collaboration: http://localhost:%d/teams\n", port)
-			fmt.Printf("📝 Version Control: http://localhost:%d/versions\n", port)
-			fmt.Printf("🤖 AI Generation: Available in all modules\n")
-			fmt.Printf("⚡ Real-time WebSocket: Enabled\n")
-
-			return server.Start(context.Background())
-		},
-	}
-
-	// Add flags
-	webCmd.Flags().IntP("port", "p", 34567, "Port to serve on")
-	webCmd.Flags().StringP("repo", "r", "", "Repository path")
-
-	rootCmd.AddCommand(webCmd)
 }
 
 // Helper functions

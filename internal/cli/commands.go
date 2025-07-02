@@ -3650,9 +3650,6 @@ func initializeCommands() {
 	// Add collaboration commands
 	AddCollaborationCommands(rootCmd, logger.NewLogger())
 
-	// Add web interface commands
-	AddWebInterfaceCommands(rootCmd, logger.NewLogger())
-
 	// Add fleet management commands
 	cfg, err := config.LoadUserConfig()
 	if err == nil {
@@ -3689,13 +3686,6 @@ func initializeCommands() {
 	rootCmd.AddCommand(mcpServerCmd)
 	rootCmd.AddCommand(neovimSetupCmd)
 	rootCmd.AddCommand(packageRepoCmd)
-
-	// Add web dashboard command (reuse existing cfg and err from above)
-	if err == nil {
-		log := logger.NewLoggerWithLevel(cfg.LogLevel)
-		webCommands := NewWebCommands(log, nil) // TODO: Add proper config
-		rootCmd.AddCommand(webCommands.CreateCommand())
-	}
 
 	commandsInitialized = true
 }

@@ -1,0 +1,63 @@
+# NixOS Template Metadata
+# This file contains metadata for all available NixOS templates
+
+templates:
+  - name: "Desktop GNOME"
+    id: "desktop-gnome"
+    file: "desktop-gnome.nix"
+    description: "Complete desktop setup with GNOME desktop environment, multimedia support, and development tools"
+    category: "Desktop"
+    tags: ["gnome", "desktop", "multimedia", "gui"]
+    nixos_version: "25.05"
+    difficulty: "beginner"
+    features:
+      - "GNOME Desktop Environment"
+      - "Audio/Video support"
+      - "Basic development tools"
+      - "Firefox & LibreOffice"
+      - "Automatic garbage collection"
+
+  - name: "Server Minimal"
+    id: "server-minimal"
+    file: "server-minimal.nix"
+    description: "Secure minimal server configuration with SSH, firewall, and basic monitoring"
+    category: "Server"
+    tags: ["server", "minimal", "security", "ssh"]
+    nixos_version: "25.05"
+    difficulty: "intermediate"
+    features:
+      - "Minimal system packages"
+      - "SSH with key authentication"
+      - "Fail2ban protection"
+      - "Firewall configuration"
+      - "Prometheus monitoring"
+
+  - name: "Development Environment"
+    id: "development"
+    file: "development.nix"
+    description: "Complete development environment with multiple languages, tools, and IDEs"
+    category: "Development"
+    tags: ["development", "programming", "ide", "docker"]
+    nixos_version: "25.05"
+    difficulty: "intermediate"
+    features:
+      - "Multiple programming languages"
+      - "Docker & containers"
+      - "VS Code & development tools"
+      - "Database servers"
+      - "Cloud tools"
+
+  - name: "Gaming Setup"
+    id: "gaming"
+    file: "gaming.nix"
+    description: "Optimized gaming configuration with Steam, graphics drivers, and performance tweaks"
+    category: "Gaming"
+    tags: ["gaming", "steam", "performance", "graphics"]
+    nixos_version: "25.05"
+    difficulty: "advanced"
+    features:
+      - "Steam & gaming platforms"
+      - "Graphics driver support"
+      - "Performance optimizations"
+      - "Discord & streaming tools"
+      - "GameMode support"

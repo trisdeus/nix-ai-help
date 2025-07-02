@@ -11,8 +11,6 @@ import (
 	"nix-ai-help/internal/fleet"
 	"nix-ai-help/internal/plugins"
 	"nix-ai-help/internal/versioning/repository"
-	"nix-ai-help/internal/web"
-	"nix-ai-help/internal/webui/config_builder"
 	"nix-ai-help/pkg/logger"
 )
 
@@ -24,8 +22,6 @@ type Service struct {
 	pluginManager *plugins.Manager
 	teamManager   *team.TeamManager
 	configRepo    *repository.ConfigRepository
-	webServer     *web.Server
-	configBuilder *config_builder.ComponentLibrary
 
 	// Integration state
 	logger  *logger.Logger
@@ -41,8 +37,6 @@ func NewService(
 	pluginManager *plugins.Manager,
 	teamManager *team.TeamManager,
 	configRepo *repository.ConfigRepository,
-	webServer *web.Server,
-	configBuilder *config_builder.ComponentLibrary,
 	logger *logger.Logger,
 ) *Service {
 	return &Service{
@@ -51,8 +45,6 @@ func NewService(
 		pluginManager: pluginManager,
 		teamManager:   teamManager,
 		configRepo:    configRepo,
-		webServer:     webServer,
-		configBuilder: configBuilder,
 		logger:        logger,
 		stopCh:        make(chan struct{}),
 	}
@@ -68,11 +60,6 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 
 	s.logger.Info("Starting nixai integration service")
-
-	// Start web server
-	if err := s.webServer.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start web server: %w", err)
-	}
 
 	// Start fleet monitoring
 	fleetMonitor := fleet.NewMonitor(s.fleetManager)
@@ -107,7 +94,6 @@ func (s *Service) Stop(ctx context.Context) error {
 	close(s.stopCh)
 
 	// Stop web server
-	s.webServer.Stop()
 	s.logger.Info("Web server stopped")
 
 	s.running = false

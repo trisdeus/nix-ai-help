@@ -1930,9 +1930,155 @@ func (s *Server) SetSocketPath(path string) {
 	s.socketPath = path
 }
 
+// setupWebuiRoutes configures webui routes for the MCP server
+func (s *Server) setupWebuiRoutes(mux *http.ServeMux) {
+	// Get templates directory from config or use default
+	templatesDir := "templates"
+
+	// Register webui routes
+	s.registerWebuiHandlers(mux, templatesDir)
+}
+
+// registerWebuiHandlers registers webui HTTP handlers
+func (s *Server) registerWebuiHandlers(mux *http.ServeMux, templatesDir string) {
+	// Static files (embedded or from filesystem)
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("internal/webui/static/"))))
+
+	// API endpoints
+	mux.HandleFunc("/api/templates", s.handleTemplatesAPI)
+	mux.HandleFunc("/api/generate", s.handleGenerateConfig)
+	mux.HandleFunc("/api/health", s.handleWebuiHealth)
+
+	// HTML pages
+	mux.HandleFunc("/builder", s.handleBuilderPage)
+	mux.HandleFunc("/builder/", s.handleBuilderPage)
+
+	// Root redirect to builder
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/builder", http.StatusFound)
+			return
+		}
+		// Let other handlers handle non-root paths
+		http.NotFound(w, r)
+	})
+}
+
+// handleTemplatesAPI serves the list of templates as JSON
+func (s *Server) handleTemplatesAPI(w http.ResponseWriter, r *http.Request) {
+	// Simple template response for now - could be enhanced to read from filesystem
+	templates := []map[string]string{
+		{
+			"name":        "SSH Service",
+			"description": "Enable SSH daemon for remote access",
+			"file":        "services.openssh = {\n  enable = true;\n  settings.PasswordAuthentication = false;\n};",
+		},
+		{
+			"name":        "Nginx Web Server",
+			"description": "HTTP/HTTPS web server",
+			"file":        "services.nginx = {\n  enable = true;\n  virtualHosts.\"example.com\" = {\n    enableACME = true;\n    forceSSL = true;\n  };\n};",
+		},
+		{
+			"name":        "Docker Service",
+			"description": "Container runtime",
+			"file":        "virtualisation.docker = {\n  enable = true;\n  enableOnBoot = true;\n};",
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(templates); err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to encode templates response: %v", err))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+// handleGenerateConfig handles configuration generation from visual components
+func (s *Server) handleGenerateConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// This would parse the component layout and generate NixOS config
+	// For now, return a simple response
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{
+		"config": "# Generated NixOS configuration\n# TODO: Implement config generation logic\n{ config, pkgs, ... }:\n{\n  # Add your configuration here\n}",
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Error(fmt.Sprintf("Failed to encode config generation response: %v", err))
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+// handleWebuiHealth provides a health check endpoint for webui
+func (s *Server) handleWebuiHealth(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]string{
+		"status":  "healthy",
+		"service": "nixai-webui",
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.logger.Error("Failed to encode webui health response", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+// handleBuilderPage serves the main visual configuration builder page
+func (s *Server) handleBuilderPage(w http.ResponseWriter, r *http.Request) {
+	// For now, serve a simple HTML response
+	// In production, this would read from embedded files or filesystem
+	html := `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NixAI Visual Configuration Builder</title>
+    <link rel="stylesheet" href="/static/css/builder.css">
+</head>
+<body>
+    <div id="app-container">
+        <h1>NixAI Visual Configuration Builder</h1>
+
+        <div id="component-library">
+            <h2>Components</h2>
+            <div id="component-list">
+                <!-- Components will be loaded via JavaScript -->
+            </div>
+        </div>
+
+        <div id="builder-canvas">
+            <h2>Configuration Canvas</h2>
+            <div id="canvas-area">
+                <!-- Drag components here -->
+            </div>
+        </div>
+
+        <div id="config-preview">
+            <h2>Generated Configuration</h2>
+            <pre id="nix-config-output"># NixOS configuration will appear here</pre>
+            <button id="export-btn">Export NixOS Config</button>
+        </div>
+    </div>
+
+    <script src="/static/js/config-builder.js"></script>
+</body>
+</html>`
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if _, err := w.Write([]byte(html)); err != nil {
+		s.logger.Error("Failed to write builder page response", "error", err)
+	}
+}
+
 // Start initializes and starts the MCP server with graceful shutdown support.
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
+
+	// Add webui routes first
+	s.setupWebuiRoutes(mux)
+
 	mux.HandleFunc("/query", s.handleQuery)
 
 	// Improved /healthz endpoint

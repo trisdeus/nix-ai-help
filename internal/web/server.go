@@ -1,281 +1,36 @@
 package web
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
-	"sync"
-	"time"
+	"path/filepath"
 
-	"nix-ai-help/internal/ai"
-	"nix-ai-help/internal/collaboration/team"
-	"nix-ai-help/internal/fleet"
-	"nix-ai-help/internal/versioning/repository"
-	"nix-ai-help/internal/webui"
-	"nix-ai-help/pkg/logger"
-
-	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
+	webui "nix-ai-help/internal/webui"
 )
 
-// ServerConfig holds configuration for the web server
-type ServerConfig struct {
-	Port           int             `yaml:"port"`
-	Host           string          `yaml:"host"`
-	StaticDir      string          `yaml:"static_dir"`
-	TemplateDir    string          `yaml:"template_dir"`
-	Authentication AuthConfig      `yaml:"authentication"`
-	TLS            TLSConfig       `yaml:"tls"`
-	CORS           CORSConfig      `yaml:"cors"`
-	RateLimit      RateLimitConfig `yaml:"rate_limit"`
-	Features       FeatureConfig   `yaml:"features"`
-}
+// DefaultPort is the default port for the web server
+const DefaultPort = 34567
 
-type AuthConfig struct {
-	Enabled        bool     `yaml:"enabled"`
-	SessionTimeout string   `yaml:"session_timeout"`
-	Providers      []string `yaml:"providers"`
-	JWTSecret      string   `yaml:"jwt_secret"`
-}
-
-type TLSConfig struct {
-	Enabled  bool   `yaml:"enabled"`
-	CertFile string `yaml:"cert_file"`
-	KeyFile  string `yaml:"key_file"`
-}
-
-type CORSConfig struct {
-	AllowedOrigins []string `yaml:"allowed_origins"`
-	AllowedMethods []string `yaml:"allowed_methods"`
-	AllowedHeaders []string `yaml:"allowed_headers"`
-}
-
-type RateLimitConfig struct {
-	Enabled bool `yaml:"enabled"`
-	RPM     int  `yaml:"rpm"`
-}
-
-type FeatureConfig struct {
-	VisualBuilder   bool `yaml:"visual_builder"`
-	FleetManagement bool `yaml:"fleet_management"`
-	Collaboration   bool `yaml:"collaboration"`
-	VersionControl  bool `yaml:"version_control"`
-	AIGeneration    bool `yaml:"ai_generation"`
-	Dashboard       bool `yaml:"dashboard"`
-}
-
-// Session represents a user session
-type Session struct {
-	ID        string                 `json:"id"`
-	UserID    string                 `json:"user_id"`
-	Username  string                 `json:"username"`
-	Role      string                 `json:"role"`
-	Teams     []string               `json:"teams"`
-	Data      map[string]interface{} `json:"data"`
-	ExpiresAt time.Time              `json:"expires_at"`
-}
-
-// Server represents the web server for nixai
-type Server struct {
-	config        *ServerConfig
-	router        *mux.Router
-	teamManager   *team.TeamManager
-	configRepo    *repository.ConfigRepository
-	fleetManager  *fleet.FleetManager
-	configBuilder *webui.ConfigBuilderAPI
-	aiProvider    ai.AIProvider
-	logger        *logger.Logger
-
-	// WebSocket management
-	upgrader      websocket.Upgrader
-	wsConnections map[string]*websocket.Conn
-	wsMutex       sync.RWMutex
-
-	// Session management
-	sessions     map[string]*Session
-	sessionMutex sync.RWMutex
-
-	// Shutdown
-	shutdownChan chan bool
-	httpServer   *http.Server
-}
-
-// NewServer creates a new web server with enhanced functionality
-func NewServer(config *ServerConfig, teamManager *team.TeamManager, configRepo *repository.ConfigRepository, fleetManager *fleet.FleetManager, logger *logger.Logger) (*Server, error) {
-	// Initialize configuration builder API
-	configBuilder, err := webui.NewConfigBuilderAPI(fleetManager, logger)
-	if err != nil {
-		logger.Warn(fmt.Sprintf("Failed to initialize config builder: %v", err))
-		configBuilder = nil
+// StartServer starts the web server for the visual configuration builder
+func StartServer(addr string, templatesDir string, staticDir string) {
+	if addr == "" {
+		addr = fmt.Sprintf(":%d", DefaultPort)
 	}
+	mux := http.NewServeMux()
 
-	server := &Server{
-		config:        config,
-		teamManager:   teamManager,
-		configRepo:    configRepo,
-		fleetManager:  fleetManager,
-		configBuilder: configBuilder,
-		logger:        logger,
-		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				// TODO: Implement proper CORS checking
-				return true
-			},
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-		},
-		wsConnections: make(map[string]*websocket.Conn),
-		sessions:      make(map[string]*Session),
-		shutdownChan:  make(chan bool, 1),
-	}
+	// Serve static files (JS, CSS)
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticDir))))
 
-	// Initialize router
-	server.router = mux.NewRouter()
-	server.setupRoutes()
+	// Register REST API endpoints
+	webui.RegisterAPI(mux, templatesDir)
 
-	return server, nil
-}
+	// Serve builder UI
+	mux.HandleFunc("/builder", func(w http.ResponseWriter, r *http.Request) {
+		tmplPath := filepath.Join(templatesDir, "builder.html")
+		http.ServeFile(w, r, tmplPath)
+	})
 
-// Start starts the web server
-func (s *Server) Start(ctx context.Context) error {
-	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
-
-	s.httpServer = &http.Server{
-		Addr:         addr,
-		Handler:      s.router,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
-
-	s.logger.Info(fmt.Sprintf("Starting web server on %s", addr))
-
-	// Start the server and block until it's shut down
-	var err error
-	if s.config.TLS.Enabled && s.config.TLS.CertFile != "" && s.config.TLS.KeyFile != "" {
-		err = s.httpServer.ListenAndServeTLS(s.config.TLS.CertFile, s.config.TLS.KeyFile)
-	} else {
-		err = s.httpServer.ListenAndServe()
-	}
-
-	if err != nil && err != http.ErrServerClosed {
-		s.logger.Error(fmt.Sprintf("Web server error: %v", err))
-		return err
-	}
-
-	return nil
-}
-
-// Stop gracefully stops the web server
-func (s *Server) Stop() {
-	if s.httpServer == nil {
-		return
-	}
-
-	s.logger.Info("Stopping web server...")
-
-	// Close all WebSocket connections
-	s.wsMutex.Lock()
-	for _, conn := range s.wsConnections {
-		conn.Close()
-	}
-	s.wsConnections = make(map[string]*websocket.Conn)
-	s.wsMutex.Unlock()
-
-	// Shutdown the HTTP server with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := s.httpServer.Shutdown(ctx); err != nil {
-		s.logger.Error(fmt.Sprintf("Error shutting down web server: %v", err))
-	} else {
-		s.logger.Info("Web server stopped gracefully")
-	}
-}
-
-// setupRoutes initializes the HTTP routes
-func (s *Server) setupRoutes() {
-	// Serve static files
-	if s.config.StaticDir != "" {
-		fs := http.FileServer(http.Dir(s.config.StaticDir))
-		s.router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
-	}
-
-	// Basic routes - these will be enhanced by EnhancedServer
-	s.router.HandleFunc("/", s.handleIndex).Methods("GET")
-}
-
-// handleIndex provides a basic index page
-func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>NixAI Web Interface</title>
-</head>
-<body>
-    <h1>NixAI Web Interface</h1>
-    <p>Welcome to the NixAI web interface. This is the basic server implementation.</p>
-    <p>For enhanced features, use the EnhancedServer.</p>
-</body>
-</html>
-`)
-}
-
-// Helper methods for Server
-
-// sendJSON sends raw JSON data
-func (s *Server) sendJSON(w http.ResponseWriter, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		s.logger.Error(fmt.Sprintf("Failed to encode JSON response: %v", err))
-	}
-}
-
-// sendError sends an error JSON response
-func (s *Server) sendError(w http.ResponseWriter, message string, code int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.WriteHeader(code)
-
-	response := map[string]interface{}{
-		"success": false,
-		"error":   message,
-	}
-
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Error(fmt.Sprintf("Failed to encode error response: %v", err))
-	}
-}
-
-// renderTemplate provides a basic template rendering (placeholder)
-func (s *Server) renderTemplate(w http.ResponseWriter, templateName string, data map[string]interface{}) {
-	// Basic fallback - just return a simple HTML page
-	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, `
-<!DOCTYPE html>
-<html>
-<head>
-    <title>NixAI - %s</title>
-</head>
-<body>
-    <h1>NixAI Basic Server</h1>
-    <p>Template: %s</p>
-    <p>This is the basic server implementation. For enhanced features, use the EnhancedServer.</p>
-</body>
-</html>
-`, data["Title"], templateName)
-}
-
-// getServiceStatus returns a service status string
-func (s *Server) getServiceStatus(available bool) string {
-	if available {
-		return "healthy"
-	}
-	return "unavailable"
+	fmt.Printf("Web UI available at http://localhost%s/builder\n", addr)
+	log.Fatal(http.ListenAndServe(addr, mux))
 }
