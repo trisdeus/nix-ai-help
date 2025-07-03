@@ -63,9 +63,36 @@
 
 ## 🎮 Modern TUI Experience
 
-The newly modernized Terminal User Interface provides a professional, accessible experience:
+nixai offers two powerful TUI interfaces to suit different preferences:
 
-### 🖥️ Interface Layout
+### 🚀 **Claude Code-Style Interface** (Default: `nixai tui`)
+
+A modern, streamlined interface inspired by Claude Code with a command-focused design:
+
+```text
+┌─ nixai TUI ─────────────────────────────────────────────────────────────────┐
+│                                                                            │
+│ Welcome to nixai! Type commands below and see results above.               │
+│                                                                            │
+│ Available commands: ask, search, explain-option, hardware, build, ...     │
+│ Type 'help' for command list or 'exit' to quit.                          │
+│                                                                            │
+│ > ask "How do I configure nginx in NixOS?"                               │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+nixai v2.0.1 | Type commands and press Enter | ↑↓ for history | Tab for completion
+```
+
+**Features:**
+- **Command-line style input** with tab completion
+- **Command history** navigation with ↑↓ arrows  
+- **Real-time suggestions** and auto-completion
+- **Live output display** above the command input
+- **Clean, minimalist design** focused on efficiency
+
+### 📋 **Classic Menu Interface** (`nixai tui --classic`)
+
+Traditional menu-based interface for browsing and discovery:
 
 ```text
 ┌─ Commands (40+ total) ─────────────┬─ Execution Panel ─────────────────┐
@@ -85,6 +112,13 @@ The newly modernized Terminal User Interface provides a professional, accessible
 └────────────────────────────────────┴───────────────────────────────────┘
 Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.1
 ```
+
+**Features:**
+- **Two-panel layout** with command browser and execution area
+- **Command discovery** through browsing and filtering
+- **Interactive parameter input** for complex commands
+- **Tab switching** between panels
+- **Visual command organization** with descriptions
 
 ### ✨ Key TUI Features
 
@@ -412,7 +446,7 @@ Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.
 - **Community Resources**: `nixai community` for NixOS community links, forums, and support channels
 - **MCP Server Integration**: `nixai mcp-server` for Model Context Protocol integration with editors and IDEs
 - **Neovim Integration**: `nixai neovim-setup` for seamless editor integration with AI-powered assistance
-- **Interactive Shell**: `nixai interactive` with modern TUI for guided assistance and command exploration
+- **Modern TUI Interface**: `nixai tui` with Claude Code-style interface for guided assistance and command exploration
 - **Configuration Sharing**: Community templates and snippets for common use cases
 - **Documentation Contributions**: User-contributed guides and best practices
 
@@ -420,7 +454,7 @@ Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.
 
 - **Beautiful Terminal Output**: Colorized, formatted output with syntax highlighting via glamour
 - **Modern TUI Interface**: Professional two-panel layout with real-time command execution
-- **Interactive & CLI Modes**: Use interactively via TUI or directly via CLI, with piped input support
+- **TUI & CLI Modes**: Use via modern TUI interface or directly via CLI, with piped input support
 - **Progress Indicators**: Real-time feedback during API calls and long-running operations
 - **Role & Agent Selection**: `--role` and `--agent` flags for specialized behavior and expertise
 - **Intelligent Help System**: Context-aware help and feature discovery with ? changelog popup
@@ -787,8 +821,8 @@ nixai doctor  # Includes provider health checks
 **Launch the modern TUI interface:**
 
 ```zsh
-nixai interactive                               # Modern TUI with full navigation
-nixai interactive --classic                    # Classic text-based interactive mode
+nixai tui                                      # Modern Claude Code-style TUI interface
+nixai tui --classic                           # Classic menu-based TUI interface
 ```
 
 **Ask questions with intelligent AI assistance:**
@@ -946,8 +980,8 @@ nixai machines show my-machine --role system-architect
 **Advanced features:**
 
 ```zsh
-nixai interactive                               # Launch modern TUI interface
-nixai interactive --classic                    # Classic interactive mode
+nixai tui                                      # Launch modern Claude Code-style TUI
+nixai tui --classic                           # Launch classic menu-based TUI
 nixai gc analyze                               # AI-powered garbage collection
 nixai store backup                             # Nix store management
 nixai community                                # Access community resources
@@ -1140,7 +1174,7 @@ nix build --rebuild
 - **Hardware detection issues**: Ensure you have appropriate permissions for hardware access
 - **AI provider failures**: Verify Ollama is running (`ollama list`) or check API keys for cloud providers
 - **TUI display issues**: Ensure your terminal supports Unicode and has sufficient size (80x24 minimum)
-- **Interactive mode problems**: Try `nixai interactive --classic` for compatibility with older terminals
+- **TUI display problems**: Try `nixai tui --classic` for compatibility with older terminals
 - **Context detection problems**: Use `nixai context status` to check system health, or `nixai context reset` to force refresh
 - **Outdated context information**: Run `nixai context detect` after major system configuration changes
 
@@ -1179,7 +1213,7 @@ nixai --version              # Should show "nixai version 2.0.1"
 nixai doctor                 # Run comprehensive health check
 nixai hardware detect       # Test hardware detection
 nixai -a "test question"     # Test AI functionality
-nixai interactive           # Launch modern TUI interface
+nixai tui                   # Launch modern TUI interface
 ```
 
 ### Latest Features Verification
