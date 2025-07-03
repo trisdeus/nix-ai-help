@@ -123,9 +123,19 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive documentation
 - Nix (with flakes enabled)
 - git
 
-**1. Build and run directly:**
+**1. Run directly (no installation required):**
 
 ```zsh
+# Run latest version from GitHub
+nix run github:olafkfreund/nix-ai-help
+
+# Ask a question directly
+nix run github:olafkfreund/nix-ai-help -- --ask "how do I configure nginx?"
+
+# Use specific AI provider
+nix run github:olafkfreund/nix-ai-help -- --provider ollama --ask "configure firewall"
+
+# Show help
 nix run github:olafkfreund/nix-ai-help -- --help
 ```
 

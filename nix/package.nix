@@ -34,8 +34,9 @@ in
 
     src = sourceToUse;
 
-    vendorHash = "sha256-es3/iGMpxRKoBmsICU3DqS8g629OWXYEXH4KaajQ+Ds=";
+    vendorHash = "sha256-bVqCgB5YOxGSoCysT6NrdBIUJc3TiOaswI33whGFtCc=";
     doCheck = false;
+    proxyVendor = true;
 
     subPackages = ["cmd/nixai"];
 
@@ -76,6 +77,9 @@ in
     '';
 
     nativeBuildInputs = [installShellFiles];
+
+    # Force use of modules instead of vendor directory
+    buildFlagsArray = ["-mod=readonly"];
 
     ldflags = let
       versionString = version; # Always use the version parameter
