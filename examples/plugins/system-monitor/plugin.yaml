@@ -1,0 +1,239 @@
+name: system-monitor
+version: 1.0.0
+description: "Real-time system monitoring and alerting plugin for NixAI"
+author: "NixAI Team"
+repository: "https://github.com/nixai/plugins/system-monitor"
+license: "MIT"
+homepage: "https://nixai.dev/plugins/system-monitor"
+documentation: "https://docs.nixai.dev/plugins/system-monitor"
+
+keywords:
+  - monitoring
+  - system
+  - alerts
+  - performance
+  - health
+  - metrics
+
+categories:
+  - monitoring
+  - system-administration
+  - diagnostics
+
+capabilities:
+  - system-monitoring
+  - resource-tracking
+  - alerting
+  - health-checks
+
+min_nixai_version: "0.1.0"
+
+supported_os:
+  - linux
+  - darwin
+
+dependencies: []
+
+configuration_schema:
+  type: object
+  properties:
+    monitoring_interval:
+      type: integer
+      default: 30
+      description: "Monitoring interval in seconds"
+      minimum: 10
+      maximum: 300
+    
+    thresholds:
+      type: object
+      properties:
+        cpu_warning:
+          type: number
+          default: 70.0
+          minimum: 0
+          maximum: 100
+          description: "CPU usage warning threshold (%)"
+        
+        cpu_critical:
+          type: number
+          default: 90.0
+          minimum: 0
+          maximum: 100
+          description: "CPU usage critical threshold (%)"
+        
+        memory_warning:
+          type: number
+          default: 80.0
+          minimum: 0
+          maximum: 100
+          description: "Memory usage warning threshold (%)"
+        
+        memory_critical:
+          type: number
+          default: 95.0
+          minimum: 0
+          maximum: 100
+          description: "Memory usage critical threshold (%)"
+        
+        disk_warning:
+          type: number
+          default: 85.0
+          minimum: 0
+          maximum: 100
+          description: "Disk usage warning threshold (%)"
+        
+        disk_critical:
+          type: number
+          default: 95.0
+          minimum: 0
+          maximum: 100
+          description: "Disk usage critical threshold (%)"
+        
+        temp_warning:
+          type: number
+          default: 70.0
+          minimum: 0
+          maximum: 150
+          description: "Temperature warning threshold (°C)"
+        
+        temp_critical:
+          type: number
+          default: 85.0
+          minimum: 0
+          maximum: 150
+          description: "Temperature critical threshold (°C)"
+    
+    alerts:
+      type: object
+      properties:
+        enable_notifications:
+          type: boolean
+          default: true
+          description: "Enable desktop notifications for alerts"
+        
+        notification_levels:
+          type: array
+          items:
+            type: string
+            enum: ["warning", "critical"]
+          default: ["critical"]
+          description: "Which alert levels trigger notifications"
+        
+        max_alerts:
+          type: integer
+          default: 100
+          minimum: 10
+          maximum: 1000
+          description: "Maximum number of alerts to keep in history"
+    
+    metrics:
+      type: object
+      properties:
+        collect_network:
+          type: boolean
+          default: true
+          description: "Collect network statistics"
+        
+        collect_temperature:
+          type: boolean
+          default: true
+          description: "Collect temperature data"
+        
+        collect_processes:
+          type: boolean
+          default: false
+          description: "Collect detailed process information"
+
+security:
+  sandbox_level: basic
+  allow_file_system: true
+  allow_network: false
+  allow_system_calls: false
+  allowed_paths:
+    - "/proc"
+    - "/sys"
+    - "/tmp"
+  required_permissions:
+    - "read:system-info"
+    - "read:process-info"
+
+resources:
+  max_memory_mb: 64
+  max_cpu_percent: 5
+  max_execution_time: "30s"
+  max_file_size: 1048576
+
+update_policy:
+  auto_update: false
+  update_channel: "stable"
+  check_interval: "24h"
+  require_approval: true
+  backup_before_update: true
+
+operations:
+  get-metrics:
+    description: "Get current system metrics"
+    parameters: {}
+    returns:
+      type: object
+      description: "Current system metrics"
+    
+  get-alerts:
+    description: "Get system alerts"
+    parameters:
+      level:
+        type: string
+        enum: ["warning", "critical"]
+        required: false
+        description: "Filter alerts by level"
+    returns:
+      type: array
+      description: "List of system alerts"
+    
+  health-check:
+    description: "Perform comprehensive system health check"
+    parameters: {}
+    returns:
+      type: object
+      description: "Comprehensive health report"
+    
+  set-thresholds:
+    description: "Update alert thresholds"
+    parameters:
+      thresholds:
+        type: object
+        required: true
+        description: "Threshold configuration object"
+    returns:
+      type: boolean
+      description: "Success status"
+    
+  get-thresholds:
+    description: "Get current alert thresholds"
+    parameters: {}
+    returns:
+      type: object
+      description: "Current threshold configuration"
+
+examples:
+  - name: "Basic monitoring"
+    description: "Get current system metrics"
+    command: "nixai plugin execute system-monitor get-metrics"
+    
+  - name: "Health check"
+    description: "Run comprehensive health check"
+    command: "nixai plugin execute system-monitor health-check"
+    
+  - name: "View critical alerts"
+    description: "Get only critical alerts"
+    command: "nixai plugin execute system-monitor get-alerts '{\"level\": \"critical\"}'"
+    
+  - name: "Update thresholds"
+    description: "Set custom alert thresholds"
+    command: "nixai plugin execute system-monitor set-thresholds '{\"thresholds\": {\"cpu_warning\": 60.0, \"memory_warning\": 75.0}}'"
+
+screenshots: []
+
+created_at: "2024-01-01T00:00:00Z"
+updated_at: "2024-01-01T00:00:00Z"
+verified: true

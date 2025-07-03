@@ -25,6 +25,7 @@ import (
 	"nix-ai-help/internal/neovim"
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/internal/packaging"
+	"nix-ai-help/internal/plugins"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 	"nix-ai-help/pkg/version"
@@ -3646,6 +3647,8 @@ func initializeCommands() {
 	// Revolutionary features from Phase 3.3
 	// Add version control commands
 	AddVersioningCommands(rootCmd, logger.NewLogger())
+	AddWebCommands(rootCmd, logger.NewLogger())
+	AddTUICommands(rootCmd, logger.NewLogger())
 
 	// Add collaboration commands
 	AddCollaborationCommands(rootCmd, logger.NewLogger())
@@ -3666,12 +3669,27 @@ func initializeCommands() {
 		rootCmd.AddCommand(integrationCommands.CreateCommand())
 	}
 
-	// Plugin system
+	// Plugin system with integrated commands
 	cfg, err = config.LoadUserConfig()
 	if err == nil {
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
+		
+		// Create traditional plugin CLI manager
 		pluginManager := NewPluginCLIManager(cfg, log)
 		rootCmd.AddCommand(pluginManager.CreatePluginCommands())
+		
+		// Initialize simple plugin integration for our built-in commands
+		pluginIntegration := plugins.NewSimplePluginIntegration(rootCmd, cfg, log)
+		
+		// Initialize in background
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			
+			if err := pluginIntegration.Initialize(ctx); err != nil {
+				log.Error(fmt.Sprintf("Plugin integration failed: %v", err))
+			}
+		}()
 	}
 
 	// Register stub commands for missing features
@@ -3686,6 +3704,8 @@ func initializeCommands() {
 	rootCmd.AddCommand(mcpServerCmd)
 	rootCmd.AddCommand(neovimSetupCmd)
 	rootCmd.AddCommand(packageRepoCmd)
+	rootCmd.AddCommand(CreateSystemInfoCommand())
+	rootCmd.AddCommand(CreatePackageMonitorCommand())
 
 	commandsInitialized = true
 }

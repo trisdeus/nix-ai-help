@@ -1,0 +1,407 @@
+name: dev-environment
+version: 1.0.0
+description: "AI-powered development environment management with intelligent project analysis and template generation"
+author: "NixAI Team"
+repository: "https://github.com/nixai/plugins/dev-environment"
+license: "MIT"
+homepage: "https://nixai.dev/plugins/dev-environment"
+documentation: "https://docs.nixai.dev/plugins/dev-environment"
+
+keywords:
+  - development
+  - environment
+  - setup
+  - templates
+  - project-analysis
+  - automation
+
+categories:
+  - development-tools
+  - project-management
+  - automation
+  - templates
+
+capabilities:
+  - environment-management
+  - template-generation
+  - dependency-resolution
+  - project-analysis
+  - automated-setup
+  - health-monitoring
+
+min_nixai_version: "0.1.0"
+
+supported_os:
+  - linux
+  - darwin
+
+dependencies:
+  - nix
+  - direnv
+  - git
+
+configuration_schema:
+  type: object
+  properties:
+    default_settings:
+      type: object
+      properties:
+        auto_activate:
+          type: boolean
+          default: true
+          description: "Automatically activate environments when entering project directories"
+        
+        template_source:
+          type: string
+          default: "builtin"
+          enum: ["builtin", "remote", "local"]
+          description: "Source for environment templates"
+        
+        backup_on_delete:
+          type: boolean
+          default: true
+          description: "Automatically backup environments before deletion"
+        
+        health_check_interval:
+          type: string
+          default: "24h"
+          description: "Interval for automatic health checks"
+          pattern: "^[0-9]+(s|m|h|d)$"
+    
+    languages:
+      type: object
+      properties:
+        go:
+          type: object
+          properties:
+            default_version:
+              type: string
+              default: "latest"
+              description: "Default Go version for new environments"
+            enable_modules:
+              type: boolean
+              default: true
+              description: "Enable Go modules by default"
+        
+        python:
+          type: object
+          properties:
+            default_version:
+              type: string
+              default: "3.11"
+              enum: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+              description: "Default Python version"
+            package_manager:
+              type: string
+              default: "pip"
+              enum: ["pip", "poetry", "pipenv"]
+              description: "Default Python package manager"
+        
+        nodejs:
+          type: object
+          properties:
+            default_version:
+              type: string
+              default: "18"
+              enum: ["16", "18", "20", "latest"]
+              description: "Default Node.js version"
+            package_manager:
+              type: string
+              default: "npm"
+              enum: ["npm", "yarn", "pnpm"]
+              description: "Default Node.js package manager"
+        
+        rust:
+          type: object
+          properties:
+            default_channel:
+              type: string
+              default: "stable"
+              enum: ["stable", "beta", "nightly"]
+              description: "Default Rust channel"
+    
+    templates:
+      type: object
+      properties:
+        auto_detect:
+          type: boolean
+          default: true
+          description: "Automatically detect project type and suggest templates"
+        
+        custom_template_path:
+          type: string
+          description: "Path to custom template directory"
+        
+        template_cache_duration:
+          type: string
+          default: "1h"
+          description: "How long to cache template information"
+          pattern: "^[0-9]+(s|m|h|d)$"
+    
+    integrations:
+      type: object
+      properties:
+        vscode:
+          type: object
+          properties:
+            generate_config:
+              type: boolean
+              default: true
+              description: "Generate VS Code configuration files"
+            extensions:
+              type: array
+              items:
+                type: string
+              default: []
+              description: "Default VS Code extensions to recommend"
+        
+        jetbrains:
+          type: object
+          properties:
+            generate_config:
+              type: boolean
+              default: false
+              description: "Generate JetBrains IDE configuration"
+        
+        docker:
+          type: object
+          properties:
+            auto_dockerfile:
+              type: boolean
+              default: false
+              description: "Automatically generate Dockerfile"
+            compose_integration:
+              type: boolean
+              default: true
+              description: "Generate docker-compose.yml for services"
+
+security:
+  sandbox_level: basic
+  allow_file_system: true
+  allow_network: true
+  allow_system_calls: true
+  allowed_paths:
+    - "/nix"
+    - "/home"
+    - "/tmp"
+  required_permissions:
+    - "read:project-files"
+    - "write:project-files"
+    - "execute:nix-commands"
+    - "execute:git-commands"
+
+resources:
+  max_memory_mb: 256
+  max_cpu_percent: 20
+  max_execution_time: "5m"
+  max_file_size: 52428800
+
+update_policy:
+  auto_update: true
+  update_channel: "stable"
+  check_interval: "24h"
+  require_approval: false
+  backup_before_update: true
+
+operations:
+  list-environments:
+    description: "List all development environments with optional filtering"
+    parameters:
+      type:
+        type: string
+        enum: ["go", "python", "nodejs", "rust", "java", "cpp"]
+        required: false
+        description: "Filter environments by type"
+      status:
+        type: string
+        enum: ["active", "inactive", "broken"]
+        required: false
+        description: "Filter environments by status"
+    returns:
+      type: array
+      description: "List of development environments"
+    
+  create-environment:
+    description: "Create a new development environment"
+    parameters:
+      name:
+        type: string
+        required: true
+        minLength: 1
+        maxLength: 100
+        description: "Environment name"
+      type:
+        type: string
+        enum: ["go", "python", "nodejs", "rust", "java", "cpp"]
+        required: true
+        description: "Environment type"
+      path:
+        type: string
+        required: true
+        description: "Project path"
+      template:
+        type: string
+        required: false
+        description: "Template to use (optional)"
+    returns:
+      type: object
+      description: "Created environment details"
+    
+  delete-environment:
+    description: "Delete a development environment"
+    parameters:
+      environment_id:
+        type: string
+        required: true
+        description: "Environment ID to delete"
+    returns:
+      type: boolean
+      description: "Success status"
+    
+  activate-environment:
+    description: "Activate a development environment"
+    parameters:
+      environment_id:
+        type: string
+        required: true
+        description: "Environment ID to activate"
+    returns:
+      type: object
+      description: "Activation details and instructions"
+    
+  deactivate-environment:
+    description: "Deactivate a development environment"
+    parameters:
+      environment_id:
+        type: string
+        required: true
+        description: "Environment ID to deactivate"
+    returns:
+      type: object
+      description: "Deactivation status"
+    
+  list-templates:
+    description: "List available environment templates"
+    parameters:
+      category:
+        type: string
+        enum: ["web", "mobile", "data", "ml", "cli", "api"]
+        required: false
+        description: "Filter templates by category"
+    returns:
+      type: array
+      description: "List of available templates"
+    
+  create-from-template:
+    description: "Create environment from template"
+    parameters:
+      template_id:
+        type: string
+        required: true
+        description: "Template ID to use"
+      name:
+        type: string
+        required: true
+        minLength: 1
+        maxLength: 100
+        description: "Environment name"
+      path:
+        type: string
+        required: true
+        description: "Project path"
+    returns:
+      type: object
+      description: "Created environment details"
+    
+  analyze-project:
+    description: "Analyze existing project structure and dependencies"
+    parameters:
+      path:
+        type: string
+        required: true
+        description: "Project path to analyze"
+    returns:
+      type: object
+      description: "Project analysis results"
+    
+  suggest-environment:
+    description: "Get AI-powered environment suggestions for a project"
+    parameters:
+      path:
+        type: string
+        required: true
+        description: "Project path to analyze"
+    returns:
+      type: object
+      description: "Analysis and environment suggestions"
+    
+  health-check:
+    description: "Check environment health and dependencies"
+    parameters:
+      environment_id:
+        type: string
+        required: false
+        description: "Specific environment to check (optional for system-wide check)"
+    returns:
+      type: object
+      description: "Health check results"
+    
+  update-dependencies:
+    description: "Update environment dependencies"
+    parameters:
+      environment_id:
+        type: string
+        required: true
+        description: "Environment ID to update"
+    returns:
+      type: object
+      description: "Update results and status"
+    
+  backup-environment:
+    description: "Create backup of environment configuration"
+    parameters:
+      environment_id:
+        type: string
+        required: true
+        description: "Environment ID to backup"
+    returns:
+      type: object
+      description: "Backup details and path"
+    
+  restore-environment:
+    description: "Restore environment from backup"
+    parameters:
+      backup_path:
+        type: string
+        required: true
+        description: "Path to backup file"
+    returns:
+      type: object
+      description: "Restored environment details"
+
+examples:
+  - name: "Create Go environment"
+    description: "Set up a new Go development environment"
+    command: "nixai plugin execute dev-environment create-environment '{\"name\": \"my-go-app\", \"type\": \"go\", \"path\": \"/home/user/projects/my-go-app\"}'"
+    
+  - name: "Analyze existing project"
+    description: "Analyze project structure and get environment suggestions"
+    command: "nixai plugin execute dev-environment analyze-project '{\"path\": \"/home/user/existing-project\"}'"
+    
+  - name: "Create from template"
+    description: "Create environment using a pre-defined template"
+    command: "nixai plugin execute dev-environment create-from-template '{\"template_id\": \"python-web\", \"name\": \"my-web-app\", \"path\": \"/home/user/projects/my-web-app\"}'"
+    
+  - name: "Environment health check"
+    description: "Check the health of all development environments"
+    command: "nixai plugin execute dev-environment health-check"
+    
+  - name: "Activate environment"
+    description: "Activate a development environment for use"
+    command: "nixai plugin execute dev-environment activate-environment '{\"environment_id\": \"env-123\"}'"
+
+screenshots: []
+
+created_at: "2024-01-01T00:00:00Z"
+updated_at: "2024-01-01T00:00:00Z"
+verified: true

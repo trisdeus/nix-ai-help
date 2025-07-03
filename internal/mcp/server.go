@@ -2021,7 +2021,7 @@ func (s *Server) handleWebuiHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		s.logger.Error("Failed to encode webui health response", "error", err)
+		s.logger.Error(fmt.Sprintf("Failed to encode webui health response: %v", err))
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -2068,7 +2068,7 @@ func (s *Server) handleBuilderPage(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if _, err := w.Write([]byte(html)); err != nil {
-		s.logger.Error("Failed to write builder page response", "error", err)
+		s.logger.Error(fmt.Sprintf("Failed to write builder page response: %v", err))
 	}
 }
 

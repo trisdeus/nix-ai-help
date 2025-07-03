@@ -1,0 +1,302 @@
+name: package-updater
+version: 1.0.0
+description: "AI-powered package update management with smart scheduling and security analysis"
+author: "NixAI Team"
+repository: "https://github.com/nixai/plugins/package-updater"
+license: "MIT"
+homepage: "https://nixai.dev/plugins/package-updater"
+documentation: "https://docs.nixai.dev/plugins/package-updater"
+
+keywords:
+  - package-management
+  - updates
+  - security
+  - automation
+  - scheduling
+  - dependencies
+
+categories:
+  - package-management
+  - system-administration
+  - security
+  - automation
+
+capabilities:
+  - package-management
+  - update-scheduling
+  - security-analysis
+  - dependency-resolution
+  - rollback-support
+
+min_nixai_version: "0.1.0"
+
+supported_os:
+  - linux
+  - darwin
+
+dependencies:
+  - nix
+  - nixos-rebuild
+
+configuration_schema:
+  type: object
+  properties:
+    check_interval:
+      type: string
+      default: "6h"
+      description: "How often to check for updates"
+      pattern: "^[0-9]+(h|m|s)$"
+    
+    update_policy:
+      type: object
+      properties:
+        auto_update:
+          type: boolean
+          default: false
+          description: "Enable automatic updates"
+        
+        security_only:
+          type: boolean
+          default: false
+          description: "Only apply security updates automatically"
+        
+        allowed_categories:
+          type: array
+          items:
+            type: string
+            enum: ["security", "bugfix", "feature"]
+          default: ["security", "bugfix", "feature"]
+          description: "Categories of updates to allow"
+        
+        excluded_packages:
+          type: array
+          items:
+            type: string
+          default: []
+          description: "Packages to exclude from updates"
+        
+        max_updates_per_run:
+          type: integer
+          default: 10
+          minimum: 1
+          maximum: 100
+          description: "Maximum updates to apply in single run"
+        
+        require_approval:
+          type: boolean
+          default: true
+          description: "Require manual approval for updates"
+        
+        backup_before_update:
+          type: boolean
+          default: true
+          description: "Create backup before applying updates"
+    
+    notifications:
+      type: object
+      properties:
+        enable_desktop:
+          type: boolean
+          default: true
+          description: "Enable desktop notifications"
+        
+        enable_email:
+          type: boolean
+          default: false
+          description: "Enable email notifications"
+        
+        email_address:
+          type: string
+          format: email
+          description: "Email address for notifications"
+        
+        notification_levels:
+          type: array
+          items:
+            type: string
+            enum: ["security", "critical", "all"]
+          default: ["security", "critical"]
+          description: "What updates trigger notifications"
+    
+    rollback:
+      type: object
+      properties:
+        auto_rollback_on_failure:
+          type: boolean
+          default: true
+          description: "Automatically rollback failed updates"
+        
+        keep_rollback_generations:
+          type: integer
+          default: 5
+          minimum: 1
+          maximum: 20
+          description: "Number of generations to keep for rollback"
+        
+        test_after_update:
+          type: boolean
+          default: false
+          description: "Run tests after updates"
+
+security:
+  sandbox_level: basic
+  allow_file_system: true
+  allow_network: true
+  allow_system_calls: true
+  allowed_paths:
+    - "/nix"
+    - "/etc/nixos"
+    - "/tmp"
+  required_permissions:
+    - "read:system-packages"
+    - "write:system-packages"
+    - "execute:nix-commands"
+
+resources:
+  max_memory_mb: 128
+  max_cpu_percent: 15
+  max_execution_time: "10m"
+  max_file_size: 10485760
+
+update_policy:
+  auto_update: true
+  update_channel: "stable"
+  check_interval: "24h"
+  require_approval: false
+  backup_before_update: true
+
+operations:
+  check-updates:
+    description: "Check for available package updates"
+    parameters: {}
+    returns:
+      type: object
+      description: "Update summary with available packages"
+    
+  list-updates:
+    description: "List available updates with filtering options"
+    parameters:
+      category:
+        type: string
+        enum: ["security", "bugfix", "feature"]
+        required: false
+        description: "Filter by update category"
+      priority:
+        type: string
+        enum: ["critical", "high", "medium", "low"]
+        required: false
+        description: "Filter by priority level"
+    returns:
+      type: array
+      description: "List of available package updates"
+    
+  create-update-plan:
+    description: "Create intelligent update plan with AI analysis"
+    parameters:
+      include_breaking:
+        type: boolean
+        required: false
+        default: false
+        description: "Include updates with breaking changes"
+    returns:
+      type: object
+      description: "Comprehensive update plan with recommendations"
+    
+  apply-updates:
+    description: "Apply selected package updates"
+    parameters:
+      packages:
+        type: array
+        items:
+          type: string
+        required: false
+        description: "Specific packages to update"
+      dry_run:
+        type: boolean
+        required: false
+        default: false
+        description: "Simulate updates without applying"
+    returns:
+      type: object
+      description: "Update results and status"
+    
+  get-update-history:
+    description: "Retrieve package update history"
+    parameters:
+      limit:
+        type: integer
+        required: false
+        default: 50
+        minimum: 1
+        maximum: 1000
+        description: "Maximum records to return"
+    returns:
+      type: array
+      description: "Historical update records"
+    
+  analyze-package:
+    description: "Analyze specific package for update details"
+    parameters:
+      package_name:
+        type: string
+        required: true
+        description: "Name of package to analyze"
+    returns:
+      type: object
+      description: "Detailed package analysis"
+    
+  set-update-policy:
+    description: "Configure update policy settings"
+    parameters:
+      policy:
+        type: object
+        required: true
+        description: "Update policy configuration"
+    returns:
+      type: boolean
+      description: "Success status"
+    
+  get-update-policy:
+    description: "Get current update policy"
+    parameters: {}
+    returns:
+      type: object
+      description: "Current update policy settings"
+    
+  rollback-update:
+    description: "Rollback a specific package update"
+    parameters:
+      package_name:
+        type: string
+        required: true
+        description: "Package to rollback"
+    returns:
+      type: object
+      description: "Rollback status and details"
+
+examples:
+  - name: "Security updates only"
+    description: "Check and apply only security updates"
+    command: "nixai plugin execute package-updater check-updates && nixai plugin execute package-updater list-updates '{\"category\": \"security\"}'"
+    
+  - name: "Smart update plan"
+    description: "Create AI-powered update plan"
+    command: "nixai plugin execute package-updater create-update-plan"
+    
+  - name: "Dry run updates"
+    description: "Test updates without applying"
+    command: "nixai plugin execute package-updater apply-updates '{\"dry_run\": true}'"
+    
+  - name: "Specific package update"
+    description: "Update only Firefox browser"
+    command: "nixai plugin execute package-updater apply-updates '{\"packages\": [\"firefox\"]}'"
+    
+  - name: "Update history audit"
+    description: "Review recent update history"
+    command: "nixai plugin execute package-updater get-update-history '{\"limit\": 20}'"
+
+screenshots: []
+
+created_at: "2024-01-01T00:00:00Z"
+updated_at: "2024-01-01T00:00:00Z"
+verified: true

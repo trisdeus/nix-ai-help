@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(./nixai:*)",
+      "Bash(grep:*)",
+      "Bash(go build:*)",
+      "Bash(curl:*)",
+      "Bash(rg:*)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(killall:*)",
+      "Bash(go get:*)",
+      "Bash(chmod:*)",
+      "Bash(/tmp/test_logo.sh:*)",
+      "Bash(timeout:*)",
+      "Bash(/dev/null)",
+      "Bash(go test:*)",
+      "Bash(go vet:*)",
+      "Bash(ls:*)",
+      "Bash(make:*)",
+      "Bash(go mod:*)",
+      "Bash(mkdir:*)",
+      "Bash(cp:*)",
+      "Bash(sudo cp:*)",
+      "Bash(rm:*)",
+      "Bash(for file in PHASE*.md IMPLEMENTATION*.md)",
+      "Bash(do mv \"$file\" docs/project-plans/)",
+      "Bash(done)",
+      "Bash(nix --extra-experimental-features 'nix-command flakes' build --no-link)",
+      "Bash(go clean:*)",
+      "Bash(nix-hash:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": []
+  }
+}

@@ -1,0 +1,364 @@
+name: service-manager
+version: 1.0.0
+description: "AI-powered systemd service management and monitoring with intelligent health analysis"
+author: "NixAI Team"
+repository: "https://github.com/nixai/plugins/service-manager"
+license: "MIT"
+homepage: "https://nixai.dev/plugins/service-manager"
+documentation: "https://docs.nixai.dev/plugins/service-manager"
+
+keywords:
+  - systemd
+  - services
+  - monitoring
+  - health-check
+  - automation
+  - management
+
+categories:
+  - system-administration
+  - monitoring
+  - service-management
+  - automation
+
+capabilities:
+  - service-management
+  - service-monitoring
+  - health-analysis
+  - log-analysis
+  - dependency-tracking
+  - performance-monitoring
+
+min_nixai_version: "0.1.0"
+
+supported_os:
+  - linux
+
+dependencies:
+  - systemctl
+  - journalctl
+
+configuration_schema:
+  type: object
+  properties:
+    monitoring:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: true
+          description: "Enable continuous service monitoring"
+        
+        interval:
+          type: string
+          default: "60s"
+          description: "Monitoring interval"
+          pattern: "^[0-9]+(s|m|h)$"
+        
+        auto_restart_failed:
+          type: boolean
+          default: false
+          description: "Automatically restart failed services"
+        
+        services_to_monitor:
+          type: array
+          items:
+            type: string
+          default: []
+          description: "Specific services to monitor (empty = all)"
+    
+    health_checks:
+      type: object
+      properties:
+        memory_threshold_mb:
+          type: number
+          default: 500.0
+          minimum: 1
+          maximum: 10000
+          description: "Memory usage threshold in MB for alerts"
+        
+        cpu_threshold_percent:
+          type: number
+          default: 80.0
+          minimum: 1
+          maximum: 100
+          description: "CPU usage threshold percentage for alerts"
+        
+        restart_count_threshold:
+          type: integer
+          default: 5
+          minimum: 1
+          maximum: 100
+          description: "Restart count threshold for alerts"
+        
+        health_score_threshold:
+          type: integer
+          default: 70
+          minimum: 0
+          maximum: 100
+          description: "Minimum health score before alerting"
+    
+    alerts:
+      type: object
+      properties:
+        enable_notifications:
+          type: boolean
+          default: true
+          description: "Enable alert notifications"
+        
+        failed_service_alerts:
+          type: boolean
+          default: true
+          description: "Alert on service failures"
+        
+        high_resource_alerts:
+          type: boolean
+          default: true
+          description: "Alert on high resource usage"
+        
+        alert_cooldown:
+          type: string
+          default: "5m"
+          description: "Minimum time between repeated alerts"
+          pattern: "^[0-9]+(s|m|h)$"
+    
+    logging:
+      type: object
+      properties:
+        log_lines_to_fetch:
+          type: integer
+          default: 50
+          minimum: 10
+          maximum: 1000
+          description: "Number of log lines to fetch by default"
+        
+        log_analysis_enabled:
+          type: boolean
+          default: true
+          description: "Enable AI-powered log analysis"
+        
+        store_log_history:
+          type: boolean
+          default: false
+          description: "Store historical log data"
+    
+    performance:
+      type: object
+      properties:
+        cache_service_info:
+          type: boolean
+          default: true
+          description: "Cache service information for performance"
+        
+        cache_duration:
+          type: string
+          default: "30s"
+          description: "How long to cache service information"
+          pattern: "^[0-9]+(s|m|h)$"
+        
+        parallel_operations:
+          type: boolean
+          default: true
+          description: "Enable parallel service operations"
+
+security:
+  sandbox_level: basic
+  allow_file_system: true
+  allow_network: false
+  allow_system_calls: true
+  allowed_paths:
+    - "/run/systemd"
+    - "/etc/systemd"
+    - "/usr/bin/systemctl"
+    - "/usr/bin/journalctl"
+    - "/var/log"
+  required_permissions:
+    - "read:systemd-services"
+    - "write:systemd-services"
+    - "execute:systemctl"
+    - "execute:journalctl"
+
+resources:
+  max_memory_mb: 128
+  max_cpu_percent: 10
+  max_execution_time: "30s"
+  max_file_size: 10485760
+
+update_policy:
+  auto_update: true
+  update_channel: "stable"
+  check_interval: "24h"
+  require_approval: false
+  backup_before_update: true
+
+operations:
+  list-services:
+    description: "List all systemd services with optional filtering"
+    parameters:
+      status:
+        type: string
+        enum: ["active", "inactive", "failed", "activating", "deactivating"]
+        required: false
+        description: "Filter services by status"
+      pattern:
+        type: string
+        required: false
+        description: "Filter services by name pattern"
+    returns:
+      type: array
+      description: "List of services with basic information"
+    
+  get-service:
+    description: "Get detailed information about a specific service"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service to get information for"
+    returns:
+      type: object
+      description: "Detailed service information including health metrics"
+    
+  start-service:
+    description: "Start a systemd service"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service to start"
+    returns:
+      type: object
+      description: "Operation result with success status and details"
+    
+  stop-service:
+    description: "Stop a systemd service"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service to stop"
+    returns:
+      type: object
+      description: "Operation result with success status and details"
+    
+  restart-service:
+    description: "Restart a systemd service"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service to restart"
+    returns:
+      type: object
+      description: "Operation result with success status and details"
+    
+  enable-service:
+    description: "Enable a service to start automatically on boot"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service to enable"
+    returns:
+      type: object
+      description: "Operation result with success status and details"
+    
+  disable-service:
+    description: "Disable a service from starting automatically on boot"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service to disable"
+    returns:
+      type: object
+      description: "Operation result with success status and details"
+    
+  reload-service:
+    description: "Reload service configuration without restarting"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service to reload"
+    returns:
+      type: object
+      description: "Operation result with success status and details"
+    
+  analyze-service:
+    description: "Perform AI-powered analysis of a service"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service to analyze"
+    returns:
+      type: object
+      description: "Comprehensive service analysis with recommendations"
+    
+  get-service-logs:
+    description: "Get recent logs for a service"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service"
+      lines:
+        type: integer
+        required: false
+        default: 50
+        minimum: 1
+        maximum: 1000
+        description: "Number of log lines to retrieve"
+    returns:
+      type: array
+      description: "Array of log lines"
+    
+  get-service-dependencies:
+    description: "Get service dependencies and dependents"
+    parameters:
+      service_name:
+        type: string
+        required: true
+        description: "Name of the service"
+    returns:
+      type: object
+      description: "Service dependency information"
+    
+  health-check:
+    description: "Perform health check on services"
+    parameters:
+      service_name:
+        type: string
+        required: false
+        description: "Specific service to check (optional for system-wide check)"
+    returns:
+      type: object
+      description: "Health check results and recommendations"
+
+examples:
+  - name: "List failed services"
+    description: "Find all services that are currently in failed state"
+    command: "nixai plugin execute service-manager list-services '{\"status\": \"failed\"}'"
+    
+  - name: "Restart nginx"
+    description: "Restart the nginx web server"
+    command: "nixai plugin execute service-manager restart-service '{\"service_name\": \"nginx\"}'"
+    
+  - name: "Analyze service health"
+    description: "Get AI-powered analysis of a service"
+    command: "nixai plugin execute service-manager analyze-service '{\"service_name\": \"postgresql\"}'"
+    
+  - name: "System health check"
+    description: "Check overall system service health"
+    command: "nixai plugin execute service-manager health-check"
+    
+  - name: "Get service logs"
+    description: "View recent logs for a specific service"
+    command: "nixai plugin execute service-manager get-service-logs '{\"service_name\": \"sshd\", \"lines\": 100}'"
+
+screenshots: []
+
+created_at: "2024-01-01T00:00:00Z"
+updated_at: "2024-01-01T00:00:00Z"
+verified: true

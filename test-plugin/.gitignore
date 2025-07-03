@@ -1,0 +1,20 @@
+# Compiled plugins
+*.so
+
+# Go build artifacts
+/vendor/
+/bin/
+/dist/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage.out

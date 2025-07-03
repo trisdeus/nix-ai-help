@@ -4,7 +4,7 @@
   installShellFiles,
   fetchFromGitHub,
   # Optional parameters for version/commit overrides
-  version ? "1.0.11",
+  version ? "2.0.0",
   src ? null,
   srcOverride ? null,
   rev ? null,
@@ -34,11 +34,11 @@ in
 
     src = sourceToUse;
 
-    vendorHash = "sha256-KWIUpLwf+1pjRsQk70pTFkOa4paVbdvBpt65ZOe7U/A=";
+    vendorHash = "sha256-es3/iGMpxRKoBmsICU3DqS8g629OWXYEXH4KaajQ+Ds=";
     doCheck = false;
 
-    # Force Go to use modules instead of vendor
-    buildFlagsArray = ["-mod=readonly"];
+    # Let buildGoModule handle vendor dependencies
+    buildFlagsArray = ["-mod=vendor"];
 
     subPackages = ["cmd/nixai"];
 
@@ -71,9 +71,7 @@ in
         fi
       fi
 
-      # Force remove vendor directory if it exists anywhere
-      echo "Removing any vendor directories..."
-      find . -name "vendor" -type d -exec rm -rf {} + 2>/dev/null || true
+      # Note: vendor directory is handled by buildGoModule, no need to remove
 
       echo "=== Build Environment Ready ==="
     '';

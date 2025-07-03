@@ -76,6 +76,7 @@ Examples:
 	pluginCmd.AddCommand(pcm.createMetricsCommand())
 	pluginCmd.AddCommand(pcm.createEventsCommand())
 	pluginCmd.AddCommand(pcm.createCreateCommand())
+	pluginCmd.AddCommand(pcm.createIntegratedCommand())
 
 	return pluginCmd
 }
@@ -871,4 +872,23 @@ func (pcm *PluginCLIManager) createPlugin(out io.Writer, pluginName, template, o
 	fmt.Fprintln(out, utils.FormatInfo("4. nixai plugin install "+pluginName+".so"))
 
 	return nil
+}
+
+// createIntegratedCommand creates the integrated command to show built-in plugin commands
+func (pcm *PluginCLIManager) createIntegratedCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "integrated",
+		Short: "Show integrated plugin commands",
+		Long: `Display information about integrated plugin commands that are built into nixai.
+		
+These commands provide plugin-like functionality but are implemented as native nixai commands
+for better performance and reliability.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			integration := plugins.NewSimplePluginIntegration(nil, pcm.config, pcm.logger)
+			integration.ListIntegratedPlugins()
+			return nil
+		},
+	}
+
+	return cmd
 }
