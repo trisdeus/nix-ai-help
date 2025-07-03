@@ -6,19 +6,20 @@
 
 ## 🌟 Slogan
 
-**nixai: Your AI-powered, privacy-first NixOS assistant with 24+ specialized commands — automate, troubleshoot, and master NixOS from your terminal with intelligent agents and role-based expertise.**
+**nixai: Your AI-powered, privacy-first NixOS assistant with 40+ specialized commands — automate, troubleshoot, and master NixOS from your terminal with intelligent agents, modern web interface, and comprehensive plugin system.**
 
-## 🆕 Latest Updates (June 2025)
+## 🆕 Latest Updates (July 2025)
 
-### 🚀 **v1.0.7: GitHub Copilot Integration and Enhanced Provider Support**
+### 🚀 **v2.0.0: Major Feature Release - Web Interface, Enhanced TUI & Plugin System**
 
-- **GitHub Copilot AI Provider**: Full integration with GitHub Copilot API using GITHUB_TOKEN authentication
-- **OpenAI-Compatible Streaming**: Real-time streaming support for Copilot provider with fallback handling
-- **Enhanced Provider Management**: Dynamic provider discovery and validation across all AI providers
-- **Improved Configuration**: Updated default configurations with Copilot model recommendations
-- **Privacy-First Options**: Leverage existing GitHub Copilot subscriptions for NixOS assistance
-- **Backward Compatibility**: All existing providers (Ollama, OpenAI, Gemini, etc.) remain fully functional
-- **Unified API Interface**: Consistent Query/QueryWithContext interface across all providers
+- **🌐 Modern Web Interface**: Responsive dashboard with configuration builder, team collaboration, and real-time monitoring
+- **🔌 Comprehensive Plugin System**: 14 plugin management commands with secure dynamic loading and community marketplace
+- **🎯 Enhanced TUI Experience**: Claude Code-style and classic interfaces with improved navigation and real-time feedback
+- **⚙️ Fleet Management**: Multi-machine deployment and configuration management with version control integration
+- **🚀 Version Control System**: Git-like workflow for NixOS configurations with branching, history, and team management
+- **📊 System Monitoring**: Advanced package monitoring, performance analysis, and intelligence gathering
+- **🤖 GitHub Copilot Integration**: Full integration with GitHub Copilot API and enhanced provider ecosystem
+- **🛡️ Security & Performance**: Improved security sandbox, plugin validation, and optimized core architecture
 
 ### ✨ **Modern TUI Interface** - **NEWLY COMPLETED!**
 
@@ -66,7 +67,7 @@ The newly modernized Terminal User Interface provides a professional, accessible
 ### 🖥️ Interface Layout
 
 ```text
-┌─ Commands (24 total) ──────────────┬─ Execution Panel ─────────────────┐
+┌─ Commands (40+ total) ─────────────┬─ Execution Panel ─────────────────┐
 │                                    │                                   │
 │ ask [INPUT]                        │ Welcome to nixai TUI!             │
 │   Ask any NixOS question           │ Select a command from the left    │
@@ -81,7 +82,7 @@ The newly modernized Terminal User Interface provides a professional, accessible
 │                                    │                                   │
 │ (Showing 1-10 of 24)               │ [INPUT] = Interactive Parameters  │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.5
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.0
 ```
 
 ### ✨ Key TUI Features
@@ -109,7 +110,7 @@ Every command in nixai now features **intelligent context detection** that autom
 
 ## 📖 User Manual & Command Reference
 
-See the full [nixai User Manual](docs/MANUAL.md) for comprehensive documentation, advanced usage, and real-world examples for every command.
+See the full [nixai User Manual](docs/MANUAL.md) for comprehensive documentation, advanced usage, and real-world examples for all 40+ commands including the new web interface, plugin system, fleet management, and version control features.
 
 ---
 
@@ -242,7 +243,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 
 ### 🎯 Advanced Features at a Glance
 
-- **24+ Specialized Commands**: Complete AI-powered toolkit for all NixOS operations
+- **40+ Specialized Commands**: Complete AI-powered toolkit for all NixOS operations
 - **Advanced Hardware Management**: Comprehensive hardware detection, optimization, and driver management
 - **Role-Based AI Agents**: Intelligent agents adapt behavior based on context and user-selected roles
 - **Multi-Provider AI**: Local Ollama, OpenAI, Gemini, with intelligent fallback and privacy-first defaults
@@ -266,7 +267,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 **TUI Interface Preview:**
 
 ```text
-┌─ Commands (24 total) ──────────────┬─ Execution Panel ─────────────────┐
+┌─ Commands (40+ total) ─────────────┬─ Execution Panel ─────────────────┐
 │                                    │                                   │
 │ ask [INPUT]                        │ Welcome to nixai TUI!             │
 │   Ask any NixOS question           │ Select a command from the left    │
@@ -279,12 +280,12 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 │                                    │ • Version display                │
 │ (Showing 1-8 of 24)               │ • ? changelog popup             │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.5
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.0
 ```
 
 ### 🤖 AI-Powered Command System
 
-- **24+ Specialized Commands**: Complete command-line toolkit for all NixOS tasks and operations
+- **40+ Specialized Commands**: Complete command-line toolkit for all NixOS tasks and operations
 - **Intelligent Agent Architecture**: Role-based AI behavior with specialized expertise domains
 - **Direct Question Interface**: `nixai -a "your question"` for instant AI-powered assistance
 - **Context-Aware Responses**: Commands adapt behavior based on detected system configuration, role, and context

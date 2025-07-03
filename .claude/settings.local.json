@@ -30,7 +30,9 @@
       "Bash(nix --extra-experimental-features 'nix-command flakes' build --no-link)",
       "Bash(go clean:*)",
       "Bash(nix-hash:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }

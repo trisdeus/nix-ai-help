@@ -3707,6 +3707,9 @@ func initializeCommands() {
 	rootCmd.AddCommand(CreateSystemInfoCommand())
 	rootCmd.AddCommand(CreatePackageMonitorCommand())
 
+	// Add comprehensive built-in manual system
+	rootCmd.AddCommand(CreateManualCommand())
+
 	commandsInitialized = true
 }
 

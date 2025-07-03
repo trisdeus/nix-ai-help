@@ -37,9 +37,6 @@ in
     vendorHash = "sha256-es3/iGMpxRKoBmsICU3DqS8g629OWXYEXH4KaajQ+Ds=";
     doCheck = false;
 
-    # Let buildGoModule handle vendor dependencies
-    buildFlagsArray = ["-mod=vendor"];
-
     subPackages = ["cmd/nixai"];
 
     # Handle source directory structure for standalone installations
@@ -71,7 +68,9 @@ in
         fi
       fi
 
-      # Note: vendor directory is handled by buildGoModule, no need to remove
+      # Force remove vendor directory if it exists to avoid conflicts
+      echo "Removing any vendor directories..."
+      find . -name "vendor" -type d -exec rm -rf {} + 2>/dev/null || true
 
       echo "=== Build Environment Ready ==="
     '';
