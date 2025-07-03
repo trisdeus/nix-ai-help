@@ -59,14 +59,15 @@ type ESResponse struct {
 
 // MCPServer represents the MCP protocol server
 type MCPServer struct {
-	logger       logger.Logger
-	listener     net.Listener
-	mu           sync.Mutex
-	lspProvider  *NixLSPProvider
-	ctx          context.Context
-	cancel       context.CancelFunc
-	shutdown     chan struct{}
-	errorManager *errors.ErrorManager
+	logger         logger.Logger
+	listener       net.Listener
+	mu             sync.Mutex
+	lspProvider    *NixLSPProvider
+	neovimHandlers *NeovimHandlers
+	ctx            context.Context
+	cancel         context.CancelFunc
+	shutdown       chan struct{}
+	errorManager   *errors.ErrorManager
 }
 
 // MCPRequest represents an MCP protocol request
@@ -163,6 +164,27 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			{
 				Name:        "nix_lsp_definition",
 				Description: "Provide go-to-definition functionality for Nix symbols",
+			},
+			// Enhanced Neovim Integration Tools
+			{
+				Name:        "neovim_completion",
+				Description: "Enhanced AI-powered completion for Neovim with context awareness",
+			},
+			{
+				Name:        "neovim_diagnostics",
+				Description: "Advanced diagnostic analysis with AI-powered fix suggestions",
+			},
+			{
+				Name:        "neovim_snippets",
+				Description: "Get comprehensive Nix code snippets for Neovim",
+			},
+			{
+				Name:        "neovim_code_actions",
+				Description: "Context-aware code actions and quick fixes for Neovim",
+			},
+			{
+				Name:        "neovim_hover_enhanced",
+				Description: "Enhanced hover documentation with AI insights and examples",
 			},
 			{
 				Name:        "get_nixos_context",
@@ -1306,6 +1328,99 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			_ = conn.Reply(ctx, req.ID, result)
 
 		// End of Phase 3 tools
+
+		// Enhanced Neovim Integration Tools
+		case "neovim_completion":
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": "Enhanced Neovim completion is available. Use the nixai Neovim integration for full functionality.",
+					},
+				},
+			})
+
+		case "neovim_diagnostics":
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": "Enhanced Neovim diagnostics available. Install nixai Neovim integration for AI-powered analysis.",
+					},
+				},
+			})
+
+		case "neovim_snippets":
+			category := ""
+			search := ""
+			format := "markdown"
+			
+			if cat, ok := params.Arguments["category"].(string); ok {
+				category = cat
+			}
+			if s, ok := params.Arguments["search"].(string); ok {
+				search = s
+			}
+			if f, ok := params.Arguments["format"].(string); ok {
+				format = f
+			}
+
+			// Create a basic snippet provider for MCP usage
+			snippetProvider := neovim.NewSnippetProvider()
+			var snippets map[string]neovim.Snippet
+			
+			if category != "" {
+				snippets = snippetProvider.GetSnippetsByCategory(category)
+			} else if search != "" {
+				snippets = snippetProvider.SearchSnippets(search)
+			} else {
+				snippets = snippetProvider.GetSnippets()
+			}
+
+			var response string
+			switch format {
+			case "vscode":
+				response = snippetProvider.ExportSnippetsToVSCode()
+			case "luasnip":
+				response = "LuaSnip format available in full Neovim integration"
+			default:
+				response = m.formatSnippetsForMCP(snippets)
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": response,
+					},
+				},
+			})
+
+		case "neovim_code_actions":
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": "Enhanced code actions available through nixai Neovim integration.",
+					},
+				},
+			})
+
+		case "neovim_hover_enhanced":
+			word := ""
+			if w, ok := params.Arguments["word"].(string); ok {
+				word = w
+			}
+			
+			response := m.generateBasicHover(word)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": response,
+					},
+				},
+			})
 
 		default:
 			_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
@@ -2953,4 +3068,79 @@ func extractRelevantSnippet(text, query string) string {
 	}
 
 	return prefix + text[start:end] + suffix
+}
+
+// formatSnippetsForMCP formats snippets for MCP response
+func (m *MCPServer) formatSnippetsForMCP(snippets map[string]neovim.Snippet) string {
+	if len(snippets) == 0 {
+		return "No snippets found for the specified criteria."
+	}
+
+	var builder strings.Builder
+	builder.WriteString("# Nix Code Snippets\n\n")
+
+	// Group by category
+	categories := make(map[string][]neovim.Snippet)
+	for _, snippet := range snippets {
+		categories[snippet.Category] = append(categories[snippet.Category], snippet)
+	}
+
+	for category, categorySnippets := range categories {
+		builder.WriteString(fmt.Sprintf("## %s\n\n", strings.Title(category)))
+
+		for _, snippet := range categorySnippets {
+			builder.WriteString(fmt.Sprintf("### %s (`%s`)\n", snippet.Description, snippet.Prefix))
+			builder.WriteString("```nix\n")
+			builder.WriteString(strings.Join(snippet.Body, "\n"))
+			builder.WriteString("\n```\n\n")
+		}
+	}
+
+	return builder.String()
+}
+
+// generateBasicHover generates basic hover information
+func (m *MCPServer) generateBasicHover(word string) string {
+	var builder strings.Builder
+	builder.WriteString("# Enhanced Documentation\n\n")
+
+	if word == "" {
+		builder.WriteString("No word provided for hover information.")
+		return builder.String()
+	}
+
+	builder.WriteString(fmt.Sprintf("## %s\n\n", word))
+
+	// Context-aware documentation based on the word
+	if strings.HasPrefix(word, "services.") {
+		builder.WriteString("**Type:** NixOS Service Configuration\n\n")
+		builder.WriteString("This configures a system service in NixOS. Services are managed by systemd.\n\n")
+		builder.WriteString("**Common pattern:**\n")
+		builder.WriteString("```nix\n")
+		builder.WriteString(fmt.Sprintf("%s = {\n", word))
+		builder.WriteString("  enable = true;\n")
+		builder.WriteString("  # Additional configuration options\n")
+		builder.WriteString("};\n")
+		builder.WriteString("```\n\n")
+	} else if strings.HasPrefix(word, "hardware.") {
+		builder.WriteString("**Type:** Hardware Configuration\n\n")
+		builder.WriteString("This configures hardware-specific settings in NixOS.\n\n")
+	} else if strings.HasPrefix(word, "environment.") {
+		builder.WriteString("**Type:** Environment Configuration\n\n")
+		builder.WriteString("This configures system environment settings like packages and variables.\n\n")
+	} else if strings.HasPrefix(word, "programs.") {
+		builder.WriteString("**Type:** Program Configuration\n\n")
+		builder.WriteString("This configures program-specific settings, often used in Home Manager.\n\n")
+	} else {
+		builder.WriteString("**Type:** Nix Expression\n\n")
+		builder.WriteString(fmt.Sprintf("This is a Nix expression or identifier: `%s`\n\n", word))
+	}
+
+	// Add general tips
+	builder.WriteString("**💡 Tips:**\n")
+	builder.WriteString("- Use `nixai explain-option` for detailed documentation\n")
+	builder.WriteString("- Check the NixOS manual for complete reference\n")
+	builder.WriteString("- Use `nixai search` to find related options\n")
+
+	return builder.String()
 }

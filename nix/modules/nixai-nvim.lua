@@ -1,7 +1,30 @@
--- nixai-nvim.lua: Integration with nixai MCP server (multi-endpoint)
+-- nixai-nvim.lua: Enhanced Integration with nixai MCP server (multi-endpoint)
 local M = {}
 
 local api = vim.api
+local uv = vim.loop
+
+-- Enhanced features configuration
+M.config = {
+  completion = {
+    enabled = true,
+    trigger_chars = { ".", "=" },
+    max_items = 10,
+  },
+  diagnostics = {
+    enabled = true,
+    auto_refresh = true,
+    severity_limit = vim.diagnostic.severity.HINT,
+  },
+  snippets = {
+    enabled = true,
+    categories = { "services", "packages", "hardware", "desktop" },
+  },
+  hover = {
+    enabled = true,
+    auto_popup = false,
+  },
+}
 
 -- Set endpoints and default socket path from global variables (populated by Nix)
 M.endpoints = vim.g.nixai_endpoints or {}
@@ -264,6 +287,325 @@ function M.setup_keymaps()
   vim.api.nvim_create_user_command('NixaiUpdate', M.nixai_update, {})
 end
 
-print("nixai integration loaded! Use <leader>nX for each endpoint, or <leader>na for default. :NixaiHelp for help.")
+-- Enhanced Features
+
+-- Completion source for nvim-cmp
+function M.setup_completion()
+  if not M.config.completion.enabled then return end
+  
+  local has_cmp, cmp = pcall(require, 'cmp')
+  if not has_cmp then return end
+  
+  local source = {}
+  source.new = function()
+    return setmetatable({}, { __index = source })
+  end
+  
+  source.get_trigger_characters = function()
+    return M.config.completion.trigger_chars
+  end
+  
+  source.complete = function(self, params, callback)
+    local context = params.context
+    local line = context.cursor_line
+    local col = context.cursor.col
+    
+    -- Call nixai for completion
+    local request = {
+      filePath = vim.api.nvim_buf_get_name(0),
+      line = context.cursor.row - 1,
+      character = col - 1,
+      context = line,
+      bufferText = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+    }
+    
+    vim.defer_fn(function()
+      local items = M._get_completion_items(request)
+      callback(items)
+    end, 0)
+  end
+  
+  -- Register the source
+  cmp.register_source('nixai', source)
+end
+
+-- Get completion items from nixai
+function M._get_completion_items(request)
+  local cmd = string.format(
+    "echo '%s' | nixai neovim-completion --format json",
+    vim.fn.json_encode(request):gsub("'", "''")
+  )
+  
+  local output = vim.fn.system(cmd)
+  if vim.v.shell_error ~= 0 then
+    return {}
+  end
+  
+  local ok, result = pcall(vim.fn.json_decode, output)
+  if not ok or type(result) ~= "table" then
+    return {}
+  end
+  
+  local items = {}
+  for _, item in ipairs(result) do
+    table.insert(items, {
+      label = item.label,
+      kind = item.kind or cmp.lsp.CompletionItemKind.Text,
+      detail = item.detail,
+      documentation = item.documentation,
+      insertText = item.insertText or item.label,
+    })
+  end
+  
+  return items
+end
+
+-- Enhanced diagnostics
+function M.setup_diagnostics()
+  if not M.config.diagnostics.enabled then return end
+  
+  -- Auto-refresh diagnostics on save
+  if M.config.diagnostics.auto_refresh then
+    vim.api.nvim_create_autocmd("BufWritePost", {
+      pattern = "*.nix",
+      callback = function()
+        M.refresh_diagnostics()
+      end,
+    })
+  end
+end
+
+function M.refresh_diagnostics()
+  local bufnr = vim.api.nvim_get_current_buf()
+  if vim.bo[bufnr].filetype ~= "nix" then return end
+  
+  local content = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+  local filepath = vim.api.nvim_buf_get_name(bufnr)
+  
+  local cmd = string.format(
+    "echo '%s' | nixai neovim-diagnostics --file '%s' --format json",
+    content:gsub("'", "''"),
+    filepath
+  )
+  
+  vim.fn.jobstart(cmd, {
+    stdout_buffered = true,
+    on_stdout = function(_, data)
+      if data and #data > 0 then
+        local output = table.concat(data, "\n")
+        local ok, diagnostics = pcall(vim.fn.json_decode, output)
+        if ok and type(diagnostics) == "table" then
+          M._apply_diagnostics(bufnr, diagnostics)
+        end
+      end
+    end,
+  })
+end
+
+function M._apply_diagnostics(bufnr, diagnostics)
+  local vim_diagnostics = {}
+  
+  for _, diag in ipairs(diagnostics) do
+    local severity = vim.diagnostic.severity.INFO
+    if diag.severity == 1 then severity = vim.diagnostic.severity.ERROR
+    elseif diag.severity == 2 then severity = vim.diagnostic.severity.WARN
+    elseif diag.severity == 3 then severity = vim.diagnostic.severity.INFO
+    elseif diag.severity == 4 then severity = vim.diagnostic.severity.HINT
+    end
+    
+    if severity <= M.config.diagnostics.severity_limit then
+      table.insert(vim_diagnostics, {
+        lnum = diag.range.start.line,
+        col = diag.range.start.character,
+        end_lnum = diag.range["end"].line,
+        end_col = diag.range["end"].character,
+        severity = severity,
+        message = diag.message,
+        source = "nixai",
+        user_data = diag.data,
+      })
+    end
+  end
+  
+  vim.diagnostic.set(vim.api.nvim_create_namespace("nixai"), bufnr, vim_diagnostics)
+end
+
+-- Snippet integration
+function M.setup_snippets()
+  if not M.config.snippets.enabled then return end
+  
+  local has_luasnip, luasnip = pcall(require, 'luasnip')
+  if not has_luasnip then return end
+  
+  -- Load nixai snippets
+  for _, category in ipairs(M.config.snippets.categories) do
+    M._load_snippets_category(category)
+  end
+end
+
+function M._load_snippets_category(category)
+  local cmd = string.format("nixai neovim-snippets --category '%s' --format luasnip", category)
+  local output = vim.fn.system(cmd)
+  
+  if vim.v.shell_error == 0 and output ~= "" then
+    -- Parse and load the Lua snippets
+    local ok, snippets = pcall(loadstring, "return " .. output)
+    if ok then
+      local luasnip = require('luasnip')
+      luasnip.add_snippets("nix", snippets)
+    end
+  end
+end
+
+-- Enhanced hover
+function M.setup_hover()
+  if not M.config.hover.enabled then return end
+  
+  vim.keymap.set("n", "K", function()
+    M.enhanced_hover()
+  end, { buffer = true, desc = "Enhanced hover with nixai" })
+end
+
+function M.enhanced_hover()
+  local word = vim.fn.expand("<cword>")
+  local line = vim.fn.line(".")
+  local col = vim.fn.col(".")
+  
+  local request = {
+    word = word,
+    filePath = vim.api.nvim_buf_get_name(0),
+    line = line - 1,
+    character = col - 1,
+    context = vim.fn.getline("."),
+  }
+  
+  local cmd = string.format(
+    "echo '%s' | nixai neovim-hover-enhanced",
+    vim.fn.json_encode(request):gsub("'", "''")
+  )
+  
+  local output = vim.fn.system(cmd)
+  if vim.v.shell_error == 0 and output ~= "" then
+    local lines = vim.split(output, "\n")
+    open_floating_markdown(lines, "Enhanced Documentation: " .. word)
+  else
+    -- Fallback to default LSP hover
+    vim.lsp.buf.hover()
+  end
+end
+
+-- Code actions
+function M.get_code_actions()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local content = table.concat(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false), "\n")
+  local filepath = vim.api.nvim_buf_get_name(bufnr)
+  
+  local cmd = string.format(
+    "echo '%s' | nixai neovim-code-actions --file '%s' --format json",
+    content:gsub("'", "''"),
+    filepath
+  )
+  
+  local output = vim.fn.system(cmd)
+  if vim.v.shell_error == 0 and output ~= "" then
+    local ok, actions = pcall(vim.fn.json_decode, output)
+    if ok and type(actions) == "table" then
+      return actions
+    end
+  end
+  
+  return {}
+end
+
+-- Setup function to initialize all enhanced features
+function M.setup_enhanced_features()
+  -- Only setup for Nix files
+  vim.api.nvim_create_autocmd("FileType", {
+    pattern = "nix",
+    callback = function()
+      M.setup_completion()
+      M.setup_diagnostics()
+      M.setup_snippets()
+      M.setup_hover()
+      
+      -- Additional Nix-specific keymaps
+      vim.keymap.set("n", "<leader>nf", function()
+        M.query("Fix issues in this file", nil, vim.api.nvim_buf_get_lines(0, 0, -1, false))
+      end, { buffer = true, desc = "Fix Nix file with AI" })
+      
+      vim.keymap.set("n", "<leader>no", function()
+        M.query("Optimize this configuration", nil, vim.api.nvim_buf_get_lines(0, 0, -1, false))
+      end, { buffer = true, desc = "Optimize Nix config with AI" })
+      
+      vim.keymap.set("n", "<leader>ns", function()
+        M.telescope_snippets()
+      end, { buffer = true, desc = "Browse Nix snippets" })
+    end,
+  })
+end
+
+-- Enhanced snippet browser with Telescope
+function M.telescope_snippets()
+  local has_telescope, telescope = pcall(require, 'telescope.builtin')
+  if not has_telescope then
+    notify("Telescope.nvim not found!", vim.log.levels.ERROR)
+    return
+  end
+  
+  local cmd = "nixai neovim-snippets --format raw"
+  local output = vim.fn.system(cmd)
+  
+  if vim.v.shell_error ~= 0 then
+    notify("Failed to load snippets", vim.log.levels.ERROR)
+    return
+  end
+  
+  local ok, snippets = pcall(vim.fn.json_decode, output)
+  if not ok or type(snippets) ~= "table" then
+    notify("Failed to parse snippets", vim.log.levels.ERROR)
+    return
+  end
+  
+  local entries = {}
+  for key, snippet in pairs(snippets) do
+    table.insert(entries, {
+      key = key,
+      snippet = snippet,
+      display = string.format("[%s] %s - %s", snippet.category, snippet.prefix, snippet.description),
+    })
+  end
+  
+  require('telescope.pickers').new({}, {
+    prompt_title = "Nix Snippets",
+    finder = require('telescope.finders').new_table {
+      results = entries,
+      entry_maker = function(entry)
+        return {
+          value = entry,
+          display = entry.display,
+          ordinal = entry.display,
+        }
+      end,
+    },
+    sorter = require('telescope.config').values.generic_sorter({}),
+    attach_mappings = function(_, map)
+      map('i', '<CR>', function(prompt_bufnr)
+        local selection = require('telescope.actions.state').get_selected_entry()
+        require('telescope.actions').close(prompt_bufnr)
+        if selection then
+          local snippet = selection.value.snippet
+          local text = table.concat(snippet.body, "\n")
+          vim.api.nvim_put({text}, "l", true, true)
+        end
+      end)
+      return true
+    end,
+  }):find()
+end
+
+-- Initialize enhanced features when module is loaded
+M.setup_enhanced_features()
+
+print("nixai enhanced integration loaded! Use <leader>nX for each endpoint, or <leader>na for default. :NixaiHelp for help.")
 
 return M
