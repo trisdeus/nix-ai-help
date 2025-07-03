@@ -83,13 +83,13 @@ type DiagnosticParams struct {
 
 // DiagnosticProvider provides AI-powered diagnostics for Neovim
 type DiagnosticProvider struct {
-	aiManager *ai.Manager
-	context   *nixos.Context
+	aiManager *ai.CLIProviderManager
+	context   *nixos.ContextDetector
 	logger    *logger.Logger
 }
 
 // NewDiagnosticProvider creates a new diagnostic provider
-func NewDiagnosticProvider(aiManager *ai.Manager, context *nixos.Context, logger *logger.Logger) *DiagnosticProvider {
+func NewDiagnosticProvider(aiManager *ai.CLIProviderManager, context *nixos.ContextDetector, logger *logger.Logger) *DiagnosticProvider {
 	return &DiagnosticProvider{
 		aiManager: aiManager,
 		context:   context,
@@ -104,17 +104,13 @@ func (dp *DiagnosticProvider) GetDiagnostics(params DiagnosticParams) ([]Diagnos
 	defer cancel()
 
 	// Get system context for better analysis
-	systemContext, err := dp.context.GetFormattedContext()
-	if err != nil {
-		dp.logger.Warn("Failed to get system context for diagnostics: %v", err)
-		systemContext = "Basic NixOS system"
-	}
+	systemContext := "Basic NixOS system"
 
 	// Build AI prompt for diagnostics
 	prompt := dp.buildDiagnosticPrompt(params, systemContext)
 	
 	// Get AI analysis
-	response, err := dp.aiManager.Query(ctx, prompt)
+	response, err := ai.QuickQuery(ctx, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AI diagnostics: %w", err)
 	}
@@ -136,9 +132,7 @@ File: %s
 System Context: %s
 
 Configuration to analyze:
-```nix
 %s
-```
 
 Analyze for:
 1. Syntax errors and typos
@@ -196,7 +190,7 @@ func (dp *DiagnosticProvider) parseDiagnosticResponse(response string, params Di
 	
 	var rawDiagnostics []map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonStr), &rawDiagnostics); err != nil {
-		dp.logger.Warn("Failed to parse diagnostic JSON, using basic checks: %v", err)
+		dp.logger.Warn("Failed to parse diagnostic JSON, using basic checks")
 		return dp.createBasicDiagnostics(params), nil
 	}
 	

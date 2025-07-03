@@ -68,13 +68,13 @@ type CompletionParams struct {
 
 // CompletionProvider provides AI-powered completion for Neovim
 type CompletionProvider struct {
-	aiManager *ai.Manager
-	context   *nixos.Context
+	aiManager *ai.CLIProviderManager
+	context   *nixos.ContextDetector
 	logger    *logger.Logger
 }
 
 // NewCompletionProvider creates a new completion provider
-func NewCompletionProvider(aiManager *ai.Manager, context *nixos.Context, logger *logger.Logger) *CompletionProvider {
+func NewCompletionProvider(aiManager *ai.CLIProviderManager, context *nixos.ContextDetector, logger *logger.Logger) *CompletionProvider {
 	return &CompletionProvider{
 		aiManager: aiManager,
 		context:   context,
@@ -92,17 +92,13 @@ func (cp *CompletionProvider) GetCompletions(params CompletionParams) ([]Complet
 	completionType := cp.detectCompletionType(params)
 	
 	// Get system context for better suggestions
-	systemContext, err := cp.context.GetFormattedContext()
-	if err != nil {
-		cp.logger.Warn("Failed to get system context for completion: %v", err)
-		systemContext = "Basic NixOS system"
-	}
+	systemContext := "Basic NixOS system"
 
 	// Build AI prompt for completion
 	prompt := cp.buildCompletionPrompt(params, completionType, systemContext)
 	
 	// Get AI suggestions
-	response, err := cp.aiManager.Query(ctx, prompt)
+	response, err := ai.QuickQuery(ctx, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get AI completion: %w", err)
 	}
@@ -214,7 +210,7 @@ func (cp *CompletionProvider) parseCompletionResponse(response, completionType s
 	
 	var rawItems []map[string]interface{}
 	if err := json.Unmarshal([]byte(jsonStr), &rawItems); err != nil {
-		cp.logger.Warn("Failed to parse completion JSON, using fallback: %v", err)
+		cp.logger.Warn("Failed to parse completion JSON, using fallback")
 		return cp.createFallbackCompletions(completionType), nil
 	}
 	

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/neovim"
 	"nix-ai-help/pkg/errors"
 	"nix-ai-help/pkg/logger"
 

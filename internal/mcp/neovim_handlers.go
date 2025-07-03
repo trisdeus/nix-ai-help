@@ -24,7 +24,7 @@ type NeovimHandlers struct {
 }
 
 // NewNeovimHandlers creates new Neovim handlers
-func NewNeovimHandlers(aiManager *ai.Manager, context *nixos.Context, logger *logger.Logger) *NeovimHandlers {
+func NewNeovimHandlers(aiManager *ai.CLIProviderManager, context *nixos.ContextDetector, logger *logger.Logger) *NeovimHandlers {
 	completionProvider := neovim.NewCompletionProvider(aiManager, context, logger)
 	diagnosticProvider := neovim.NewDiagnosticProvider(aiManager, context, logger)
 	snippetProvider := neovim.NewSnippetProvider()
@@ -60,7 +60,7 @@ func (nh *NeovimHandlers) HandleNeovimCompletion(ctx context.Context, conn *json
 
 	items, err := nh.completionProvider.GetCompletions(params)
 	if err != nil {
-		nh.logger.Error("Failed to get completions: %v", err)
+		nh.logger.Error("Failed to get completions")
 		return conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeInternalError,
 			Message: fmt.Sprintf("Completion failed: %v", err),
@@ -97,7 +97,7 @@ func (nh *NeovimHandlers) HandleNeovimDiagnostics(ctx context.Context, conn *jso
 
 	diagnostics, err := nh.diagnosticProvider.GetDiagnostics(params)
 	if err != nil {
-		nh.logger.Error("Failed to get diagnostics: %v", err)
+		nh.logger.Error("Failed to get diagnostics")
 		return conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeInternalError,
 			Message: fmt.Sprintf("Diagnostic analysis failed: %v", err),
@@ -185,7 +185,7 @@ func (nh *NeovimHandlers) HandleNeovimCodeActions(ctx context.Context, conn *jso
 	// Get diagnostics first
 	diagnostics, err := nh.diagnosticProvider.GetDiagnostics(params)
 	if err != nil {
-		nh.logger.Error("Failed to get diagnostics for code actions: %v", err)
+		nh.logger.Error("Failed to get diagnostics for code actions")
 		return conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeInternalError,
 			Message: fmt.Sprintf("Code action analysis failed: %v", err),
