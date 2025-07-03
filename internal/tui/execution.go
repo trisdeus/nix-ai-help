@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -104,37 +105,171 @@ type ExecutionCancelledMsg struct {
 
 // DetectExecutionRequest analyzes user input for execution requests
 func (em *ExecutionManager) DetectExecutionRequest(userInput string) (*ExecutionRequest, error) {
-	// Get a provider to analyze the input
+	// First try using AI provider if available
 	provider, err := em.providerMgr.GetDefaultProvider()
-	if err != nil {
-		em.logger.Error(fmt.Sprintf("Failed to get provider for execution detection: %v", err))
-		return nil, err
+	if err == nil {
+		// Check if the provider supports execution detection
+		if eap, ok := provider.(*ai.ExecutionAwareProvider); ok && eap.IsExecutionEnabled() {
+			// Use the execution-aware provider to detect commands
+			execReq := eap.DetectExecutionRequest(userInput)
+			if execReq != nil {
+				// Convert to TUI execution request
+				tuiReq := &ExecutionRequest{
+					ID:          em.generateID(),
+					UserQuery:   userInput,
+					Command:     execReq.Command,
+					Args:        execReq.Args,
+					Description: execReq.Description,
+					Category:    execReq.Category,
+					DryRun:      execReq.DryRun,
+					State:       ExecutionDetecting,
+					CreatedAt:   time.Now(),
+				}
+				
+				em.requests = append(em.requests, *tuiReq)
+				return tuiReq, nil
+			}
+		}
+	} else {
+		// Provider not available, use fallback pattern matching
+		em.logger.Warn(fmt.Sprintf("Provider not available for execution detection, using fallback: %v", err))
 	}
 
-	// Check if the provider supports execution detection
-	if eap, ok := provider.(*ai.ExecutionAwareProvider); ok && eap.IsExecutionEnabled() {
-		// Use the execution-aware provider to detect commands
-		execReq := eap.DetectExecutionRequest(userInput)
-		if execReq != nil {
-			// Convert to TUI execution request
-			tuiReq := &ExecutionRequest{
-				ID:          em.generateID(),
-				UserQuery:   userInput,
-				Command:     execReq.Command,
-				Args:        execReq.Args,
-				Description: execReq.Description,
-				Category:    execReq.Category,
-				DryRun:      execReq.DryRun,
-				State:       ExecutionDetecting,
-				CreatedAt:   time.Now(),
-			}
+	// Fallback: Use simple pattern matching for execution detection
+	return em.fallbackExecutionDetection(userInput)
+}
+
+// fallbackExecutionDetection uses pattern matching when AI provider is unavailable
+func (em *ExecutionManager) fallbackExecutionDetection(userInput string) (*ExecutionRequest, error) {
+	
+	// Define execution patterns for fallback detection
+	executionPatterns := []struct {
+		pattern     *regexp.Regexp
+		category    string
+		description string
+	}{
+		{regexp.MustCompile(`(?i)\b(install|add)\s+([a-zA-Z0-9_-]+)`), "package", "Install package"},
+		{regexp.MustCompile(`(?i)\b(remove|uninstall|delete)\s+([a-zA-Z0-9_-]+)`), "package", "Remove package"},
+		{regexp.MustCompile(`(?i)\b(update|upgrade)\s+(system|packages?)`), "system", "Update system"},
+		{regexp.MustCompile(`(?i)\bnixos-rebuild\s+(switch|boot|test)`), "nixos", "NixOS rebuild"},
+		{regexp.MustCompile(`(?i)\b(start|stop|restart|enable|disable)\s+([a-zA-Z0-9_-]+)`), "service", "Service management"},
+		{regexp.MustCompile(`(?i)\bsystemctl\s+(start|stop|restart|enable|disable|status)\s+([a-zA-Z0-9_.-]+)`), "systemctl", "Systemctl command"},
+		{regexp.MustCompile(`(?i)\bnix-env\s+-[iueq]`), "nix", "Nix environment command"},
+		{regexp.MustCompile(`(?i)\bnix-collect-garbage`), "nix", "Garbage collection"},
+		{regexp.MustCompile(`(?i)\b(run|execute)\s+([a-zA-Z0-9_-]+)`), "command", "Run command"},
+		{regexp.MustCompile(`(?i)\b(can you|please)\s+(install|run|execute|start|stop)`), "request", "Polite command request"},
+	}
+	
+	// Check each pattern
+	for _, ep := range executionPatterns {
+		if matches := ep.pattern.FindStringSubmatch(userInput); matches != nil {
+			// Extract command and arguments
+			command, args := em.parseCommandFromMatch(userInput, matches, ep.category)
 			
-			em.requests = append(em.requests, *tuiReq)
-			return tuiReq, nil
+			if command != "" {
+				tuiReq := &ExecutionRequest{
+					ID:          em.generateID(),
+					UserQuery:   userInput,
+					Command:     command,
+					Args:        args,
+					Description: ep.description,
+					Category:    ep.category,
+					DryRun:      true, // Default to dry run for safety
+					State:       ExecutionDetecting,
+					CreatedAt:   time.Now(),
+				}
+				
+				em.requests = append(em.requests, *tuiReq)
+				em.logger.Info(fmt.Sprintf("Fallback execution detection matched: %s", command))
+				return tuiReq, nil
+			}
 		}
 	}
+	
+	return nil, nil
+}
 
-	return nil, nil // No execution detected
+// parseCommandFromMatch extracts command and arguments from regex matches
+func (em *ExecutionManager) parseCommandFromMatch(userInput string, matches []string, category string) (string, []string) {
+	userLower := strings.ToLower(strings.TrimSpace(userInput))
+	
+	switch category {
+	case "package":
+		if strings.Contains(userLower, "install") || strings.Contains(userLower, "add") {
+			if len(matches) >= 3 {
+				return "nix-env", []string{"-iA", "nixpkgs." + matches[2]}
+			}
+		} else if strings.Contains(userLower, "remove") || strings.Contains(userLower, "uninstall") {
+			if len(matches) >= 3 {
+				return "nix-env", []string{"-e", matches[2]}
+			}
+		}
+		
+	case "system":
+		if strings.Contains(userLower, "update") || strings.Contains(userLower, "upgrade") {
+			return "nixos-rebuild", []string{"switch", "--upgrade"}
+		}
+		
+	case "nixos":
+		if strings.Contains(userLower, "nixos-rebuild") {
+			if strings.Contains(userLower, "switch") {
+				return "nixos-rebuild", []string{"switch"}
+			} else if strings.Contains(userLower, "boot") {
+				return "nixos-rebuild", []string{"boot"}
+			} else if strings.Contains(userLower, "test") {
+				return "nixos-rebuild", []string{"test"}
+			}
+		}
+		
+	case "service", "systemctl":
+		if strings.Contains(userLower, "systemctl") {
+			// Extract systemctl command directly
+			parts := strings.Fields(userInput)
+			for i, part := range parts {
+				if strings.ToLower(part) == "systemctl" && i+2 < len(parts) {
+					return "systemctl", []string{parts[i+1], parts[i+2]}
+				}
+			}
+		} else {
+			// Natural language service commands
+			if len(matches) >= 3 {
+				action := matches[1]
+				service := matches[2]
+				return "systemctl", []string{action, service}
+			}
+		}
+		
+	case "nix":
+		if strings.Contains(userLower, "nix-env") {
+			// Extract nix-env command
+			parts := strings.Fields(userInput)
+			for i, part := range parts {
+				if strings.Contains(strings.ToLower(part), "nix-env") && i+1 < len(parts) {
+					return "nix-env", parts[i+1:]
+				}
+			}
+		} else if strings.Contains(userLower, "nix-collect-garbage") {
+			return "nix-collect-garbage", []string{"-d"}
+		}
+		
+	case "command":
+		if len(matches) >= 3 {
+			return matches[2], []string{}
+		}
+		
+	case "request":
+		// Parse polite requests like "can you install firefox"
+		words := strings.Fields(userLower)
+		for i, word := range words {
+			if word == "install" && i+1 < len(words) {
+				return "nix-env", []string{"-iA", "nixpkgs." + words[i+1]}
+			} else if (word == "start" || word == "stop" || word == "restart") && i+1 < len(words) {
+				return "systemctl", []string{word, words[i+1]}
+			}
+		}
+	}
+	
+	return "", nil
 }
 
 // RequestExecution initiates execution of a command

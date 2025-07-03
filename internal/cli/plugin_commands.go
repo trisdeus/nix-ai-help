@@ -337,46 +337,75 @@ func (pcm *PluginCLIManager) createCreateCommand() *cobra.Command {
 // Implementation methods
 
 func (pcm *PluginCLIManager) listPlugins(out io.Writer, showAll, showCapabilities bool) error {
-	fmt.Fprintln(out, utils.FormatHeader("📦 Installed Plugins"))
+	fmt.Fprintln(out, utils.FormatHeader("📦 Available Plugins"))
 	fmt.Fprintln(out)
 
-	plugins := pcm.manager.ListPlugins()
-	if len(plugins) == 0 {
-		fmt.Fprintln(out, utils.FormatInfo("No plugins installed"))
-		return nil
+	// First show integrated plugins (built-in)
+	integration := plugins.NewSimplePluginIntegration(nil, pcm.config, pcm.logger)
+	integratedPlugins := integration.GetIntegratedCommands()
+	
+	if len(integratedPlugins) > 0 {
+		fmt.Fprintln(out, utils.FormatHeader("🔧 Integrated Plugins (Built-in)"))
+		fmt.Fprintln(out)
+		
+		for _, plugin := range integratedPlugins {
+			statusIcon := "✅"
+			statusColor := utils.FormatSuccess
+			
+			fmt.Fprintln(out, statusColor(fmt.Sprintf("%s %s (v%s) - %s",
+				statusIcon, plugin.Name, plugin.Version, plugin.Description)))
+
+			if showCapabilities {
+				if len(plugin.Commands) > 0 {
+					fmt.Fprintln(out, utils.FormatInfo(fmt.Sprintf("   Commands: %s", strings.Join(plugin.Commands, ", "))))
+				}
+			}
+		}
+		fmt.Fprintln(out)
 	}
 
-	for _, plugin := range plugins {
-		status, _ := pcm.manager.GetPluginStatus(plugin.Name())
+	// Then show external/installed plugins
+	plugins := pcm.manager.ListPlugins()
+	if len(plugins) > 0 {
+		fmt.Fprintln(out, utils.FormatHeader("📦 External Plugins"))
+		fmt.Fprintln(out)
+		
+		for _, plugin := range plugins {
+			status, _ := pcm.manager.GetPluginStatus(plugin.Name())
 
-		statusIcon := "❓"
-		statusColor := utils.FormatInfo
-		if status != nil {
-			switch status.State {
-			case 3: // StateRunning
-				statusIcon = "✅"
-				statusColor = utils.FormatSuccess
-			case 5: // StateStopped
-				statusIcon = "⏹️"
-				statusColor = utils.FormatWarning
-			case 6: // StateError
-				statusIcon = "❌"
-				statusColor = utils.FormatError
-			case 7: // StateDisabled
-				statusIcon = "🚫"
-				statusColor = utils.FormatInfo
+			statusIcon := "❓"
+			statusColor := utils.FormatInfo
+			if status != nil {
+				switch status.State {
+				case 3: // StateRunning
+					statusIcon = "✅"
+					statusColor = utils.FormatSuccess
+				case 5: // StateStopped
+					statusIcon = "⏹️"
+					statusColor = utils.FormatWarning
+				case 6: // StateError
+					statusIcon = "❌"
+					statusColor = utils.FormatError
+				case 7: // StateDisabled
+					statusIcon = "🚫"
+					statusColor = utils.FormatInfo
+				}
+			}
+
+			fmt.Fprintln(out, statusColor(fmt.Sprintf("%s %s (%s) - %s",
+				statusIcon, plugin.Name(), plugin.Version(), plugin.Description())))
+
+			if showCapabilities {
+				capabilities := plugin.Capabilities()
+				if len(capabilities) > 0 {
+					fmt.Fprintln(out, utils.FormatInfo(fmt.Sprintf("   Capabilities: %s", strings.Join(capabilities, ", "))))
+				}
 			}
 		}
-
-		fmt.Fprintln(out, statusColor(fmt.Sprintf("%s %s (%s) - %s",
-			statusIcon, plugin.Name(), plugin.Version(), plugin.Description())))
-
-		if showCapabilities {
-			capabilities := plugin.Capabilities()
-			if len(capabilities) > 0 {
-				fmt.Fprintln(out, utils.FormatInfo(fmt.Sprintf("   Capabilities: %s", strings.Join(capabilities, ", "))))
-			}
-		}
+	} else {
+		fmt.Fprintln(out, utils.FormatHeader("📦 External Plugins"))
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, utils.FormatInfo("No external plugins installed"))
 	}
 
 	return nil
