@@ -99,6 +99,13 @@ func getAvailableCommands() []Command {
 			Examples:    []string{"nixai plugin list", "nixai plugin install", "nixai plugin create"},
 		},
 		{
+			Name:        "execute",
+			Description: "Execute commands with AI-powered safety validation",
+			Category:    "Execution",
+			Usage:       "nixai execute [command] [args...]",
+			Examples:    []string{"nixai execute nix-env -iA nixpkgs.firefox", "nixai execute --dry-run nixos-rebuild switch", "nixai execute status"},
+		},
+		{
 			Name:        "version-control",
 			Description: "Git-like configuration version control",
 			Category:    "Version Control",

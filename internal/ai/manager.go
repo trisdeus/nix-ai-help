@@ -18,13 +18,14 @@ import (
 
 // ProviderManager manages AI providers using the configuration system.
 type ProviderManager struct {
-	registry     *config.ModelRegistry
-	config       *config.UserConfig
-	providers    map[string]Provider  // Cache of initialized providers
-	cache        *cache.Manager       // Response cache manager
-	monitor      *performance.Monitor // Performance monitoring
-	errorManager *errors.ErrorManager // Error handling and analytics
-	logger       *logger.Logger
+	registry        *config.ModelRegistry
+	config          *config.UserConfig
+	providers       map[string]Provider  // Cache of initialized providers
+	cache           *cache.Manager       // Response cache manager
+	monitor         *performance.Monitor // Performance monitoring
+	errorManager    *errors.ErrorManager // Error handling and analytics
+	logger          *logger.Logger
+	executionConfig *ExecutionWrapperConfig // Execution wrapper configuration
 }
 
 // NewProviderManager creates a new provider manager with the given configuration.
@@ -81,14 +82,23 @@ func NewProviderManager(cfg *config.UserConfig, log *logger.Logger) *ProviderMan
 	}
 	errorManager := errors.NewErrorManager(errorManagerConfig)
 
+	// Initialize execution wrapper configuration
+	executionConfig := &ExecutionWrapperConfig{
+		Enabled:       cfg.Execution.Enabled,
+		AutoExecute:   false, // Always start with safe defaults
+		DryRunDefault: cfg.Execution.DryRunDefault,
+		Patterns:      getDefaultExecutionPatternsStrings(),
+	}
+
 	return &ProviderManager{
-		registry:     registry,
-		config:       cfg,
-		providers:    make(map[string]Provider),
-		cache:        cacheManager,
-		monitor:      performance.NewMonitor(log),
-		errorManager: errorManager,
-		logger:       log,
+		registry:        registry,
+		config:          cfg,
+		providers:       make(map[string]Provider),
+		cache:           cacheManager,
+		monitor:         performance.NewMonitor(log),
+		errorManager:    errorManager,
+		logger:          log,
+		executionConfig: executionConfig,
 	}
 }
 
@@ -109,6 +119,12 @@ func (pm *ProviderManager) GetProvider(providerName string) (Provider, error) {
 	provider, err := pm.initializeProvider(providerName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize provider '%s': %w", providerName, err)
+	}
+
+	// Wrap provider with execution awareness if enabled
+	if pm.executionConfig.Enabled {
+		provider = NewExecutionAwareProvider(provider, pm.executionConfig, pm.logger)
+		pm.logger.Info(fmt.Sprintf("Wrapped provider %s with execution awareness", providerName))
 	}
 
 	// Cache the provider
@@ -937,4 +953,98 @@ func (pm *ProviderManager) PrewarmCache(ctx context.Context, commonQueries []str
 
 		pm.logger.Info("Cache prewarming completed")
 	}()
+}
+
+// Execution Management Methods
+
+// EnableAutoExecution enables automatic command execution for all providers
+func (pm *ProviderManager) EnableAutoExecution() {
+	pm.executionConfig.AutoExecute = true
+	pm.logger.Warn("Auto-execution enabled for all providers - commands will be executed automatically")
+	
+	// Update existing cached providers
+	for providerName, provider := range pm.providers {
+		if eap, ok := provider.(*ExecutionAwareProvider); ok {
+			eap.EnableAutoExecution()
+			pm.logger.Info(fmt.Sprintf("Auto-execution enabled for provider: %s", providerName))
+		}
+	}
+}
+
+// DisableAutoExecution disables automatic command execution for all providers
+func (pm *ProviderManager) DisableAutoExecution() {
+	pm.executionConfig.AutoExecute = false
+	pm.logger.Info("Auto-execution disabled for all providers - commands will be suggested only")
+	
+	// Update existing cached providers
+	for providerName, provider := range pm.providers {
+		if eap, ok := provider.(*ExecutionAwareProvider); ok {
+			eap.DisableAutoExecution()
+			pm.logger.Info(fmt.Sprintf("Auto-execution disabled for provider: %s", providerName))
+		}
+	}
+}
+
+// SetExecutionEnabled enables or disables execution detection for all providers
+func (pm *ProviderManager) SetExecutionEnabled(enabled bool) {
+	pm.executionConfig.Enabled = enabled
+	if enabled {
+		pm.logger.Info("Execution detection enabled for all providers")
+	} else {
+		pm.logger.Info("Execution detection disabled for all providers")
+	}
+	
+	// Clear provider cache to force reinitialization with new settings
+	pm.RefreshProviders()
+}
+
+// IsExecutionEnabled returns whether execution detection is enabled
+func (pm *ProviderManager) IsExecutionEnabled() bool {
+	return pm.executionConfig.Enabled
+}
+
+// IsAutoExecuteEnabled returns whether auto-execution is enabled
+func (pm *ProviderManager) IsAutoExecuteEnabled() bool {
+	return pm.executionConfig.AutoExecute
+}
+
+// GetExecutionCapabilities returns execution capabilities for all providers
+func (pm *ProviderManager) GetExecutionCapabilities() map[string]interface{} {
+	capabilities := map[string]interface{}{
+		"enabled":       pm.executionConfig.Enabled,
+		"auto_execute":  pm.executionConfig.AutoExecute,
+		"dry_run_default": pm.executionConfig.DryRunDefault,
+		"pattern_count": len(pm.executionConfig.Patterns),
+		"providers":     make(map[string]interface{}),
+	}
+	
+	// Get capabilities from each cached provider
+	providerCaps := make(map[string]interface{})
+	for providerName, provider := range pm.providers {
+		if eap, ok := provider.(*ExecutionAwareProvider); ok {
+			providerCaps[providerName] = eap.GetExecutionCapabilities()
+		} else {
+			providerCaps[providerName] = map[string]interface{}{
+				"execution_aware": false,
+			}
+		}
+	}
+	capabilities["providers"] = providerCaps
+	
+	return capabilities
+}
+
+// getDefaultExecutionPatternsStrings returns default execution patterns as strings
+func getDefaultExecutionPatternsStrings() []string {
+	return []string{
+		`(?i)\b(install|add|remove|delete|uninstall)\s+\w+`,
+		`(?i)\b(rebuild|switch|build)\b`,
+		`(?i)\b(run|execute|start|stop|restart)\s+\w+`,
+		`(?i)\b(update|upgrade|download)\s+\w+`,
+		`(?i)\b(enable|disable)\s+\w+`,
+		`(?i)\b(check|status|list|show)\s+\w+`,
+		`(?i)\bcan you (run|execute|install|build|start|stop)`,
+		`(?i)\bplease (run|execute|install|build|start|stop)`,
+		`(?i)\bhow do i (install|run|execute|build|start|stop)`,
+	}
 }

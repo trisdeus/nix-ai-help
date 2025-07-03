@@ -126,7 +126,7 @@ func getAllCommandSuggestions() []string {
 		"team", "fleet", "machines",
 		
 		// Workflow and automation
-		"workflow", "plugin", "version-control",
+		"workflow", "plugin", "version-control", "execute",
 		
 		// Web and integrations
 		"web", "mcp-server", "neovim-setup",
@@ -192,6 +192,15 @@ func getAllCommandSuggestions() []string {
 		"package-monitor security",
 		"package-monitor analyze",
 		"package-monitor stats",
+		
+		// Execution examples
+		"execute status",
+		"execute config",
+		"execute history",
+		"execute nix-env -iA nixpkgs.firefox",
+		"execute --dry-run nixos-rebuild switch",
+		"execute --category package nix-collect-garbage -d",
+		"execute --description \"Update system\" nixos-rebuild switch",
 		
 		"help ask",
 		"help build",

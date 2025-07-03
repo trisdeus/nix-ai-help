@@ -33,7 +33,16 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(nix run:*)"
+      "Bash(nix run:*)",
+      "Bash(go run:*)",
+      "Bash(just build)",
+      "Bash(sed:*)",
+      "Bash(awk:*)",
+      "Bash(mv:*)",
+      "Bash(just test:*)",
+      "Bash(nix build:*)",
+      "Bash(nix flake lock:*)",
+      "Bash(./result/bin/nixai:*)"
     ],
     "deny": []
   }

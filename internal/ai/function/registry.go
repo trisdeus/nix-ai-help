@@ -13,6 +13,7 @@ import (
 	"nix-ai-help/internal/ai/function/devenv"
 	"nix-ai-help/internal/ai/function/diagnose"
 	"nix-ai-help/internal/ai/function/doctor"
+	"nix-ai-help/internal/ai/function/execution"
 	explainHomeoption "nix-ai-help/internal/ai/function/explain-home-option"
 	explainoption "nix-ai-help/internal/ai/function/explain-option"
 	"nix-ai-help/internal/ai/function/flakes"
@@ -67,6 +68,7 @@ func registerAllFunctions() {
 		{"devenv", devenv.NewDevenvFunction()},
 		{"diagnose", diagnose.NewDiagnoseFunction()},
 		{"doctor", doctor.NewDoctorFunction()},
+		{"execute_command", execution.NewExecutionFunction()},
 		{"explain-home-option", explainHomeoption.NewExplainHomeOptionFunction()},
 		{"explain-option", explainoption.NewExplainOptionFunction()},
 		{"flakes", flakes.NewFlakesFunction()},

@@ -7,7 +7,7 @@ import (
 
 var (
 	// These will be set at build time via ldflags
-	Version   = "2.0.1"
+	Version   = "2.0.2"
 	GitCommit = "unknown"
 	BuildDate = "unknown"
 	GoVersion = runtime.Version()

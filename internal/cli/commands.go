@@ -3748,6 +3748,11 @@ func initializeCommands() {
 	rootCmd.AddCommand(configureCmd)
 	rootCmd.AddCommand(diagnoseCmd)
 	rootCmd.AddCommand(doctorCmd)
+	// Add execution commands
+	executeCmd := NewExecuteCommand()
+	executeCmd.AddCommand(NewExecuteStatusCommand())
+	executeCmd.AddCommand(NewExecuteConfigCommand())
+	rootCmd.AddCommand(executeCmd)
 	rootCmd.AddCommand(flakeCmd)
 	rootCmd.AddCommand(learnCmd)
 	rootCmd.AddCommand(logsCmd)

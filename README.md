@@ -67,22 +67,6 @@ nixai offers two powerful TUI interfaces to suit different preferences:
 
 ### 🚀 **Claude Code-Style Interface** (Default: `nixai tui`)
 
-A modern, streamlined interface inspired by Claude Code with a command-focused design:
-
-```text
-┌─ nixai TUI ─────────────────────────────────────────────────────────────────┐
-│                                                                            │
-│ Welcome to nixai! Type commands below and see results above.               │
-│                                                                            │
-│ Available commands: ask, search, explain-option, hardware, build, ...     │
-│ Type 'help' for command list or 'exit' to quit.                          │
-│                                                                            │
-│ > ask "How do I configure nginx in NixOS?"                               │
-│                                                                            │
-└────────────────────────────────────────────────────────────────────────────┘
-nixai v2.0.1 | Type commands and press Enter | ↑↓ for history | Tab for completion
-```
-
 **Features:**
 - **Command-line style input** with tab completion
 - **Command history** navigation with ↑↓ arrows  
@@ -90,35 +74,8 @@ nixai v2.0.1 | Type commands and press Enter | ↑↓ for history | Tab for comp
 - **Live output display** above the command input
 - **Clean, minimalist design** focused on efficiency
 
-### 📋 **Classic Menu Interface** (`nixai tui --classic`)
-
-Traditional menu-based interface for browsing and discovery:
-
-```text
-┌─ Commands (40+ total) ─────────────┬─ Execution Panel ─────────────────┐
-│                                    │                                   │
-│ ask [INPUT]                        │ Welcome to nixai TUI!             │
-│   Ask any NixOS question           │ Select a command from the left    │
-│ search [INPUT]                     │ panel to get started.             │
-│   Search for packages/services     │                                   │
-│ explain-option [INPUT]             │ Latest Updates:                   │
-│   Explain a NixOS option           │ • Interactive parameter input     │
-│ hardware detect                    │ • 8 major commands upgraded       │
-│   Comprehensive hardware analysis  │ • Real-time TUI output            │
-│ build [INPUT]                      │ • Enhanced command discovery      │
-│   Advanced build troubleshooting   │ • Live execution feedback         │
-│                                    │                                   │
-│ (Showing 1-10 of 24)               │ [INPUT] = Interactive Parameters  │
-└────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.1
-```
-
-**Features:**
-- **Two-panel layout** with command browser and execution area
-- **Command discovery** through browsing and filtering
-- **Interactive parameter input** for complex commands
-- **Tab switching** between panels
-- **Visual command organization** with descriptions
+![alt text](tui_1.png)
+![alt text](tui_2.png)
 
 ### ✨ Key TUI Features
 

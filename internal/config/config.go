@@ -98,18 +98,60 @@ const EmbeddedDefaultConfig = `default:
         templates:
             python:
                 enabled: true
-                default_version: "311"
-                default_package_manager: "pip"
-            rust:
-                enabled: true
-                default_version: "stable"
-            nodejs:
-                enabled: true
-                default_version: "20"
-                default_package_manager: "npm"
-            golang:
-                enabled: true
-                default_version: "1.21"
+    execution:
+        enabled: true
+        confirmation_required: true
+        dry_run_default: false
+        max_execution_time: 10m
+        default_working_dir: ""
+        allowed_commands:
+            - "nix*"
+            - "nixos-*"
+            - "systemctl"
+            - "journalctl"
+            - "ls"
+            - "cat"
+            - "grep"
+            - "find"
+            - "git"
+        forbidden_commands:
+            - "rm -rf /"
+            - "dd"
+            - "mkfs*"
+            - "fdisk"
+        sudo_commands:
+            - "nixos-rebuild"
+            - "systemctl"
+        allowed_directories:
+            - "/home"
+            - "/etc/nixos"
+            - "/tmp"
+            - "/var/log"
+        forbidden_paths:
+            - "/boot"
+            - "/sys"
+            - "/proc"
+        allowed_environment_variables:
+            - "PATH"
+            - "HOME"
+            - "NIX_PATH"
+        categories:
+            package:
+                commands: ["nix", "nix-env", "nix-shell", "nix-build"]
+                requires_confirmation: false
+                requires_sudo: false
+                max_execution_time: 5m
+            system:
+                commands: ["nixos-rebuild", "systemctl"]
+                requires_confirmation: true
+                requires_sudo: true
+                max_execution_time: 15m
+        security:
+            audit_logging: true
+            audit_log_path: "/var/log/nixai/commands.log"
+            session_timeout: 30m
+            password_timeout: 15m
+            max_concurrent_commands: 3
     discourse:
         base_url: "https://discourse.nixos.org"
         api_key: ""  # Optional: set via DISCOURSE_API_KEY environment variable
@@ -294,6 +336,44 @@ type PluginMarketplaceConfig struct {
 	SearchTimeout   int    `yaml:"search_timeout" json:"search_timeout"`
 }
 
+// ExecutionConfig represents command execution configuration
+type ExecutionConfig struct {
+	Enabled                      bool                              `yaml:"enabled" json:"enabled"`
+	ConfirmationRequired         bool                              `yaml:"confirmation_required" json:"confirmation_required"`
+	DryRunDefault               bool                              `yaml:"dry_run_default" json:"dry_run_default"`
+	MaxExecutionTime            time.Duration                     `yaml:"max_execution_time" json:"max_execution_time"`
+	DefaultWorkingDir           string                            `yaml:"default_working_dir" json:"default_working_dir"`
+	AllowedCommands             []string                          `yaml:"allowed_commands" json:"allowed_commands"`
+	ForbiddenCommands           []string                          `yaml:"forbidden_commands" json:"forbidden_commands"`
+	SudoCommands                []string                          `yaml:"sudo_commands" json:"sudo_commands"`
+	AllowedDirectories          []string                          `yaml:"allowed_directories" json:"allowed_directories"`
+	ForbiddenPaths              []string                          `yaml:"forbidden_paths" json:"forbidden_paths"`
+	AllowedEnvironmentVariables []string                          `yaml:"allowed_environment_variables" json:"allowed_environment_variables"`
+	Categories                  map[string]ExecutionCategoryConfig `yaml:"categories" json:"categories"`
+	Security                    ExecutionSecurityConfig           `yaml:"security" json:"security"`
+}
+
+// ExecutionCategoryConfig represents configuration for a command category
+type ExecutionCategoryConfig struct {
+	Commands             []string      `yaml:"commands" json:"commands"`
+	RequiresConfirmation bool          `yaml:"requires_confirmation" json:"requires_confirmation"`
+	RequiresSudo         bool          `yaml:"requires_sudo" json:"requires_sudo"`
+	MaxExecutionTime     time.Duration `yaml:"max_execution_time" json:"max_execution_time"`
+	AllowedDirectories   []string      `yaml:"allowed_directories" json:"allowed_directories"`
+	ForbiddenArgs        []string      `yaml:"forbidden_args" json:"forbidden_args"`
+	AllowedArgs          []string      `yaml:"allowed_args" json:"allowed_args"`
+}
+
+// ExecutionSecurityConfig represents security configuration for command execution
+type ExecutionSecurityConfig struct {
+	AuditLogging         bool          `yaml:"audit_logging" json:"audit_logging"`
+	AuditLogPath         string        `yaml:"audit_log_path" json:"audit_log_path"`
+	SessionTimeout       time.Duration `yaml:"session_timeout" json:"session_timeout"`
+	PasswordTimeout      time.Duration `yaml:"password_timeout" json:"password_timeout"`
+	MaxConcurrentCommands int          `yaml:"max_concurrent_commands" json:"max_concurrent_commands"`
+	RequireSudoFor       []string      `yaml:"require_sudo_for" json:"require_sudo_for"`
+}
+
 // PluginSecurityConfig represents security configuration for plugins
 type PluginSecurityConfig struct {
 	SandboxEnabled       bool     `yaml:"sandbox_enabled" json:"sandbox_enabled"`
@@ -387,6 +467,7 @@ type YAMLConfig struct {
 	Discourse   DiscourseConfig   `yaml:"discourse" json:"discourse"`
 	Cache       CacheConfig       `yaml:"cache" json:"cache"`
 	Plugin      PluginConfig      `yaml:"plugin" json:"plugin"`
+	Execution   ExecutionConfig   `yaml:"execution" json:"execution"`
 }
 
 type UserConfig struct {
@@ -406,6 +487,7 @@ type UserConfig struct {
 	NixOSContext NixOSContext      `yaml:"nixos_context" json:"nixos_context"`
 	Cache        CacheConfig       `yaml:"cache" json:"cache"`
 	Plugin       PluginConfig      `yaml:"plugin" json:"plugin"`
+	Execution    ExecutionConfig   `yaml:"execution" json:"execution"`
 }
 
 // GetAITimeout returns the timeout for a specific AI provider
