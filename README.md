@@ -1221,9 +1221,9 @@ nixai tui                   # Launch modern TUI interface
 Test the newly completed TUI modernization and context system:
 
 ```zsh
-nixai interactive           # Launch modern TUI
+nixai tui                   # Launch modern TUI
 # In TUI: Press ? to view changelog
-# In TUI: Use Tab to switch panels
+# In TUI: Use Tab to switch panels  
 # In TUI: Type / to search commands
 # In TUI: Use ↑↓ arrows to navigate
 
@@ -1249,20 +1249,23 @@ nixai revolutionizes how you interact with NixOS by providing AI-powered assista
 **Sarah is new to NixOS and feels overwhelmed by the complexity**
 
 ```bash
-# Step 1: Instant access - no installation needed!
-nix run github:olafkfreund/nix-ai-help
+# Step 1: Start with nixai (install first: nix profile install github:olafkfreund/nix-ai-help)
+nixai --help
 
 # Step 2: Launch the modern TUI for guided exploration
-nix run github:olafkfreund/nix-ai-help -- tui
+nixai tui
 
 # Step 3: Ask questions in natural language
-nix run github:olafkfreund/nix-ai-help -- ask "What is a NixOS configuration and how do I modify it?"
+nixai ask "What is a NixOS configuration and how do I modify it?"
 
 # Step 4: Access the built-in manual system
-nix run github:olafkfreund/nix-ai-help -- manual basics
+nixai manual basics
 
 # Step 5: Generate her first configuration
-nix run github:olafkfreund/nix-ai-help -- configure --template desktop
+nixai configure --template desktop
+
+# Alternative: Use nix run if you prefer not to install
+# nix run github:olafkfreund/nix-ai-help -- ask "question"
 ```
 
 **Sarah's Journey:**
@@ -1279,19 +1282,22 @@ nix run github:olafkfreund/nix-ai-help -- configure --template desktop
 
 ```bash
 # Step 1: Initialize fleet management
-nix run github:olafkfreund/nix-ai-help -- fleet init --name "production-servers"
+nixai fleet init --name "production-servers"
 
 # Step 2: Start the web dashboard for visual management
-nix run github:olafkfreund/nix-ai-help -- web start
+nixai web start
 
 # Step 3: Deploy configurations with rolling updates
-nix run github:olafkfreund/nix-ai-help -- fleet deploy --batch-size 5 --health-check
+nixai fleet deploy --batch-size 5 --health-check
 
 # Step 4: Monitor system health across all machines
-nix run github:olafkfreund/nix-ai-help -- intelligence monitor --fleet production-servers
+nixai intelligence monitor --fleet production-servers
 
 # Step 5: Automate troubleshooting with AI
-nix run github:olafkfreund/nix-ai-help -- diagnose --fleet --auto-fix
+nixai diagnose --fleet --auto-fix
+
+# Alternative: Use nix run if nixai not installed on all systems
+# nix run github:olafkfreund/nix-ai-help -- fleet deploy --batch-size 5
 ```
 
 **Mike's Workflow:**
@@ -1308,20 +1314,23 @@ nix run github:olafkfreund/nix-ai-help -- diagnose --fleet --auto-fix
 
 ```bash
 # Step 1: Analyze a new project repository
-nix run github:olafkfreund/nix-ai-help -- package-repo https://github.com/user/cool-project
+nixai package-repo https://github.com/user/cool-project
 
 # Step 2: Generate development environment automatically
-nix run github:olafkfreund/nix-ai-help -- devenv create --project cool-project --lang python
+nixai devenv create --project cool-project --lang python
 
 # Step 3: Integrate with VS Code using MCP server
-nix run github:olafkfreund/nix-ai-help -- mcp-server start --ephemeral
+nixai mcp-server start --ephemeral
 
 # Step 4: Get AI help directly in the editor
 # VS Code: Use GitHub Copilot Chat or Claude Dev extension
 # Ask: "How do I configure this NixOS service?"
 
 # Step 5: Manage flakes with AI guidance
-nix run github:olafkfreund/nix-ai-help -- flake optimize --auto-update
+nixai flake optimize --auto-update
+
+# Alternative: Use nix run for temporary analysis
+# nix run github:olafkfreund/nix-ai-help -- package-repo <url>
 ```
 
 **Alex's Development Flow:**
@@ -1338,19 +1347,22 @@ nix run github:olafkfreund/nix-ai-help -- flake optimize --auto-update
 
 ```bash
 # Step 1: Comprehensive hardware analysis
-nix run github:olafkfreund/nix-ai-help -- hardware detect --detailed
+nixai hardware detect --detailed
 
 # Step 2: AI-powered optimization recommendations
-nix run github:olafkfreund/nix-ai-help -- hardware optimize --gaming --gpu nvidia
+nixai hardware optimize --gaming --gpu nvidia
 
 # Step 3: Automatic driver configuration
-nix run github:olafkfreund/nix-ai-help -- hardware drivers --auto-install --gaming
+nixai hardware drivers --auto-install --gaming
 
 # Step 4: Performance monitoring and tuning
-nix run github:olafkfreund/nix-ai-help -- performance monitor --realtime
+nixai performance monitor --realtime
 
 # Step 5: Gaming-specific configuration generation
-nix run github:olafkfreund/nix-ai-help -- configure --template gaming --gpu nvidia
+nixai configure --template gaming --gpu nvidia
+
+# Alternative: Use nix run for one-time hardware analysis
+# nix run github:olafkfreund/nix-ai-help -- hardware detect --detailed
 ```
 
 **Jordan's Gaming Setup:**
@@ -1367,19 +1379,22 @@ nix run github:olafkfreund/nix-ai-help -- configure --template gaming --gpu nvid
 
 ```bash
 # Step 1: Access educational content
-nix run github:olafkfreund/nix-ai-help -- learn --list-topics
+nixai learn --list-topics
 
 # Step 2: Interactive learning modules
-nix run github:olafkfreund/nix-ai-help -- learn nix-language --interactive
+nixai learn nix-language --interactive
 
 # Step 3: Generate teaching examples
-nix run github:olafkfreund/nix-ai-help -- snippets search "beginner examples"
+nixai snippets search "beginner examples"
 
 # Step 4: Create student lab environments
-nix run github:olafkfreund/nix-ai-help -- configure --template educational --multi-user
+nixai configure --template educational --multi-user
 
 # Step 5: Demonstrate concepts with real examples
-nix run github:olafkfreund/nix-ai-help -- ask "Show me how derivations work with practical examples"
+nixai ask "Show me how derivations work with practical examples"
+
+# Alternative: Students can use nix run for learning without installation
+# nix run github:olafkfreund/nix-ai-help -- learn nix-language
 ```
 
 **Dr. Chen's Teaching Approach:**
@@ -1396,19 +1411,22 @@ nix run github:olafkfreund/nix-ai-help -- ask "Show me how derivations work with
 
 ```bash
 # Step 1: Generate home server configuration
-nix run github:olafkfreund/nix-ai-help -- configure --template homelab --services "nextcloud,jellyfin,vaultwarden"
+nixai configure --template homelab --services "nextcloud,jellyfin,vaultwarden"
 
 # Step 2: Container and service management
-nix run github:olafkfreund/nix-ai-help -- ask "How do I run Docker containers on NixOS?"
+nixai ask "How do I run Docker containers on NixOS?"
 
 # Step 3: Network and security configuration
-nix run github:olafkfreund/nix-ai-help -- configure --advanced --security-hardening --firewall
+nixai configure --advanced --security-hardening --firewall
 
 # Step 4: Backup and maintenance automation
-nix run github:olafkfreund/nix-ai-help -- templates search "automated-backup"
+nixai templates search "automated-backup"
 
 # Step 5: Monitoring and alerting
-nix run github:olafkfreund/nix-ai-help -- intelligence monitor --services --alerts
+nixai intelligence monitor --services --alerts
+
+# Alternative: Use nix run for configuration generation
+# nix run github:olafkfreund/nix-ai-help -- configure --template homelab
 ```
 
 **Maria's Home Lab Journey:**
@@ -1425,19 +1443,22 @@ nix run github:olafkfreund/nix-ai-help -- intelligence monitor --services --aler
 
 ```bash
 # Step 1: Analyze existing system
-nix run github:olafkfreund/nix-ai-help -- migrate analyze --source /etc
+nixai migrate analyze --source /etc
 
 # Step 2: Generate migration plan
-nix run github:olafkfreund/nix-ai-help -- migrate plan --from ubuntu --services detected
+nixai migrate plan --from ubuntu --services detected
 
 # Step 3: Automated configuration conversion
-nix run github:olafkfreund/nix-ai-help -- migrate convert --backup-existing
+nixai migrate convert --backup-existing
 
 # Step 4: Testing and validation
-nix run github:olafkfreund/nix-ai-help -- migrate test --dry-run --verbose
+nixai migrate test --dry-run --verbose
 
 # Step 5: Rollback strategy
-nix run github:olafkfreund/nix-ai-help -- migrate rollback --plan migration-backup
+nixai migrate rollback --plan migration-backup
+
+# Alternative: Use nix run for system analysis on client machines
+# nix run github:olafkfreund/nix-ai-help -- migrate analyze --source /etc
 ```
 
 **Tom's Migration Process:**
@@ -1454,19 +1475,22 @@ nix run github:olafkfreund/nix-ai-help -- migrate rollback --plan migration-back
 
 ```bash
 # Step 1: Access community features
-nix run github:olafkfreund/nix-ai-help -- community --search "similar-configs"
+nixai community --search "similar-configs"
 
 # Step 2: Share templates and configurations
-nix run github:olafkfreund/nix-ai-help -- templates publish --name "lisa-desktop" --description "Minimal productivity setup"
+nixai templates publish --name "lisa-desktop" --description "Minimal productivity setup"
 
 # Step 3: Contribute to documentation
-nix run github:olafkfreund/nix-ai-help -- manual contribute --topic "desktop-environments"
+nixai manual contribute --topic "desktop-environments"
 
 # Step 4: Help others with AI-powered assistance
-nix run github:olafkfreund/nix-ai-help -- ask "How do I help a newcomer set up their first NixOS system?"
+nixai ask "How do I help a newcomer set up their first NixOS system?"
 
 # Step 5: Plugin development
-nix run github:olafkfreund/nix-ai-help -- plugin create --template advanced --name "lisa-utils"
+nixai plugin create --template advanced --name "lisa-utils"
+
+# Alternative: Use nix run for quick community searches
+# nix run github:olafkfreund/nix-ai-help -- community --search "configs"
 ```
 
 **Lisa's Community Impact:**
@@ -1498,8 +1522,12 @@ nix run github:olafkfreund/nix-ai-help -- plugin create --template advanced --na
 **Ready to Start Your Journey?**
 
 ```bash
-# Take the first step - no installation required!
-nix run github:olafkfreund/nix-ai-help -- ask "How can nixai help me with my NixOS goals?"
+# Take the first step - install nixai and start exploring!
+nix profile install github:olafkfreund/nix-ai-help
+nixai ask "How can nixai help me with my NixOS goals?"
+
+# Or try without installing first:
+# nix run github:olafkfreund/nix-ai-help -- ask "How can nixai help me?"
 ```
 
 *nixai transforms NixOS from a complex system into an intelligent, approachable platform that grows with your expertise and supports your unique requirements.*
