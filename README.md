@@ -6,20 +6,22 @@
 
 ## 🌟 Slogan
 
-**nixai: Your AI-powered, privacy-first NixOS assistant with 40+ specialized commands — automate, troubleshoot, and master NixOS from your terminal with intelligent agents, modern web interface, and comprehensive plugin system.**
+**nixai: Revolutionary AI-powered NixOS management platform with 40+ specialized commands — run instantly with nix run, leverage 7 AI providers, manage multi-machine fleets, and master NixOS with intelligent agents, modern web interface, and comprehensive plugin ecosystem.**
 
 ## 🆕 Latest Updates (July 2025)
 
-### 🚀 **v2.0.0: Major Feature Release - Web Interface, Enhanced TUI & Plugin System**
+### 🚀 **v2.0.0: Revolutionary AI-Powered NixOS Management Platform**
 
-- **🌐 Modern Web Interface**: Responsive dashboard with configuration builder, team collaboration, and real-time monitoring
-- **🔌 Comprehensive Plugin System**: 14 plugin management commands with secure dynamic loading and community marketplace
-- **🎯 Enhanced TUI Experience**: Claude Code-style and classic interfaces with improved navigation and real-time feedback
-- **⚙️ Fleet Management**: Multi-machine deployment and configuration management with version control integration
-- **🚀 Version Control System**: Git-like workflow for NixOS configurations with branching, history, and team management
-- **📊 System Monitoring**: Advanced package monitoring, performance analysis, and intelligence gathering
-- **🤖 GitHub Copilot Integration**: Full integration with GitHub Copilot API and enhanced provider ecosystem
-- **🛡️ Security & Performance**: Improved security sandbox, plugin validation, and optimized core architecture
+- **⚡ Instant Access**: Run directly with `nix run github:olafkfreund/nix-ai-help` - no installation required!
+- **🌐 Modern Web Interface**: Responsive dashboard with visual configuration builder, team collaboration, and real-time monitoring
+- **📚 Built-in Manual System**: 28+ comprehensive documentation topics with interactive navigation and offline access
+- **🤖 Multi-Provider AI**: 7 AI providers including OpenAI, Claude, Gemini, Groq, Ollama, and GitHub Copilot
+- **🌍 Fleet Management**: Multi-machine deployment with rolling strategies, health monitoring, and centralized configuration
+- **🔌 Advanced Plugin System**: 14 plugin management commands with secure sandboxing and community marketplace
+- **🎯 Enhanced TUI**: Claude Code-style interface with dual-panel layout and real-time command execution
+- **📝 Configuration Templates**: Built-in templates with GitHub integration and marketplace for community sharing
+- **🔗 Editor Integration**: Enhanced MCP server with nix run support for seamless VS Code/Neovim integration
+- **🧠 AI Intelligence**: System analysis, conflict detection, predictive recommendations, and automated troubleshooting
 
 ### ✨ **Modern TUI Interface** - **NEWLY COMPLETED!**
 
@@ -44,19 +46,18 @@
 - **🔄 Migration Assistant**: AI-powered channel-to-flakes migration with backup and rollback support
 - **📝 Neovim Integration**: Complete Neovim setup with 5 management commands and MCP integration
 
-### 🚀 **Recent Feature Additions**
+### 🚀 **Breakthrough Features in 2.0.0**
 
-- **🤖 Enhanced AI Provider Ecosystem**: Added Claude (Anthropic) and Groq providers for expanded AI capabilities and ultra-fast inference
-- **Real-time streaming and interface compatibility for all AI providers**
-- **Unified Query/QueryWithContext interface for all providers**
-- **Refactored agent and CLI layers for context-aware and legacy support**
-- **Improved CLI completion and test reliability**
-- **Modern TUI Architecture**: Complete `/internal/tui/` system with Bubble Tea framework
-- **Context-Aware System**: Intelligent NixOS context detection with 4 management commands
-- **Enhanced Hardware Management**: 6 specialized subcommands for comprehensive system analysis
-- **AI Provider Flexibility**: Configuration-driven provider selection with fallback support
-- **MCP Integration**: Model Context Protocol server for enhanced documentation queries
-- **Developer Tools**: Advanced flake management, package analysis, and development environments
+- **🎯 nix run Integration**: Primary installation method with automatic dependency resolution and ephemeral mode
+- **📚 Comprehensive Manual System**: Complete offline documentation with 28+ topics and interactive navigation
+- **🌍 Enterprise Fleet Management**: Multi-machine deployment with rolling strategies and health monitoring
+- **🤖 7-Provider AI Ecosystem**: Enhanced provider system with Claude, Groq, Gemini 2.5 Flash, and intelligent fallbacks
+- **🔗 Enhanced Editor Integration**: MCP server with auto-detection and improved VS Code/Neovim support
+- **🌐 Advanced Web Dashboard**: Visual configuration builder with drag-and-drop and real-time collaboration
+- **📝 Template Marketplace**: Built-in templates with GitHub integration and community sharing
+- **🧠 AI Intelligence System**: System analysis, conflict detection, and predictive recommendations
+- **🔧 Modern TUI Architecture**: Dual-panel interface with real-time execution and enhanced navigation
+- **🛡️ Security & Performance**: Enhanced plugin sandboxing, optimized caching, and comprehensive testing
 
 ---
 
@@ -82,7 +83,7 @@ The newly modernized Terminal User Interface provides a professional, accessible
 │                                    │                                   │
 │ (Showing 1-10 of 24)               │ [INPUT] = Interactive Parameters  │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.0
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.1
 ```
 
 ### ✨ Key TUI Features
@@ -116,28 +117,36 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive documentation
 
 ## 🚀 Installation
 
-### 📦 Flake-based Installation (Recommended)
+### ⚡ Instant Access (Recommended)
 
-**Prerequisites:**
-
-- Nix (with flakes enabled)
-- git
-
-**1. Run directly (no installation required):**
+**Run directly with nix run - no installation required!**
 
 ```zsh
 # Run latest version from GitHub
 nix run github:olafkfreund/nix-ai-help
 
 # Ask a question directly
-nix run github:olafkfreund/nix-ai-help -- --ask "how do I configure nginx?"
+nix run github:olafkfreund/nix-ai-help -- ask "how do I configure nginx?"
 
-# Use specific AI provider
-nix run github:olafkfreund/nix-ai-help -- --provider ollama --ask "configure firewall"
+# Launch modern TUI interface
+nix run github:olafkfreund/nix-ai-help -- tui
 
-# Show help
-nix run github:olafkfreund/nix-ai-help -- --help
+# Start web dashboard
+nix run github:olafkfreund/nix-ai-help -- web start
+
+# Start MCP server for VS Code/Neovim
+nix run github:olafkfreund/nix-ai-help -- mcp-server start --ephemeral
+
+# Browse built-in manual
+nix run github:olafkfreund/nix-ai-help -- manual
 ```
+
+### 📦 Traditional Installation
+
+**Prerequisites:**
+
+- Nix (with flakes enabled)
+- git
 
 **2. Build from source (Latest Development):**
 
@@ -251,13 +260,16 @@ nixai -a "How do I enable SSH in NixOS?"
 nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 ```
 
-### 🎯 Advanced Features at a Glance
+### 🎯 Revolutionary Features at a Glance
 
+- **Instant Access**: Run with `nix run github:olafkfreund/nix-ai-help` - no installation required
 - **40+ Specialized Commands**: Complete AI-powered toolkit for all NixOS operations
-- **Advanced Hardware Management**: Comprehensive hardware detection, optimization, and driver management
-- **Role-Based AI Agents**: Intelligent agents adapt behavior based on context and user-selected roles
-- **Multi-Provider AI**: Local Ollama, OpenAI, Gemini, with intelligent fallback and privacy-first defaults
-- **MCP Integration**: Model Context Protocol server for enhanced documentation queries
+- **Built-in Manual System**: 28+ comprehensive documentation topics with interactive navigation
+- **Multi-Provider AI**: 7 AI providers including Claude, Groq, Gemini 2.5 Flash, OpenAI, and local Ollama
+- **Fleet Management**: Multi-machine deployment with enterprise-grade features
+- **Web Dashboard**: Modern interface with visual configuration builder and team collaboration
+- **Editor Integration**: Enhanced MCP server with auto-detection for VS Code/Neovim
+- **Template Marketplace**: Built-in templates with GitHub integration and community sharing
 
 ---
 
@@ -290,7 +302,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 │                                    │ • Version display                │
 │ (Showing 1-8 of 24)               │ • ? changelog popup             │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.0
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.1
 ```
 
 ### 🤖 AI-Powered Command System
@@ -1163,7 +1175,7 @@ nixai config reset
 After installation, verify everything works:
 
 ```zsh
-nixai --version              # Should show "nixai version 1.0.5"
+nixai --version              # Should show "nixai version 2.0.1"
 nixai doctor                 # Run comprehensive health check
 nixai hardware detect       # Test hardware detection
 nixai -a "test question"     # Test AI functionality
@@ -1191,3 +1203,269 @@ nixai ask "How do I configure SSH?" # See context-aware response
 ---
 
 **For full command help, advanced usage, and troubleshooting, see the [User Manual](docs/MANUAL.md).**
+
+---
+
+## 🗺️ User Journey: How nixai Transforms Your NixOS Experience
+
+nixai revolutionizes how you interact with NixOS by providing AI-powered assistance for every aspect of your system management. Here's how different users leverage nixai to solve real-world problems:
+
+### 👨‍💻 **The NixOS Newcomer: Getting Started**
+
+**Sarah is new to NixOS and feels overwhelmed by the complexity**
+
+```bash
+# Step 1: Instant access - no installation needed!
+nix run github:olafkfreund/nix-ai-help
+
+# Step 2: Launch the modern TUI for guided exploration
+nix run github:olafkfreund/nix-ai-help -- tui
+
+# Step 3: Ask questions in natural language
+nix run github:olafkfreund/nix-ai-help -- ask "What is a NixOS configuration and how do I modify it?"
+
+# Step 4: Access the built-in manual system
+nix run github:olafkfreund/nix-ai-help -- manual basics
+
+# Step 5: Generate her first configuration
+nix run github:olafkfreund/nix-ai-help -- configure --template desktop
+```
+
+**Sarah's Journey:**
+- **Week 1**: Uses `nixai ask` to understand basic concepts like derivations, the Nix store, and configuration.nix
+- **Week 2**: Leverages `nixai configure` to generate desktop configurations with window managers
+- **Week 3**: Discovers `nixai hardware detect` to optimize her laptop for better battery life
+- **Week 4**: Uses `nixai templates` to find community configurations for her development workflow
+
+**Result**: Sarah goes from NixOS confusion to confidently managing her system in under a month.
+
+### 🏢 **The System Administrator: Enterprise Fleet Management**
+
+**Mike manages 50+ NixOS servers and needs centralized control**
+
+```bash
+# Step 1: Initialize fleet management
+nix run github:olafkfreund/nix-ai-help -- fleet init --name "production-servers"
+
+# Step 2: Start the web dashboard for visual management
+nix run github:olafkfreund/nix-ai-help -- web start
+
+# Step 3: Deploy configurations with rolling updates
+nix run github:olafkfreund/nix-ai-help -- fleet deploy --batch-size 5 --health-check
+
+# Step 4: Monitor system health across all machines
+nix run github:olafkfreund/nix-ai-help -- intelligence monitor --fleet production-servers
+
+# Step 5: Automate troubleshooting with AI
+nix run github:olafkfreund/nix-ai-help -- diagnose --fleet --auto-fix
+```
+
+**Mike's Workflow:**
+- **Daily**: Uses the web dashboard to monitor fleet health and performance metrics
+- **Weekly**: Deploys updates using `nixai fleet deploy` with automated rollback on failure
+- **Monthly**: Analyzes system intelligence reports to optimize configurations
+- **On-demand**: Leverages AI diagnostics to troubleshoot issues across multiple machines
+
+**Result**: Mike reduces system management time by 70% while improving reliability and standardization.
+
+### 🎨 **The Developer: Streamlined Development Environment**
+
+**Alex develops multiple projects and needs consistent, reproducible environments**
+
+```bash
+# Step 1: Analyze a new project repository
+nix run github:olafkfreund/nix-ai-help -- package-repo https://github.com/user/cool-project
+
+# Step 2: Generate development environment automatically
+nix run github:olafkfreund/nix-ai-help -- devenv create --project cool-project --lang python
+
+# Step 3: Integrate with VS Code using MCP server
+nix run github:olafkfreund/nix-ai-help -- mcp-server start --ephemeral
+
+# Step 4: Get AI help directly in the editor
+# VS Code: Use GitHub Copilot Chat or Claude Dev extension
+# Ask: "How do I configure this NixOS service?"
+
+# Step 5: Manage flakes with AI guidance
+nix run github:olafkfreund/nix-ai-help -- flake optimize --auto-update
+```
+
+**Alex's Development Flow:**
+- **Project Setup**: Uses `nixai package-repo` to automatically generate Nix expressions for new projects
+- **Environment Management**: Leverages `nixai devenv` to create consistent development shells
+- **Editor Integration**: Uses MCP server for contextual NixOS help within VS Code/Neovim
+- **CI/CD**: Integrates `nixai build` commands in CI pipelines for intelligent failure analysis
+
+**Result**: Alex achieves 100% reproducible development environments with AI-assisted configuration.
+
+### 🔧 **The Hardware Enthusiast: Optimization & Gaming**
+
+**Jordan has a gaming rig and wants maximum performance from NixOS**
+
+```bash
+# Step 1: Comprehensive hardware analysis
+nix run github:olafkfreund/nix-ai-help -- hardware detect --detailed
+
+# Step 2: AI-powered optimization recommendations
+nix run github:olafkfreund/nix-ai-help -- hardware optimize --gaming --gpu nvidia
+
+# Step 3: Automatic driver configuration
+nix run github:olafkfreund/nix-ai-help -- hardware drivers --auto-install --gaming
+
+# Step 4: Performance monitoring and tuning
+nix run github:olafkfreund/nix-ai-help -- performance monitor --realtime
+
+# Step 5: Gaming-specific configuration generation
+nix run github:olafkfreund/nix-ai-help -- configure --template gaming --gpu nvidia
+```
+
+**Jordan's Gaming Setup:**
+- **Hardware Detection**: Uses `nixai hardware detect` to identify all components and their optimal drivers
+- **Performance Tuning**: Leverages AI recommendations for CPU scaling, GPU configuration, and thermal management
+- **Game Management**: Creates Steam and Lutris configurations optimized for his hardware
+- **Monitoring**: Uses real-time performance monitoring to track system health during gaming
+
+**Result**: Jordan achieves optimal gaming performance with automated hardware optimization and monitoring.
+
+### 🎓 **The Educator: Teaching NixOS Concepts**
+
+**Dr. Chen teaches advanced Linux systems and uses NixOS in her curriculum**
+
+```bash
+# Step 1: Access educational content
+nix run github:olafkfreund/nix-ai-help -- learn --list-topics
+
+# Step 2: Interactive learning modules
+nix run github:olafkfreund/nix-ai-help -- learn nix-language --interactive
+
+# Step 3: Generate teaching examples
+nix run github:olafkfreund/nix-ai-help -- snippets search "beginner examples"
+
+# Step 4: Create student lab environments
+nix run github:olafkfreund/nix-ai-help -- configure --template educational --multi-user
+
+# Step 5: Demonstrate concepts with real examples
+nix run github:olafkfreund/nix-ai-help -- ask "Show me how derivations work with practical examples"
+```
+
+**Dr. Chen's Teaching Approach:**
+- **Curriculum Design**: Uses `nixai learn` modules to structure NixOS lessons
+- **Live Demonstrations**: Leverages `nixai ask` to provide real-time explanations during lectures
+- **Student Labs**: Creates standardized lab environments using `nixai configure --template educational`
+- **Assignment Generation**: Uses AI to generate practical NixOS challenges for students
+
+**Result**: Dr. Chen creates engaging, hands-on NixOS education with AI-powered explanations and examples.
+
+### 🏠 **The Home Lab Enthusiast: Self-Hosting Everything**
+
+**Maria runs a comprehensive home lab with multiple services**
+
+```bash
+# Step 1: Generate home server configuration
+nix run github:olafkfreund/nix-ai-help -- configure --template homelab --services "nextcloud,jellyfin,vaultwarden"
+
+# Step 2: Container and service management
+nix run github:olafkfreund/nix-ai-help -- ask "How do I run Docker containers on NixOS?"
+
+# Step 3: Network and security configuration
+nix run github:olafkfreund/nix-ai-help -- configure --advanced --security-hardening --firewall
+
+# Step 4: Backup and maintenance automation
+nix run github:olafkfreund/nix-ai-help -- templates search "automated-backup"
+
+# Step 5: Monitoring and alerting
+nix run github:olafkfreund/nix-ai-help -- intelligence monitor --services --alerts
+```
+
+**Maria's Home Lab Journey:**
+- **Service Setup**: Uses configuration templates to quickly deploy home lab services
+- **Security**: Implements security hardening with AI-recommended configurations
+- **Monitoring**: Sets up comprehensive monitoring with automated alerts
+- **Maintenance**: Uses AI-guided maintenance routines to keep services running smoothly
+
+**Result**: Maria operates a robust, secure home lab with minimal manual intervention.
+
+### 🔄 **The Migration Specialist: Legacy System Modernization**
+
+**Tom helps organizations migrate from traditional Linux to NixOS**
+
+```bash
+# Step 1: Analyze existing system
+nix run github:olafkfreund/nix-ai-help -- migrate analyze --source /etc
+
+# Step 2: Generate migration plan
+nix run github:olafkfreund/nix-ai-help -- migrate plan --from ubuntu --services detected
+
+# Step 3: Automated configuration conversion
+nix run github:olafkfreund/nix-ai-help -- migrate convert --backup-existing
+
+# Step 4: Testing and validation
+nix run github:olafkfreund/nix-ai-help -- migrate test --dry-run --verbose
+
+# Step 5: Rollback strategy
+nix run github:olafkfreund/nix-ai-help -- migrate rollback --plan migration-backup
+```
+
+**Tom's Migration Process:**
+- **Assessment**: Uses AI to analyze existing systems and identify migration complexity
+- **Planning**: Creates detailed migration plans with risk assessment
+- **Execution**: Performs automated migrations with comprehensive backup strategies
+- **Validation**: Tests migrated systems to ensure functional equivalence
+
+**Result**: Tom successfully migrates organizations to NixOS with minimal downtime and risk.
+
+### 🌐 **The Community Contributor: Sharing Knowledge**
+
+**Lisa contributes to the NixOS community and shares her configurations**
+
+```bash
+# Step 1: Access community features
+nix run github:olafkfreund/nix-ai-help -- community --search "similar-configs"
+
+# Step 2: Share templates and configurations
+nix run github:olafkfreund/nix-ai-help -- templates publish --name "lisa-desktop" --description "Minimal productivity setup"
+
+# Step 3: Contribute to documentation
+nix run github:olafkfreund/nix-ai-help -- manual contribute --topic "desktop-environments"
+
+# Step 4: Help others with AI-powered assistance
+nix run github:olafkfreund/nix-ai-help -- ask "How do I help a newcomer set up their first NixOS system?"
+
+# Step 5: Plugin development
+nix run github:olafkfreund/nix-ai-help -- plugin create --template advanced --name "lisa-utils"
+```
+
+**Lisa's Community Impact:**
+- **Template Sharing**: Publishes popular configuration templates for others to use
+- **Documentation**: Contributes to the built-in manual system
+- **Plugin Development**: Creates useful plugins for the community
+- **Mentoring**: Uses AI to help newcomers with personalized guidance
+
+**Result**: Lisa builds a reputation as a helpful community member while advancing NixOS adoption.
+
+### 🚀 **The Innovation Journey: Common Success Patterns**
+
+**What makes these users successful with nixai:**
+
+1. **Start Small**: Begin with simple questions using `nixai ask`
+2. **Explore Interactively**: Use `nixai tui` for guided discovery
+3. **Leverage AI Intelligence**: Trust the AI recommendations and learn from them
+4. **Build Incrementally**: Use templates and configurations as starting points
+5. **Integrate Workflows**: Incorporate nixai into existing development/operations workflows
+6. **Share & Learn**: Engage with the community through templates and documentation
+
+**Universal Benefits:**
+- **Reduced Learning Curve**: AI guidance makes NixOS accessible to everyone
+- **Increased Productivity**: Automated tasks and intelligent recommendations save time
+- **Better Reliability**: AI-powered diagnostics and monitoring prevent issues
+- **Enhanced Collaboration**: Shared templates and configurations build community knowledge
+- **Continuous Improvement**: AI learns from usage patterns to provide better suggestions
+
+**Ready to Start Your Journey?**
+
+```bash
+# Take the first step - no installation required!
+nix run github:olafkfreund/nix-ai-help -- ask "How can nixai help me with my NixOS goals?"
+```
+
+*nixai transforms NixOS from a complex system into an intelligent, approachable platform that grows with your expertise and supports your unique requirements.*

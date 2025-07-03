@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"nix-ai-help/pkg/utils"
 	"nix-ai-help/pkg/version"
 )
 
@@ -741,7 +742,12 @@ func (m *ClaudeTUI) executeCommand(input string) {
 	}
 
 	// Try to execute the actual nixai command
-	nixaiPath := "./nixai"
+	nixaiPath, pathErr := utils.GetExecutablePath()
+	if pathErr != nil {
+		m.addOutput(m.styles.error.Render(fmt.Sprintf("Error getting executable path: %v", pathErr)))
+		m.addOutput("") // Add empty line for separation
+		return
+	}
 	cmd := exec.Command(nixaiPath, args...)
 	
 	output, err := cmd.CombinedOutput()

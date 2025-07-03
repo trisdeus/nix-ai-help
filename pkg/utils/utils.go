@@ -647,3 +647,20 @@ func HashString(input string) string {
 func DecodeBase64(encoded string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(encoded)
 }
+
+// GetExecutablePath returns the path to the current nixai executable
+func GetExecutablePath() (string, error) {
+	execPath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("failed to get executable path: %v", err)
+	}
+	
+	// Resolve symlinks to get the actual binary path
+	resolvedPath, err := filepath.EvalSymlinks(execPath)
+	if err != nil {
+		// If we can't resolve symlinks, use the original path
+		return execPath, nil
+	}
+	
+	return resolvedPath, nil
+}

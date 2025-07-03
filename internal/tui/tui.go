@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"nix-ai-help/pkg/utils"
 )
 
 // TUI represents the main terminal user interface
@@ -351,13 +352,17 @@ func (t *TUI) runCommand(cmdName string) {
 	fmt.Println()
 	
 	// Execute the actual nixai command
-	nixaiPath := "./nixai" // Assume nixai binary is in current directory
+	nixaiPath, err := utils.GetExecutablePath()
+	if err != nil {
+		fmt.Printf("Error getting executable path: %v\n", err)
+		return
+	}
 	cmd := exec.Command(nixaiPath, cmdName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		fmt.Printf("Error running command: %v\n", err)
 	}
@@ -382,13 +387,17 @@ func (t *TUI) runCommandWithOptions(cmd Command) {
 	fmt.Println()
 	
 	// Execute the actual nixai command
-	nixaiPath := "./nixai"
+	nixaiPath, err := utils.GetExecutablePath()
+	if err != nil {
+		fmt.Printf("Error getting executable path: %v\n", err)
+		return
+	}
 	execCmd := exec.Command(nixaiPath, args...)
 	execCmd.Stdout = os.Stdout
 	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin
 	
-	err := execCmd.Run()
+	err = execCmd.Run()
 	if err != nil {
 		fmt.Printf("Error running command: %v\n", err)
 	}
@@ -418,7 +427,13 @@ func (t *TUI) showDetailedHelp(cmd Command) {
 	fmt.Println()
 	
 	// Try to get actual help from nixai command
-	nixaiPath := "./nixai"
+	nixaiPath, err := utils.GetExecutablePath()
+	if err != nil {
+		// If we can't get the path, skip the help command
+		fmt.Print("Press Enter to continue...")
+		fmt.Scanln()
+		return
+	}
 	execCmd := exec.Command(nixaiPath, cmd.Name, "--help")
 	output, err := execCmd.CombinedOutput()
 	if err == nil {
