@@ -7,7 +7,6 @@ import (
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/logger"
@@ -35,14 +34,8 @@ type ExecutionAwareTUI struct {
 	mode               ExecutionMode           // Current mode
 	pendingExecution   *ExecutionRequest       // Pending execution request
 	selectedExecution  int                     // Selected execution in history
-	showExecutionPanel bool                    // Show execution status panel
 	executionOutput    []string                // Execution-specific output
 	confirmPrompt      string                  // Confirmation prompt text
-	
-	// Layout
-	leftPanelWidth     int                     // Width of left panel
-	rightPanelWidth    int                     // Width of right panel
-	panelSplit         bool                    // Whether to show split panel view
 }
 
 // NewExecutionAwareTUI creates a new execution-aware TUI
@@ -63,10 +56,6 @@ func NewExecutionAwareTUI(cfg *config.UserConfig, log *logger.Logger) (*Executio
 		config:           cfg,
 		logger:           log,
 		mode:             ModeNormal,
-		showExecutionPanel: true,
-		panelSplit:       true,
-		leftPanelWidth:   60,
-		rightPanelWidth:  40,
 		executionOutput:  []string{},
 	}
 	
@@ -94,8 +83,8 @@ func (m *ExecutionAwareTUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+e":
-			// Toggle execution panel
-			m.showExecutionPanel = !m.showExecutionPanel
+			// Show execution status
+			m.showExecutionStatus()
 			return m, nil
 			
 		case "ctrl+h":
@@ -145,9 +134,20 @@ func (m *ExecutionAwareTUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			
 		case "up", "down":
-			// Handle execution history navigation
+			// Handle execution history navigation or suggestion navigation
 			if m.mode == ModeHistory {
 				return m.handleHistoryNavigation(msg.String())
+			}
+			// Otherwise, let base TUI handle suggestion navigation
+			var baseTUI tea.Model
+			baseTUI, cmd = m.ClaudeTUI.Update(msg)
+			m.ClaudeTUI = baseTUI.(*ClaudeTUI)
+			return m, cmd
+			
+		case "tab":
+			// Handle tab completion with execution detection
+			if m.mode == ModeNormal {
+				return m.handleTabCompletion()
 			}
 			
 		case "enter":
@@ -157,6 +157,15 @@ func (m *ExecutionAwareTUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if input != "" {
 					return m.handleCommandInput(input)
 				}
+			}
+			
+		default:
+			// Forward all other keys to base TUI for normal handling (typing, etc.)
+			if m.mode == ModeNormal {
+				var baseTUI tea.Model
+				baseTUI, cmd = m.ClaudeTUI.Update(msg)
+				m.ClaudeTUI = baseTUI.(*ClaudeTUI)
+				return m, cmd
 			}
 		}
 		
@@ -200,20 +209,11 @@ func (m *ExecutionAwareTUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 		
 	case tea.WindowSizeMsg:
-		// Handle window resize
-		m.width = msg.Width
-		m.height = msg.Height
-		
-		if m.panelSplit {
-			m.leftPanelWidth = int(float64(msg.Width) * 0.6)
-			m.rightPanelWidth = msg.Width - m.leftPanelWidth - 2
-		} else {
-			m.leftPanelWidth = msg.Width
-			m.rightPanelWidth = 0
-		}
-		
-		m.textInput.Width = m.leftPanelWidth - 8
-		return m, nil
+		// Handle window resize - pass to base TUI
+		var baseTUI tea.Model
+		baseTUI, cmd = m.ClaudeTUI.Update(msg)
+		m.ClaudeTUI = baseTUI.(*ClaudeTUI)
+		return m, cmd
 	}
 	
 	// Update base TUI if not handled above
@@ -232,276 +232,207 @@ func (m *ExecutionAwareTUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the TUI
 func (m *ExecutionAwareTUI) View() string {
-	if !m.panelSplit || !m.showExecutionPanel {
-		// Single panel mode or execution panel hidden
-		return m.renderSinglePanel()
-	}
-	
-	// Split panel mode
-	leftPanel := m.renderLeftPanel()
-	rightPanel := m.renderRightPanel()
-	
-	return lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		leftPanel,
-		m.styles.commandBox.Width(1).Render("│"),
-		rightPanel,
-	)
-}
-
-// renderLeftPanel renders the main command panel
-func (m *ExecutionAwareTUI) renderLeftPanel() string {
-	var sections []string
-	
-	// Header
-	header := m.renderHeader()
-	sections = append(sections, header)
-	
-	// Mode indicator
-	if m.mode != ModeNormal {
-		modeIndicator := m.renderModeIndicator()
-		sections = append(sections, modeIndicator)
-	}
-	
-	// Confirmation prompt (if in confirm mode)
-	if m.mode == ModeConfirm && m.pendingExecution != nil {
-		confirmSection := m.renderConfirmationSection()
-		sections = append(sections, confirmSection)
-	}
-	
-	// Command input or history view
-	if m.mode == ModeHistory {
-		historySection := m.renderHistorySection()
-		sections = append(sections, historySection)
-	} else {
-		inputSection := m.renderInputSection()
-		sections = append(sections, inputSection)
-	}
-	
-	// Output
-	outputSection := m.renderOutputSection()
-	sections = append(sections, outputSection)
-	
-	// Footer with keybindings
-	footer := m.renderFooter()
-	sections = append(sections, footer)
-	
-	content := strings.Join(sections, "\n\n")
-	
-	return lipgloss.NewStyle().
-		Width(m.leftPanelWidth).
-		Render(content)
-}
-
-// renderRightPanel renders the execution status panel
-func (m *ExecutionAwareTUI) renderRightPanel() string {
-	var sections []string
-	
-	// Execution panel header
-	header := m.styles.header.Render("⚡ Execution Manager")
-	sections = append(sections, header)
-	
-	// Active executions
-	activeExecs := m.executionManager.GetActiveExecutions()
-	if len(activeExecs) > 0 {
-		activeSection := m.renderActiveExecutions(activeExecs)
-		sections = append(sections, activeSection)
-	}
-	
-	// Execution statistics
-	stats := m.executionManager.GetExecutionStats()
-	statsSection := FormatExecutionSummary(stats, m.styles)
-	sections = append(sections, statsSection)
-	
-	// Recent execution output
-	if len(m.executionOutput) > 0 {
-		outputHeader := m.styles.warning.Render("📜 Recent Activity")
-		sections = append(sections, outputHeader)
-		
-		// Show last 10 execution messages
-		recentOutput := m.executionOutput
-		if len(recentOutput) > 10 {
-			recentOutput = recentOutput[len(recentOutput)-10:]
-		}
-		
-		for _, line := range recentOutput {
-			sections = append(sections, m.styles.output.Render(line))
-		}
-	}
-	
-	// Execution capabilities info
-	if m.providerManager != nil && m.providerManager.IsExecutionEnabled() {
-		capHeader := m.styles.accent.Render("🔧 Capabilities")
-		sections = append(sections, capHeader)
-		
-		capInfo := []string{
-			"✅ Execution detection enabled",
-			fmt.Sprintf("🤖 Auto-execute: %v", m.providerManager.IsAutoExecuteEnabled()),
-			"🛡️ Security validation active",
-			"📝 Audit logging enabled",
-		}
-		
-		for _, info := range capInfo {
-			sections = append(sections, m.styles.muted.Render(info))
-		}
-	}
-	
-	content := strings.Join(sections, "\n\n")
-	
-	return lipgloss.NewStyle().
-		Width(m.rightPanelWidth).
-		Render(content)
-}
-
-// Helper methods for rendering different sections
-
-func (m *ExecutionAwareTUI) renderSinglePanel() string {
-	// Use the base TUI view with execution enhancements
+	// Use the base TUI view for the main interface
 	baseView := m.ClaudeTUI.View()
 	
-	// Add execution status if there are active executions
-	activeExecs := m.executionManager.GetActiveExecutions()
-	if len(activeExecs) > 0 {
-		statusLine := fmt.Sprintf("⚡ %d active execution(s)", len(activeExecs))
-		baseView = m.styles.warning.Render(statusLine) + "\n" + baseView
+	// Handle special execution modes
+	if m.mode == ModeConfirm && m.pendingExecution != nil {
+		return m.renderConfirmationView(baseView)
+	}
+	
+	if m.mode == ModeHistory {
+		return m.renderHistoryView()
+	}
+	
+	// Add simple execution status if there are active executions
+	return m.addExecutionStatusToBaseView(baseView)
+}
+
+// renderConfirmationView shows execution confirmation overlay
+func (m *ExecutionAwareTUI) renderConfirmationView(baseView string) string {
+	lines := strings.Split(baseView, "\n")
+	width := m.ClaudeTUI.width
+	
+	// Create centered confirmation prompt
+	centerText := func(text string) string {
+		if width > 0 && len(text) < width {
+			padding := (width - len(text)) / 2
+			if padding > 0 {
+				return strings.Repeat(" ", padding) + text
+			}
+		}
+		return text
+	}
+	
+	// Insert confirmation prompt before command input
+	confirmHeader := "Execution Confirmation Required"
+	commandText := fmt.Sprintf("Command: %s %s", m.pendingExecution.Command, strings.Join(m.pendingExecution.Args, " "))
+	promptText := "Execute this command? (y/N):"
+	
+	confirmLines := []string{
+		"",
+		m.styles.warning.Render(centerText(confirmHeader)),
+		"",
+		centerText(commandText),
+		"",
+		m.styles.prompt.Render(centerText(promptText)),
+		"",
+	}
+	
+	// Find the command input line and insert confirmation above it
+	for i, line := range lines {
+		if strings.Contains(line, "nixai >") {
+			result := append(lines[:i], confirmLines...)
+			result = append(result, lines[i:]...)
+			return strings.Join(result, "\n")
+		}
 	}
 	
 	return baseView
 }
 
-func (m *ExecutionAwareTUI) renderHeader() string {
-	title := "NixAI - AI-Powered Command Execution"
-	return m.styles.header.Render(title)
+// renderHistoryView shows execution history
+func (m *ExecutionAwareTUI) renderHistoryView() string {
+	var sections []string
+	width := m.ClaudeTUI.width
+
+	// Center text helper
+	centerText := func(text string) string {
+		if width > 0 && len(text) < width {
+			padding := (width - len(text)) / 2
+			if padding > 0 {
+				return strings.Repeat(" ", padding) + text
+			}
+		}
+		return text
+	}
+
+	// Header
+	headerText := "Execution History"
+	header := m.styles.header.Render(centerText(headerText))
+	sections = append(sections, header)
+
+	// History content
+	history := m.executionManager.GetExecutionHistory()
+	if len(history) == 0 {
+		noHistoryText := "No execution history available"
+		sections = append(sections, m.styles.muted.Render(centerText(noHistoryText)))
+	} else {
+		for i, req := range history {
+			style := m.styles.output
+			if i == m.selectedExecution {
+				style = m.styles.selectedSug
+			}
+			
+			summary := fmt.Sprintf("%s - %s [%s]", 
+				req.CreatedAt.Format("15:04:05"),
+				req.Command,
+				req.State)
+			
+			sections = append(sections, style.Render(summary))
+		}
+	}
+
+	sections = append(sections, "")
+	escText := "Press Esc to return"
+	sections = append(sections, m.styles.muted.Render(centerText(escText)))
+
+	return strings.Join(sections, "\n")
+}
+
+// addExecutionStatusToBaseView adds simple execution info to the base view
+func (m *ExecutionAwareTUI) addExecutionStatusToBaseView(baseView string) string {
+	lines := strings.Split(baseView, "\n")
+	
+	// Find version line and add execution status above it
+	for i := len(lines) - 1; i >= 0; i-- {
+		if strings.Contains(lines[i], "nixai v") {
+			executionStatus := m.renderSimpleExecutionStatus()
+			if executionStatus != "" {
+				result := append(lines[:i], executionStatus)
+				result = append(result, lines[i:]...)
+				return strings.Join(result, "\n")
+			}
+			break
+		}
+	}
+	
+	return baseView
+}
+
+// renderSimpleExecutionStatus renders a simple one-line execution status
+func (m *ExecutionAwareTUI) renderSimpleExecutionStatus() string {
+	activeExecs := m.executionManager.GetActiveExecutions()
+	stats := m.executionManager.GetExecutionStats()
+	
+	var statusText string
+	if len(activeExecs) > 0 {
+		statusText = fmt.Sprintf("Execution: %d active | Total: %d", 
+			len(activeExecs), stats["total"])
+	} else if stats["total"].(int) > 0 {
+		statusText = fmt.Sprintf("Execution: %d completed | Success rate: %.1f%%", 
+			stats["completed"], stats["success_rate"])
+	} else {
+		return ""
+	}
+	
+	// Center the text by calculating padding
+	width := m.ClaudeTUI.width
+	if width > 0 && len(statusText) < width {
+		padding := (width - len(statusText)) / 2
+		if padding > 0 {
+			statusText = strings.Repeat(" ", padding) + statusText
+		}
+	}
+	
+	return m.styles.muted.Render(statusText)
+}
+
+// Helper methods for rendering different sections
+
+func (m *ExecutionAwareTUI) showExecutionStatus() {
+	stats := m.executionManager.GetExecutionStats()
+	activeExecs := m.executionManager.GetActiveExecutions()
+	
+	statusMsg := fmt.Sprintf("Execution Status: Total=%d, Active=%d, Completed=%d, Success Rate=%.1f%%",
+		stats["total"], len(activeExecs), stats["completed"], stats["success_rate"])
+	
+	m.ClaudeTUI.addOutput(m.styles.accent.Render(statusMsg))
 }
 
 func (m *ExecutionAwareTUI) renderModeIndicator() string {
-	var modeText string
-	var style lipgloss.Style
-	
 	switch m.mode {
 	case ModeExecution:
-		modeText = "🔧 EXECUTION MODE"
-		style = m.styles.warning
+		return m.styles.warning.Render("EXECUTION MODE")
 	case ModeHistory:
-		modeText = "📜 HISTORY MODE"
-		style = m.styles.accent
+		return m.styles.accent.Render("HISTORY MODE")
 	case ModeConfirm:
-		modeText = "❓ CONFIRMATION MODE"
-		style = m.styles.error
+		return m.styles.error.Render("CONFIRMATION MODE")
 	default:
 		return ""
 	}
-	
-	return style.Render(modeText)
-}
-
-func (m *ExecutionAwareTUI) renderConfirmationSection() string {
-	if m.pendingExecution == nil {
-		return ""
-	}
-	
-	var lines []string
-	lines = append(lines, m.styles.warning.Render("⚠️ Execution Confirmation Required"))
-	lines = append(lines, "")
-	lines = append(lines, FormatExecutionRequest(m.pendingExecution, m.styles))
-	lines = append(lines, "")
-	lines = append(lines, m.styles.prompt.Render("Execute this command? (y/N):"))
-	
-	return strings.Join(lines, "\n")
-}
-
-func (m *ExecutionAwareTUI) renderInputSection() string {
-	// Render the command input with execution detection hints
-	inputBox := m.styles.commandBox.Render(m.textInput.View())
-	
-	// Add suggestion for execution commands
-	if m.textInput.Value() != "" {
-		// Check if current input might be an execution request
-		if req, _ := m.executionManager.DetectExecutionRequest(m.textInput.Value()); req != nil {
-			hint := m.styles.accent.Render("💡 Execution detected - press Enter to proceed")
-			return inputBox + "\n" + hint
-		}
-	}
-	
-	return inputBox
-}
-
-func (m *ExecutionAwareTUI) renderOutputSection() string {
-	// Render output similar to the base TUI
-	outputLines := m.output
-	maxLines := 10 // Limit for split panel view
-	if len(outputLines) > maxLines {
-		outputLines = outputLines[len(outputLines)-maxLines:]
-	}
-	
-	outputContent := strings.Join(outputLines, "\n")
-	if outputContent == "" {
-		outputContent = m.styles.muted.Render("No output yet...")
-	}
-	
-	return m.styles.output.Render(outputContent)
-}
-
-func (m *ExecutionAwareTUI) renderHistorySection() string {
-	history := m.executionManager.GetExecutionHistory()
-	if len(history) == 0 {
-		return m.styles.muted.Render("No execution history available")
-	}
-	
-	var lines []string
-	lines = append(lines, m.styles.header.Render("📜 Execution History"))
-	lines = append(lines, "")
-	
-	// Show recent executions (last 10)
-	start := 0
-	if len(history) > 10 {
-		start = len(history) - 10
-	}
-	
-	for i := start; i < len(history); i++ {
-		req := history[i]
-		style := m.styles.output
-		if i == m.selectedExecution {
-			style = m.styles.selectedSug
-		}
-		
-		summary := fmt.Sprintf("%s - %s %s", 
-			req.CreatedAt.Format("15:04:05"),
-			req.Command,
-			FormatExecutionStatus(&req, m.styles))
-		
-		lines = append(lines, style.Render(summary))
-	}
-	
-	return strings.Join(lines, "\n")
-}
-
-func (m *ExecutionAwareTUI) renderActiveExecutions(executions []ExecutionRequest) string {
-	var lines []string
-	lines = append(lines, m.styles.warning.Render("🏃 Active Executions"))
-	lines = append(lines, "")
-	
-	for _, exec := range executions {
-		status := FormatExecutionStatus(&exec, m.styles)
-		summary := fmt.Sprintf("%s: %s", exec.ID[:8], status)
-		lines = append(lines, summary)
-	}
-	
-	return strings.Join(lines, "\n")
-}
-
-func (m *ExecutionAwareTUI) renderFooter() string {
-	keybinds := []string{
-		"Ctrl+E: Toggle Execution Panel",
-		"Ctrl+H: Execution History", 
-		"Ctrl+X: Execution Mode",
-		"Ctrl+C: Quit",
-	}
-	
-	return m.styles.muted.Render(strings.Join(keybinds, " | "))
 }
 
 // Event handlers
+
+func (m *ExecutionAwareTUI) handleTabCompletion() (tea.Model, tea.Cmd) {
+	// First check if we have suggestions to complete
+	if m.showSuggestions && len(m.getFilteredSuggestions()) > 0 {
+		filtered := m.getFilteredSuggestions()
+		if m.selectedSuggestion >= 0 && m.selectedSuggestion < len(filtered) {
+			selectedCommand := filtered[m.selectedSuggestion]
+			m.textInput.SetValue(selectedCommand)
+			m.showSuggestions = false
+			
+			// Check if the completed command might be an execution request
+			if execReq, _ := m.executionManager.DetectExecutionRequest(selectedCommand); execReq != nil {
+				// Show hint that this could be executed
+				m.ClaudeTUI.addOutput(m.styles.accent.Render("💡 Execution detected - press Enter to proceed"))
+			}
+		}
+	}
+	return m, nil
+}
 
 func (m *ExecutionAwareTUI) handleCommandInput(input string) (tea.Model, tea.Cmd) {
 	// First, try to detect execution requests
@@ -514,15 +445,20 @@ func (m *ExecutionAwareTUI) handleCommandInput(input string) (tea.Model, tea.Cmd
 		// Execution detected, request confirmation
 		cmd := m.executionManager.RequestExecution(execReq)
 		m.textInput.SetValue("")
+		// Add to command history for execution commands too
+		m.commandHistory = append(m.commandHistory, input)
+		m.historyIndex = -1
 		return m, cmd
 	}
 	
-	// No execution detected, handle as normal command
-	baseTUI, cmd := m.ClaudeTUI.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	m.ClaudeTUI = baseTUI.(*ClaudeTUI)
+	// No execution detected, handle as normal nixai command
+	m.ClaudeTUI.executeCommand(input)
+	m.commandHistory = append(m.commandHistory, input)
+	m.historyIndex = -1
 	m.textInput.SetValue("")
+	m.showSuggestions = false
 	
-	return m, cmd
+	return m, nil
 }
 
 func (m *ExecutionAwareTUI) handleHistoryNavigation(direction string) (tea.Model, tea.Cmd) {
@@ -548,16 +484,58 @@ func (m *ExecutionAwareTUI) handleHistoryNavigation(direction string) (tea.Model
 // Utility methods
 
 func (m *ExecutionAwareTUI) updateExecutionSuggestions() {
-	// Add execution-specific suggestions
+	// Add execution-specific suggestions that will trigger execution detection
 	execSuggestions := []string{
+		// Package management (these should trigger execution)
+		"install firefox",
+		"install git", 
+		"install vim",
+		"install code",
+		"install nodejs",
+		"install docker",
+		"update system",
+		"upgrade packages", 
+		"remove firefox",
+		"uninstall git",
+		
+		// System management (these should trigger execution)
+		"rebuild nixos",
+		"rebuild switch", 
+		"start docker",
+		"stop nginx",
+		"restart apache",
+		"enable service",
+		"disable firewall",
+		"check services",
+		"status nginx",
+		
+		// Direct command suggestions (will trigger execution)
+		"nix-env -i firefox",
+		"nix-env -u",
+		"nix-collect-garbage -d", 
+		"nixos-rebuild switch",
+		"systemctl restart nginx",
+		"systemctl status docker",
+		"systemctl start postgresql",
+		"systemctl stop apache2",
+		
+		// Natural language that should trigger execution
+		"please install firefox",
+		"can you start docker",
+		"run nix-collect-garbage",
+		"execute nixos-rebuild switch",
+		
+		// Regular nixai commands (these won't trigger execution)
 		"execute --help",
 		"execute status", 
 		"execute config",
 		"execute history",
-		"install firefox",
-		"rebuild nixos",
-		"update system",
-		"check services",
+		"ask \"how to install nodejs\"",
+		"diagnose boot", 
+		"search firefox",
+		"help install",
+		"explain-option services.nginx",
+		"flake create",
 	}
 	
 	// Merge with existing suggestions
