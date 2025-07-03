@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"nix-ai-help/internal/ai"
@@ -85,6 +87,7 @@ Usage:
 var askQuestion string
 var nixosPath string
 var daemonMode bool
+var ephemeralMode bool
 var agentRole string
 var agentType string
 var aiProvider string
@@ -101,6 +104,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&aiModel, "model", "", "Specify the AI model (llama3, gpt-4, gemini-1.5-pro, etc.)")
 	rootCmd.PersistentFlags().StringVar(&contextFile, "context-file", "", "Path to a file containing context information (JSON or text)")
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
+	mcpServerCmd.Flags().BoolVarP(&ephemeralMode, "ephemeral", "e", false, "Run MCP server in ephemeral mode (good for nix run)")
 	mcpServerCmd.Flags().StringVar(&socketPath, "socket-path", "/tmp/nixai-mcp.sock", "Specify the MCP server socket path")
 	doctorCmd.Flags().BoolP("verbose", "v", false, "Show detailed output and progress information")
 
@@ -1038,9 +1042,13 @@ The MCP server provides VS Code integration and documentation querying capabilit
 Examples:
   nixai mcp-server start        # Start the MCP server
   nixai mcp-server start -d     # Start the MCP server in daemon mode
+  nixai mcp-server start -e     # Start in ephemeral mode (good for nix run)
   nixai mcp-server stop         # Stop the MCP server  
   nixai mcp-server status       # Check server status
-  nixai mcp-server restart      # Restart the MCP server`,
+  nixai mcp-server restart      # Restart the MCP server
+  
+For nix run usage:
+  nix run github:olafkfreund/nix-ai-help -- mcp-server start -e`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return handleMCPServerCommand(args)
 	},
@@ -2506,7 +2514,7 @@ func handleMCPServerCommand(args []string) error {
 	subcommand := args[0]
 	switch subcommand {
 	case "start":
-		return handleMCPServerStart(cfg, daemonMode, socketPath)
+		return handleMCPServerStart(cfg, daemonMode, ephemeralMode, socketPath)
 	case "stop":
 		return handleMCPServerStop(cfg)
 	case "status":
@@ -2543,9 +2551,35 @@ func handleMCPServerCommand(args []string) error {
 }
 
 // handleMCPServerStart starts the MCP server
-func handleMCPServerStart(cfg *config.UserConfig, daemon bool, socketPath string) error {
+func handleMCPServerStart(cfg *config.UserConfig, daemon bool, ephemeral bool, socketPath string) error {
 	fmt.Println(utils.FormatHeader("🚀 Starting MCP Server"))
 	fmt.Println()
+
+	// Handle ephemeral mode (good for nix run)
+	if ephemeral {
+		fmt.Println(utils.FormatInfo("Running in ephemeral mode (nix run compatible)"))
+		
+		// Create a unique temporary socket path
+		if socketPath == "/tmp/nixai-mcp.sock" {
+			socketPath = fmt.Sprintf("/tmp/nixai-mcp-%d.sock", os.Getpid())
+		}
+		
+		// Set up cleanup on exit
+		defer func() {
+			fmt.Println(utils.FormatInfo("Cleaning up ephemeral resources..."))
+			os.Remove(socketPath)
+		}()
+		
+		// Handle interrupt signals for graceful cleanup
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		go func() {
+			<-sigCh
+			fmt.Println(utils.FormatInfo("Received shutdown signal, cleaning up..."))
+			os.Remove(socketPath)
+			os.Exit(0)
+		}()
+	}
 
 	// If daemon mode is requested, fork the process
 	if daemon {
@@ -2697,8 +2731,13 @@ func handleMCPServerStart(cfg *config.UserConfig, daemon bool, socketPath string
 	}
 	fmt.Println(utils.FormatKeyValue("Unix Socket", socketPath))
 	fmt.Println()
-	fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check server health"))
-	fmt.Println(utils.FormatTip("Use 'nixai mcp-server stop' to stop the server"))
+	if ephemeral {
+		fmt.Println(utils.FormatTip("Ephemeral mode: Press Ctrl+C to stop the server"))
+		fmt.Println(utils.FormatTip("Socket will be automatically cleaned up on exit"))
+	} else {
+		fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check server health"))
+		fmt.Println(utils.FormatTip("Use 'nixai mcp-server stop' to stop the server"))
+	}
 
 	// Keep the process running
 	select {}
@@ -2810,7 +2849,7 @@ func handleMCPServerRestart(cfg *config.UserConfig, socketPath string) error {
 	fmt.Println(utils.FormatSuccess("done"))
 
 	// Start again
-	return handleMCPServerStart(cfg, false, socketPath)
+	return handleMCPServerStart(cfg, false, false, socketPath)
 }
 
 // handleMCPServerQuery queries the MCP server directly

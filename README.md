@@ -941,6 +941,7 @@ nixai store backup                             # Nix store management
 nixai community                                # Access community resources
 nixai learn nix-language                       # Interactive learning modules
 nixai mcp-server start                         # Start MCP server for editor integration
+nix run github:olafkfreund/nix-ai-help -- mcp-server start -e  # Start MCP server with nix run (ephemeral mode)
 ```
 
 **TUI Navigation (Interactive Mode):**
