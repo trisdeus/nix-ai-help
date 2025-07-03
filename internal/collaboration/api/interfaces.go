@@ -28,40 +28,34 @@ type CollaborativeAPI interface {
 	GetPrivacyPolicy(ctx context.Context) (*PrivacyPolicy, error)
 	SetPrivacyPreferences(ctx context.Context, prefs *PrivacyPreferences) error
 	
-	// Federated Learning
-	ContributeToModel(ctx context.Context, contribution *ModelContribution) error
-	GetModelUpdates(ctx context.Context, modelID string) (*ModelUpdate, error)
-	
-	// Community Stats
-	GetCommunityStats(ctx context.Context) (*CommunityStats, error)
-	GetUserStats(ctx context.Context, userID string) (*UserStats, error)
+	// Model Updates (Federated Learning)
+	SubmitModelUpdate(ctx context.Context, update *ModelUpdate) error
+	GetModelUpdates(ctx context.Context, modelID string) ([]*ModelUpdate, error)
+	ApplyModelUpdate(ctx context.Context, update *ModelUpdate) error
 }
 
-// KnowledgeManager handles knowledge sharing and management
-type KnowledgeManager interface {
-	// Knowledge lifecycle
-	CreateKnowledge(ctx context.Context, knowledge *KnowledgeItem) error
-	UpdateKnowledge(ctx context.Context, id string, updates *KnowledgeUpdate) error
-	DeleteKnowledge(ctx context.Context, id string) error
+// FederatedLearningAPI handles distributed model training
+type FederatedLearningAPI interface {
+	// Model coordination
+	JoinTraining(ctx context.Context, modelID string) error
+	LeaveTraining(ctx context.Context, modelID string) error
+	GetTrainingStatus(ctx context.Context, modelID string) (*TrainingStatus, error)
 	
-	// Knowledge discovery
-	SearchByTags(ctx context.Context, tags []string) (*KnowledgeResults, error)
-	SearchByCategory(ctx context.Context, category string) (*KnowledgeResults, error)
-	SearchBySimilarity(ctx context.Context, reference *KnowledgeItem) (*KnowledgeResults, error)
+	// Gradient sharing
+	ShareGradients(ctx context.Context, gradients *GradientUpdate) error
+	AggregateGradients(ctx context.Context, modelID string) (*AggregatedGradients, error)
 	
-	// Knowledge validation
-	ValidateKnowledge(ctx context.Context, knowledge *KnowledgeItem) (*ValidationResult, error)
-	ModerateKnowledge(ctx context.Context, id string, moderation *ModerationAction) error
-	
-	// Knowledge analytics
-	GetKnowledgeMetrics(ctx context.Context, id string) (*KnowledgeMetrics, error)
-	GetTrendingKnowledge(ctx context.Context, timeframe string) (*KnowledgeResults, error)
+	// Privacy-preserving training
+	AnonymizeGradients(ctx context.Context, gradients *GradientUpdate) (*GradientUpdate, error)
+	ValidatePrivacy(ctx context.Context, data interface{}) (*PrivacyValidation, error)
 }
 
-// SolutionEngine handles community solution management
-type SolutionEngine interface {
-	// Solution lifecycle
-	CreateSolution(ctx context.Context, solution *Solution) error
+// CommunityAPI handles community-driven features
+type CommunityAPI interface {
+	// Community solutions
+	SubmitSolution(ctx context.Context, solution *Solution) error
+	VoteSolution(ctx context.Context, solutionID string, vote *Vote) error
+	CommentSolution(ctx context.Context, solutionID string, comment *Comment) error
 	UpdateSolution(ctx context.Context, id string, updates *SolutionUpdate) error
 	ArchiveSolution(ctx context.Context, id string, reason string) error
 	
@@ -78,355 +72,240 @@ type SolutionEngine interface {
 	GetSolutionUsage(ctx context.Context, id string) (*UsageMetrics, error)
 }
 
-// PatternAnalyzer handles configuration pattern analysis and learning
-type PatternAnalyzer interface {
-	// Pattern discovery
-	DiscoverPatterns(ctx context.Context, configurations []*Configuration) ([]*ConfigurationPattern, error)
-	AnalyzePattern(ctx context.Context, pattern *ConfigurationPattern) (*PatternAnalysis, error)
-	ComparePatterns(ctx context.Context, pattern1, pattern2 *ConfigurationPattern) (*PatternComparison, error)
-	
-	// Pattern learning
-	LearnFromSuccess(ctx context.Context, successCase *SuccessCase) error
-	LearnFromFailure(ctx context.Context, failureCase *FailureCase) error
-	UpdatePatternKnowledge(ctx context.Context, knowledge *PatternKnowledge) error
-	
-	// Pattern recommendation
-	RecommendPatterns(ctx context.Context, context *RecommendationContext) (*PatternRecommendations, error)
-	GetPatternSuggestions(ctx context.Context, configuration *Configuration) (*PatternSuggestions, error)
-	
-	// Pattern evolution
-	TrackPatternEvolution(ctx context.Context, patternID string) (*PatternEvolution, error)
-	PredictPatternTrends(ctx context.Context, timeframe string) (*PatternTrends, error)
-}
+// Data Types
 
-// FederatedLearningClient handles federated learning operations
-type FederatedLearningClient interface {
-	// Model participation
-	JoinFederatedModel(ctx context.Context, modelID string, capabilities *ClientCapabilities) error
-	LeaveFederatedModel(ctx context.Context, modelID string) error
-	
-	// Learning contributions
-	SubmitGradients(ctx context.Context, modelID string, gradients *ModelGradients) error
-	ReceiveModelUpdate(ctx context.Context, modelID string) (*ModelUpdate, error)
-	
-	// Privacy-preserving operations
-	ComputePrivateGradients(ctx context.Context, data *TrainingData, privacy *PrivacyParams) (*PrivateGradients, error)
-	ValidateModelUpdate(ctx context.Context, update *ModelUpdate) (*ValidationResult, error)
-	
-	// Client status
-	GetLearningStatus(ctx context.Context) (*LearningStatus, error)
-	GetContributionHistory(ctx context.Context) (*ContributionHistory, error)
-}
-
-// PrivacyManager handles privacy and anonymization
-type PrivacyManager interface {
-	// Data anonymization
-	AnonymizeConfiguration(ctx context.Context, config *Configuration) (*AnonymizedConfiguration, error)
-	AnonymizeError(ctx context.Context, errorData *ErrorData) (*AnonymizedError, error)
-	AnonymizeUsageData(ctx context.Context, usage *UsageData) (*AnonymizedUsage, error)
-	
-	// Privacy assessment
-	AssessPrivacyRisk(ctx context.Context, data interface{}) (*PrivacyRisk, error)
-	CheckDataSensitivity(ctx context.Context, data interface{}) (*SensitivityReport, error)
-	
-	// Consent management
-	GetConsentStatus(ctx context.Context, userID string) (*ConsentStatus, error)
-	UpdateConsent(ctx context.Context, userID string, consent *ConsentUpdate) error
-	
-	// Privacy compliance
-	GeneratePrivacyReport(ctx context.Context, userID string) (*PrivacyReport, error)
-	HandleDataDeletionRequest(ctx context.Context, userID string) error
-}
-
-// Data Types for Collaborative Intelligence
-
-// KnowledgeItem represents a piece of shared knowledge
+// Knowledge sharing types
 type KnowledgeItem struct {
-	ID            string                 `json:"id"`
-	Title         string                 `json:"title"`
-	Description   string                 `json:"description"`
-	Category      string                 `json:"category"`
-	Tags          []string               `json:"tags"`
-	Content       interface{}            `json:"content"`
-	Author        string                 `json:"author"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
-	Version       int                    `json:"version"`
-	Rating        float64                `json:"rating"`
-	UsageCount    int                    `json:"usage_count"`
-	Verified      bool                   `json:"verified"`
-	Metadata      map[string]interface{} `json:"metadata"`
+	ID          string                 `json:"id"`
+	Title       string                 `json:"title"`
+	Content     string                 `json:"content"`
+	Category    string                 `json:"category"`
+	Tags        []string               `json:"tags"`
+	Author      string                 `json:"author"`
+	Created     time.Time              `json:"created"`
+	Updated     time.Time              `json:"updated"`
+	Metadata    map[string]interface{} `json:"metadata"`
 }
 
-// KnowledgeQuery represents a search query for knowledge
 type KnowledgeQuery struct {
 	Query       string            `json:"query"`
 	Category    string            `json:"category,omitempty"`
 	Tags        []string          `json:"tags,omitempty"`
-	Author      string            `json:"author,omitempty"`
-	Limit       int               `json:"limit"`
-	Offset      int               `json:"offset"`
-	Filters     map[string]interface{} `json:"filters,omitempty"`
-	SortBy      string            `json:"sort_by"`
-	SortOrder   string            `json:"sort_order"`
+	Limit       int               `json:"limit,omitempty"`
+	Offset      int               `json:"offset,omitempty"`
+	Filters     map[string]string `json:"filters,omitempty"`
 }
 
-// KnowledgeResults represents search results
 type KnowledgeResults struct {
-	Items      []*KnowledgeItem `json:"items"`
-	Total      int              `json:"total"`
-	Query      *KnowledgeQuery  `json:"query"`
-	Timestamp  time.Time        `json:"timestamp"`
-	Suggestions []string        `json:"suggestions,omitempty"`
+	Items      []KnowledgeItem `json:"items"`
+	Total      int             `json:"total"`
+	Page       int             `json:"page"`
+	HasMore    bool            `json:"has_more"`
 }
 
-// Solution represents a community solution
+// Solution types
 type Solution struct {
-	ID            string                 `json:"id"`
-	Title         string                 `json:"title"`
-	Description   string                 `json:"description"`
-	Problem       *ProblemDescription    `json:"problem"`
-	Steps         []*SolutionStep        `json:"steps"`
-	Code          string                 `json:"code,omitempty"`
-	Author        string                 `json:"author"`
-	CreatedAt     time.Time              `json:"created_at"`
-	UpdatedAt     time.Time              `json:"updated_at"`
-	Rating        float64                `json:"rating"`
-	Difficulty    string                 `json:"difficulty"`
-	Verified      bool                   `json:"verified"`
-	SuccessRate   float64                `json:"success_rate"`
-	Tags          []string               `json:"tags"`
-	Prerequisites []string               `json:"prerequisites"`
-	Metadata      map[string]interface{} `json:"metadata"`
+	ID          string                 `json:"id"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	Code        string                 `json:"code"`
+	Category    string                 `json:"category"`
+	Tags        []string               `json:"tags"`
+	Author      string                 `json:"author"`
+	Created     time.Time              `json:"created"`
+	Rating      float64                `json:"rating"`
+	Votes       int                    `json:"votes"`
+	Metadata    map[string]interface{} `json:"metadata"`
 }
 
-// ProblemDescription describes a problem to be solved
 type ProblemDescription struct {
-	Title         string                 `json:"title"`
-	Description   string                 `json:"description"`
-	Category      string                 `json:"category"`
-	Symptoms      []string               `json:"symptoms"`
-	Environment   *EnvironmentContext    `json:"environment"`
-	ErrorMessages []string               `json:"error_messages,omitempty"`
-	Context       map[string]interface{} `json:"context"`
-	Urgency       string                 `json:"urgency"`
+	Title       string            `json:"title"`
+	Description string            `json:"description"`
+	Category    string            `json:"category"`
+	Context     map[string]string `json:"context"`
+	Tags        []string          `json:"tags"`
 }
 
-// ConfigurationPattern represents a reusable configuration pattern
+type SolutionResults struct {
+	Solutions []Solution `json:"solutions"`
+	Total     int        `json:"total"`
+	Page      int        `json:"page"`
+	HasMore   bool       `json:"has_more"`
+}
+
+type Rating struct {
+	Value   int    `json:"value"`   // 1-5 stars
+	Comment string `json:"comment,omitempty"`
+	UserID  string `json:"user_id"`
+}
+
+// Pattern types
 type ConfigurationPattern struct {
-	ID           string                 `json:"id"`
-	Name         string                 `json:"name"`
-	Description  string                 `json:"description"`
-	Category     string                 `json:"category"`
-	Pattern      interface{}            `json:"pattern"`
-	Variables    []*PatternVariable     `json:"variables"`
-	Conditions   []*PatternCondition    `json:"conditions"`
-	Benefits     []string               `json:"benefits"`
-	Drawbacks    []string               `json:"drawbacks,omitempty"`
-	Popularity   float64                `json:"popularity"`
-	Reliability  float64                `json:"reliability"`
-	Complexity   string                 `json:"complexity"`
-	Author       string                 `json:"author"`
-	CreatedAt    time.Time              `json:"created_at"`
-	UsageCount   int                    `json:"usage_count"`
-	SuccessRate  float64                `json:"success_rate"`
-	Tags         []string               `json:"tags"`
-	Examples     []*PatternExample      `json:"examples"`
-	Metadata     map[string]interface{} `json:"metadata"`
-}
-
-// ModelContribution represents a contribution to federated learning
-type ModelContribution struct {
-	ID           string                 `json:"id"`
-	ModelID      string                 `json:"model_id"`
-	ClientID     string                 `json:"client_id"`
-	Gradients    interface{}            `json:"gradients"`
-	DataSize     int                    `json:"data_size"`
-	Privacy      *PrivacyParams         `json:"privacy"`
-	Timestamp    time.Time              `json:"timestamp"`
-	Metrics      map[string]float64     `json:"metrics"`
-	Metadata     map[string]interface{} `json:"metadata"`
-}
-
-// PrivacyPreferences represents user privacy preferences
-type PrivacyPreferences struct {
-	UserID                  string                 `json:"user_id"`
-	AllowDataSharing        bool                   `json:"allow_data_sharing"`
-	AllowAnalytics          bool                   `json:"allow_analytics"`
-	AnonymizationLevel      string                 `json:"anonymization_level"`
-	DataRetentionPeriod     int                    `json:"data_retention_period"`
-	AllowFederatedLearning  bool                   `json:"allow_federated_learning"`
-	ShareErrorReports       bool                   `json:"share_error_reports"`
-	ShareUsagePatterns      bool                   `json:"share_usage_patterns"`
-	ShareConfigurations     bool                   `json:"share_configurations"`
-	CustomPreferences       map[string]interface{} `json:"custom_preferences"`
-	UpdatedAt               time.Time              `json:"updated_at"`
-}
-
-// Supporting Types
-
-type KnowledgeUpdate struct {
-	Title       *string                `json:"title,omitempty"`
-	Description *string                `json:"description,omitempty"`
-	Content     interface{}            `json:"content,omitempty"`
-	Tags        []string               `json:"tags,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-}
-
-type ValidationResult struct {
-	Valid    bool     `json:"valid"`
-	Score    float64  `json:"score"`
-	Issues   []string `json:"issues"`
-	Warnings []string `json:"warnings"`
-}
-
-type ModerationAction struct {
-	Action    string `json:"action"`
-	Reason    string `json:"reason"`
-	Moderator string `json:"moderator"`
-}
-
-type KnowledgeMetrics struct {
-	Views       int     `json:"views"`
-	Downloads   int     `json:"downloads"`
-	Shares      int     `json:"shares"`
-	Rating      float64 `json:"rating"`
-	Feedback    int     `json:"feedback_count"`
-}
-
-type SolutionStep struct {
-	Order       int    `json:"order"`
-	Description string `json:"description"`
-	Command     string `json:"command,omitempty"`
-	Expected    string `json:"expected,omitempty"`
-}
-
-type EnvironmentContext struct {
-	NixOSVersion  string                 `json:"nixos_version"`
-	Architecture  string                 `json:"architecture"`
-	Hardware      map[string]interface{} `json:"hardware"`
-	Services      []string               `json:"services"`
-	Packages      []string               `json:"packages"`
-}
-
-type PatternVariable struct {
-	Name         string      `json:"name"`
-	Type         string      `json:"type"`
-	Description  string      `json:"description"`
-	Default      interface{} `json:"default,omitempty"`
-	Required     bool        `json:"required"`
-	Validation   string      `json:"validation,omitempty"`
-}
-
-type PatternCondition struct {
-	Type        string      `json:"type"`
-	Expression  string      `json:"expression"`
-	Description string      `json:"description"`
-	Required    bool        `json:"required"`
-}
-
-type PatternExample struct {
+	ID          string                 `json:"id"`
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
-	Input       interface{}            `json:"input"`
-	Output      interface{}            `json:"output"`
+	Pattern     string                 `json:"pattern"`
+	Category    string                 `json:"category"`
+	UseCase     string                 `json:"use_case"`
+	Frequency   int                    `json:"frequency"`
+	Success     float64                `json:"success_rate"`
+	Created     time.Time              `json:"created"`
+	Metadata    map[string]interface{} `json:"metadata"`
+}
+
+type PatternContext struct {
+	Category     string            `json:"category"`
+	Environment  string            `json:"environment"`
+	Requirements []string          `json:"requirements"`
+	Constraints  map[string]string `json:"constraints"`
+}
+
+type PatternResults struct {
+	Patterns []ConfigurationPattern `json:"patterns"`
+	Total    int                    `json:"total"`
+	Page     int                    `json:"page"`
+	HasMore  bool                   `json:"has_more"`
+}
+
+type PatternFeedback struct {
+	PatternID   string                 `json:"pattern_id"`
+	Successful  bool                   `json:"successful"`
+	Comments    string                 `json:"comments"`
+	Improvements []string              `json:"improvements"`
 	Context     map[string]interface{} `json:"context"`
 }
 
-type PrivacyParams struct {
-	Method          string  `json:"method"`
-	Epsilon         float64 `json:"epsilon,omitempty"`
-	Delta           float64 `json:"delta,omitempty"`
-	NoiseScale      float64 `json:"noise_scale,omitempty"`
-	ClippingBound   float64 `json:"clipping_bound,omitempty"`
+// Privacy types
+type PrivacyPolicy struct {
+	Version     string            `json:"version"`
+	LastUpdated time.Time         `json:"last_updated"`
+	Policies    map[string]string `json:"policies"`
 }
 
-type CommunityStats struct {
-	TotalUsers          int                    `json:"total_users"`
-	ActiveUsers         int                    `json:"active_users"`
-	TotalKnowledge      int                    `json:"total_knowledge"`
-	TotalSolutions      int                    `json:"total_solutions"`
-	TotalPatterns       int                    `json:"total_patterns"`
-	RecentActivity      []*ActivitySummary     `json:"recent_activity"`
-	TopContributors     []*ContributorSummary  `json:"top_contributors"`
-	PopularCategories   []*CategorySummary     `json:"popular_categories"`
-	Timestamp          time.Time              `json:"timestamp"`
+type PrivacyPreferences struct {
+	ShareData        bool     `json:"share_data"`
+	ShareConfigs     bool     `json:"share_configs"`
+	SharePatterns    bool     `json:"share_patterns"`
+	AnonymizeLevel   string   `json:"anonymize_level"` // "none", "basic", "full"
+	AllowedCategories []string `json:"allowed_categories"`
 }
 
-type UserStats struct {
-	UserID             string    `json:"user_id"`
-	JoinedAt           time.Time `json:"joined_at"`
-	ContributionsCount int       `json:"contributions_count"`
-	KnowledgeShared    int       `json:"knowledge_shared"`
-	SolutionsProvided  int       `json:"solutions_provided"`
-	PatternsCreated    int       `json:"patterns_created"`
-	Rating             float64   `json:"rating"`
-	ReputationPoints   int       `json:"reputation_points"`
-	Badges             []string  `json:"badges"`
-	LastActive         time.Time `json:"last_active"`
+// Federated learning types
+type ModelUpdate struct {
+	ModelID     string                 `json:"model_id"`
+	Version     string                 `json:"version"`
+	UpdateType  string                 `json:"update_type"` // "weights", "gradients", "parameters"
+	Data        []byte                 `json:"data"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	Created     time.Time              `json:"created"`
 }
 
-type ActivitySummary struct {
-	Type        string    `json:"type"`
-	Count       int       `json:"count"`
-	Timestamp   time.Time `json:"timestamp"`
-	Description string    `json:"description"`
+type SolutionUpdate struct {
+	SolutionID  string                 `json:"solution_id"`
+	UpdateType  string                 `json:"update_type"`
+	Content     string                 `json:"content"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	Author      string                 `json:"author"`
+	Created     time.Time              `json:"created"`
 }
 
-type ContributorSummary struct {
-	UserID       string  `json:"user_id"`
-	Username     string  `json:"username"`
-	Contributions int    `json:"contributions"`
-	Rating       float64 `json:"rating"`
+type SolutionMatches struct {
+	Exact   []Solution `json:"exact"`
+	Similar []Solution `json:"similar"`
+	Related []Solution `json:"related"`
 }
 
-type CategorySummary struct {
-	Category string `json:"category"`
-	Count    int    `json:"count"`
-	Growth   float64 `json:"growth"`
+type RankingCriteria struct {
+	SortBy    string  `json:"sort_by"`    // "rating", "date", "relevance"
+	Order     string  `json:"order"`      // "asc", "desc"
+	MinRating float64 `json:"min_rating"`
+	MaxAge    int     `json:"max_age_days"`
 }
 
-// Event Types for Real-time Collaboration
-
-type CollaborationEvent interface {
-	GetType() string
-	GetTimestamp() time.Time
-	GetUserID() string
+// Additional missing types
+type RankedSolution struct {
+	Solution *Solution `json:"solution"`
+	Score    float64   `json:"score"`
+	Reason   string    `json:"reason"`
 }
 
-type KnowledgeSharedEvent struct {
-	Type        string    `json:"type"`
-	Timestamp   time.Time `json:"timestamp"`
-	UserID      string    `json:"user_id"`
-	KnowledgeID string    `json:"knowledge_id"`
-	Category    string    `json:"category"`
+type SolutionValidation struct {
+	Valid   bool     `json:"valid"`
+	Issues  []string `json:"issues"`
+	Warnings []string `json:"warnings"`
 }
 
-type SolutionFoundEvent struct {
-	Type        string    `json:"type"`
-	Timestamp   time.Time `json:"timestamp"`
-	UserID      string    `json:"user_id"`
-	SolutionID  string    `json:"solution_id"`
-	ProblemType string    `json:"problem_type"`
-	Success     bool      `json:"success"`
+type TestEnvironment struct {
+	OS           string            `json:"os"`
+	Version      string            `json:"version"`
+	Architecture string            `json:"architecture"`
+	Resources    map[string]string `json:"resources"`
 }
 
-type PatternDiscoveredEvent struct {
-	Type        string    `json:"type"`
-	Timestamp   time.Time `json:"timestamp"`
-	UserID      string    `json:"user_id"`
-	PatternID   string    `json:"pattern_id"`
-	Confidence  float64   `json:"confidence"`
+type TestResult struct {
+	Success     bool                   `json:"success"`
+	Output      string                 `json:"output"`
+	Errors      []string               `json:"errors"`
+	Duration    time.Duration          `json:"duration"`
+	Environment *TestEnvironment       `json:"environment"`
+	Metadata    map[string]interface{} `json:"metadata"`
 }
 
-func (e *KnowledgeSharedEvent) GetType() string     { return e.Type }
-func (e *KnowledgeSharedEvent) GetTimestamp() time.Time { return e.Timestamp }
-func (e *KnowledgeSharedEvent) GetUserID() string  { return e.UserID }
+type EffectivenessMetrics struct {
+	SuccessRate  float64 `json:"success_rate"`
+	UsageCount   int     `json:"usage_count"`
+	AverageRating float64 `json:"average_rating"`
+	LastUsed     time.Time `json:"last_used"`
+}
 
-func (e *SolutionFoundEvent) GetType() string      { return e.Type }
-func (e *SolutionFoundEvent) GetTimestamp() time.Time { return e.Timestamp }
-func (e *SolutionFoundEvent) GetUserID() string    { return e.UserID }
+type UsageMetrics struct {
+	TotalUses    int       `json:"total_uses"`
+	UniqueUsers  int       `json:"unique_users"`
+	LastUsed     time.Time `json:"last_used"`
+	PopularityTrend string `json:"popularity_trend"`
+}
 
-func (e *PatternDiscoveredEvent) GetType() string  { return e.Type }
-func (e *PatternDiscoveredEvent) GetTimestamp() time.Time { return e.Timestamp }
-func (e *PatternDiscoveredEvent) GetUserID() string { return e.UserID }
+type TrainingStatus struct {
+	ModelID       string    `json:"model_id"`
+	Status        string    `json:"status"`
+	Participants  int       `json:"participants"`
+	Progress      float64   `json:"progress"`
+	LastUpdate    time.Time `json:"last_update"`
+}
+
+type GradientUpdate struct {
+	ModelID     string                 `json:"model_id"`
+	Gradients   []byte                 `json:"gradients"`
+	Epoch       int                    `json:"epoch"`
+	Timestamp   time.Time              `json:"timestamp"`
+	Metadata    map[string]interface{} `json:"metadata"`
+}
+
+type AggregatedGradients struct {
+	ModelID       string    `json:"model_id"`
+	Gradients     []byte    `json:"gradients"`
+	Participants  int       `json:"participants"`
+	Epoch         int       `json:"epoch"`
+	Timestamp     time.Time `json:"timestamp"`
+}
+
+type PrivacyValidation struct {
+	Valid         bool     `json:"valid"`
+	PrivacyLevel  string   `json:"privacy_level"`
+	Issues        []string `json:"issues"`
+	Recommendations []string `json:"recommendations"`
+}
+
+type Vote struct {
+	UserID    string    `json:"user_id"`
+	Value     int       `json:"value"` // -1, 0, 1
+	Timestamp time.Time `json:"timestamp"`
+}
+
+type Comment struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Content   string    `json:"content"`
+	Timestamp time.Time `json:"timestamp"`
+	Votes     int       `json:"votes"`
+}

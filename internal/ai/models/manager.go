@@ -15,12 +15,12 @@ import (
 
 // ModelManager coordinates all AI model operations for nixai
 type ModelManager struct {
-	config            *config.Config
+	config            *config.UserConfig
 	fineTuningEnv     *fine_tuning.FineTuningEnvironment
 	datasetCurator    *fine_tuning.DatasetCurator
 	trainer           *fine_tuning.ModelTrainer
 	semanticAnalyzer  *semantic.SemanticAnalyzer
-	logger            logger.Logger
+	logger            *logger.Logger
 	mu                sync.RWMutex
 	
 	// Model registry for trained models
@@ -73,7 +73,7 @@ type ModelStatus struct {
 }
 
 // NewModelManager creates a new model manager
-func NewModelManager(cfg *config.Config) (*ModelManager, error) {
+func NewModelManager(cfg *config.UserConfig) (*ModelManager, error) {
 	// Initialize fine-tuning environment
 	fineTuningEnv, err := fine_tuning.NewFineTuningEnvironment(cfg)
 	if err != nil {
@@ -91,7 +91,7 @@ func NewModelManager(cfg *config.Config) (*ModelManager, error) {
 		datasetCurator:   datasetCurator,
 		trainer:          trainer,
 		semanticAnalyzer: semanticAnalyzer,
-		logger:           logger.NewLogger("model-manager"),
+		logger:           logger.NewLogger(),
 		trainedModels:    make(map[string]*TrainedModel),
 	}
 
@@ -112,16 +112,12 @@ func (mm *ModelManager) Initialize(ctx context.Context) error {
 
 	// Validate environment
 	if err := mm.fineTuningEnv.ValidateEnvironment(); err != nil {
-		mm.logger.Warn("Environment validation issues", map[string]interface{}{
-			"error": err.Error(),
-		})
+		mm.logger.Warn(fmt.Sprintf("Environment validation issues: %v", err))
 	}
 
 	// Load existing trained models
 	if err := mm.loadTrainedModels(); err != nil {
-		mm.logger.Warn("Failed to load existing trained models", map[string]interface{}{
-			"error": err.Error(),
-		})
+		mm.logger.Warn(fmt.Sprintf("Failed to load existing trained models: %v", err))
 	}
 
 	mm.logger.Info("Model management system initialized successfully")
@@ -133,9 +129,7 @@ func (mm *ModelManager) StartTraining(ctx context.Context, modelName string, cus
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 
-	mm.logger.Info("Starting model training", map[string]interface{}{
-		"model_name": modelName,
-	})
+	mm.logger.Info(fmt.Sprintf("Starting model training for %s", modelName))
 
 	// Get training configuration
 	var config fine_tuning.TrainingConfig
@@ -156,10 +150,7 @@ func (mm *ModelManager) StartTraining(ctx context.Context, modelName string, cus
 		return nil, fmt.Errorf("failed to start training: %w", err)
 	}
 
-	mm.logger.Info("Model training started successfully", map[string]interface{}{
-		"model_name": modelName,
-		"state":      state.Status,
-	})
+	mm.logger.Info(fmt.Sprintf("Model training started successfully for %s (status: %s)", modelName, state.Status))
 
 	return state, nil
 }
@@ -171,20 +162,15 @@ func (mm *ModelManager) GetTrainingProgress() (map[string]interface{}, error) {
 
 // PerformSemanticAnalysis analyzes a NixOS configuration for intent and issues
 func (mm *ModelManager) PerformSemanticAnalysis(ctx context.Context, configPath, content string) (*semantic.AnalysisResult, error) {
-	mm.logger.Info("Performing semantic analysis", map[string]interface{}{
-		"config_path": configPath,
-	})
+	mm.logger.Info(fmt.Sprintf("Performing semantic analysis on %s", configPath))
 
 	result, err := mm.semanticAnalyzer.AnalyzeConfiguration(ctx, configPath, content)
 	if err != nil {
 		return nil, fmt.Errorf("semantic analysis failed: %w", err)
 	}
 
-	mm.logger.Info("Semantic analysis completed", map[string]interface{}{
-		"issues_found":   len(result.Issues),
-		"suggestions":    len(result.Suggestions),
-		"security_score": result.SecurityAnalysis.Score,
-	})
+	mm.logger.Info(fmt.Sprintf("Semantic analysis completed: %d issues, %d suggestions, security score: %.2f",
+		len(result.Issues), len(result.Suggestions), result.SecurityAnalysis.Score))
 
 	return result, nil
 }
@@ -231,9 +217,7 @@ func (mm *ModelManager) SetActiveModel(modelName string) error {
 	}
 
 	mm.activeModel = modelName
-	mm.logger.Info("Active model changed", map[string]interface{}{
-		"model": modelName,
-	})
+	mm.logger.Info(fmt.Sprintf("Active model changed to %s", modelName))
 
 	return nil
 }
@@ -282,9 +266,7 @@ func (mm *ModelManager) GetStatus() (*ModelStatus, error) {
 	// Get dataset stats
 	datasetStats, err := mm.datasetCurator.GetDatasetStats()
 	if err != nil {
-		mm.logger.Warn("Failed to get dataset stats", map[string]interface{}{
-			"error": err.Error(),
-		})
+		mm.logger.Warn(fmt.Sprintf("Failed to get dataset stats: %v", err))
 		datasetStats = make(map[string]interface{})
 	}
 

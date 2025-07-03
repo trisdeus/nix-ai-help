@@ -18,7 +18,7 @@ import (
 // DatasetCurator manages the collection and preparation of NixOS-specific training data
 type DatasetCurator struct {
 	Environment *FineTuningEnvironment
-	Logger      logger.Logger
+	Logger      *logger.Logger
 }
 
 // TrainingExample represents a single training example for the model
@@ -67,7 +67,7 @@ type DatasetSource struct {
 func NewDatasetCurator(env *FineTuningEnvironment) *DatasetCurator {
 	return &DatasetCurator{
 		Environment: env,
-		Logger:      logger.NewLogger("dataset-curator"),
+		Logger:      logger.NewLogger(),
 	}
 }
 
@@ -84,24 +84,15 @@ func (dc *DatasetCurator) CurateDatasets(ctx context.Context) error {
 			continue
 		}
 		
-		dc.Logger.Info("Processing data source", map[string]interface{}{
-			"source": source.Name,
-			"type":   source.Type,
-		})
+		dc.Logger.Info(fmt.Sprintf("Processing data source: %s (type: %s)", source.Name, source.Type))
 		
 		examples, err := source.Processor(source)
 		if err != nil {
-			dc.Logger.Error("Failed to process data source", map[string]interface{}{
-				"source": source.Name,
-				"error":  err.Error(),
-			})
+			dc.Logger.Error(fmt.Sprintf("Failed to process data source %s: %v", source.Name, err))
 			continue
 		}
 		
-		dc.Logger.Info("Collected examples from source", map[string]interface{}{
-			"source": source.Name,
-			"count":  len(examples),
-		})
+		dc.Logger.Info(fmt.Sprintf("Collected %d examples from source %s", len(examples), source.Name))
 		
 		allExamples = append(allExamples, examples...)
 	}
@@ -117,11 +108,8 @@ func (dc *DatasetCurator) CurateDatasets(ctx context.Context) error {
 		return fmt.Errorf("failed to save datasets: %w", err)
 	}
 	
-	dc.Logger.Info("Dataset curation completed", map[string]interface{}{
-		"total_examples":    len(allExamples),
-		"filtered_examples": len(filteredExamples),
-		"categories":        len(categorizedExamples),
-	})
+	dc.Logger.Info(fmt.Sprintf("Dataset curation completed: %d total examples, %d filtered examples, %d categories",
+		len(allExamples), len(filteredExamples), len(categorizedExamples)))
 	
 	return nil
 }
@@ -582,11 +570,7 @@ func (dc *DatasetCurator) saveDatasets(categorizedExamples map[string][]Training
 			}
 		}
 		
-		dc.Logger.Info("Saved dataset", map[string]interface{}{
-			"category": category,
-			"file":     filepath,
-			"count":    len(examples),
-		})
+		dc.Logger.Info(fmt.Sprintf("Saved dataset for category %s with %d examples to %s", category, len(examples), filepath))
 	}
 	
 	return nil

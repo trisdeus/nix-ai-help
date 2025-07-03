@@ -18,8 +18,8 @@ type FineTuningEnvironment struct {
 	ModelDir    string
 	OutputDir   string
 	ConfigPath  string
-	Logger      logger.Logger
-	config      *config.Config
+	Logger      *logger.Logger
+	config      *config.UserConfig
 }
 
 // EnvironmentConfig holds configuration for the fine-tuning environment
@@ -50,16 +50,13 @@ type EnvironmentConfig struct {
 }
 
 // NewFineTuningEnvironment creates a new fine-tuning environment
-func NewFineTuningEnvironment(config *config.Config) (*FineTuningEnvironment, error) {
+func NewFineTuningEnvironment(config *config.UserConfig) (*FineTuningEnvironment, error) {
 	// Get base directory from config or use default
-	baseDir := config.AI.FineTuning.BaseDirectory
-	if baseDir == "" {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get home directory: %w", err)
-		}
-		baseDir = filepath.Join(homeDir, ".nixai", "fine-tuning")
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
+	baseDir := filepath.Join(homeDir, ".nixai", "fine-tuning")
 
 	env := &FineTuningEnvironment{
 		BaseDir:    baseDir,
@@ -67,7 +64,7 @@ func NewFineTuningEnvironment(config *config.Config) (*FineTuningEnvironment, er
 		ModelDir:   filepath.Join(baseDir, "models"),
 		OutputDir:  filepath.Join(baseDir, "output"),
 		ConfigPath: filepath.Join(baseDir, "config.yaml"),
-		Logger:     logger.NewLogger("fine-tuning"),
+		Logger:     logger.NewLogger(),
 		config:     config,
 	}
 
@@ -76,9 +73,7 @@ func NewFineTuningEnvironment(config *config.Config) (*FineTuningEnvironment, er
 
 // Initialize sets up the fine-tuning environment directories and configuration
 func (env *FineTuningEnvironment) Initialize(ctx context.Context) error {
-	env.Logger.Info("Initializing fine-tuning environment", map[string]interface{}{
-		"base_dir": env.BaseDir,
-	})
+	env.Logger.Info(fmt.Sprintf("Initializing fine-tuning environment at %s", env.BaseDir))
 
 	// Create necessary directories
 	dirs := []string{

@@ -15,7 +15,7 @@ import (
 // ModelTrainer handles the training of NixOS-specific AI models
 type ModelTrainer struct {
 	Environment *FineTuningEnvironment
-	Logger      logger.Logger
+	Logger      *logger.Logger
 }
 
 // TrainingConfig holds configuration for model training
@@ -103,17 +103,14 @@ type TrainingState struct {
 func NewModelTrainer(env *FineTuningEnvironment) *ModelTrainer {
 	return &ModelTrainer{
 		Environment: env,
-		Logger:      logger.NewLogger("model-trainer"),
+		Logger:      logger.NewLogger(),
 	}
 }
 
 // StartTraining begins training a NixOS-specific model
 func (mt *ModelTrainer) StartTraining(ctx context.Context, config TrainingConfig) (*TrainingState, error) {
-	mt.Logger.Info("Starting model training", map[string]interface{}{
-		"model_name": config.ModelName,
-		"base_model": config.BaseModel,
-		"dataset":    config.DatasetPath,
-	})
+	mt.Logger.Info(fmt.Sprintf("Starting model training: %s (base: %s, dataset: %s)", 
+		config.ModelName, config.BaseModel, config.DatasetPath))
 
 	// Validate configuration
 	if err := mt.validateConfig(config); err != nil {
@@ -196,10 +193,7 @@ func (mt *ModelTrainer) runTraining(ctx context.Context, config TrainingConfig, 
 			time.Sleep(100 * time.Millisecond)
 		}
 
-		mt.Logger.Info("Completed epoch", map[string]interface{}{
-			"epoch":    epoch,
-			"progress": state.Progress,
-		})
+		mt.Logger.Info(fmt.Sprintf("Completed epoch %d, progress: %.2f%%", epoch, state.Progress*100))
 	}
 
 	// Training completed
@@ -211,11 +205,8 @@ func (mt *ModelTrainer) runTraining(ctx context.Context, config TrainingConfig, 
 	mt.saveFinalModel(config, state)
 	mt.saveTrainingState(state)
 
-	mt.Logger.Info("Training completed successfully", map[string]interface{}{
-		"model_name":   config.ModelName,
-		"total_epochs": config.Epochs,
-		"final_loss":   state.Metrics[len(state.Metrics)-1].TrainingLoss,
-	})
+	mt.Logger.Info(fmt.Sprintf("Training completed successfully: %s (%d epochs, final loss: %.4f)", 
+		config.ModelName, config.Epochs, state.Metrics[len(state.Metrics)-1].TrainingLoss))
 }
 
 // validateConfig validates the training configuration
@@ -289,10 +280,7 @@ func (mt *ModelTrainer) simulateTrainingMetrics(epoch, step int, config Training
 func (mt *ModelTrainer) saveCheckpoint(config TrainingConfig, state *TrainingState, epoch, step int) {
 	checkpointDir := filepath.Join(config.OutputPath, "checkpoints", fmt.Sprintf("epoch_%d_step_%d", epoch, step))
 	if err := os.MkdirAll(checkpointDir, 0755); err != nil {
-		mt.Logger.Error("Failed to create checkpoint directory", map[string]interface{}{
-			"error": err.Error(),
-			"dir":   checkpointDir,
-		})
+		mt.Logger.Error(fmt.Sprintf("Failed to create checkpoint directory %s: %v", checkpointDir, err))
 		return
 	}
 
@@ -307,34 +295,22 @@ func (mt *ModelTrainer) saveCheckpoint(config TrainingConfig, state *TrainingSta
 
 	checkpointFile := filepath.Join(checkpointDir, "checkpoint_info.json")
 	if err := mt.saveJSON(checkpointFile, checkpointInfo); err != nil {
-		mt.Logger.Error("Failed to save checkpoint info", map[string]interface{}{
-			"error": err.Error(),
-			"file":  checkpointFile,
-		})
+		mt.Logger.Error(fmt.Sprintf("Failed to save checkpoint info to %s: %v", checkpointFile, err))
 	}
 
-	mt.Logger.Info("Saved checkpoint", map[string]interface{}{
-		"epoch": epoch,
-		"step":  step,
-		"dir":   checkpointDir,
-	})
+	mt.Logger.Info(fmt.Sprintf("Saved checkpoint for epoch %d, step %d to %s", epoch, step, checkpointDir))
 }
 
 // evaluateModel performs model evaluation
 func (mt *ModelTrainer) evaluateModel(config TrainingConfig, state *TrainingState, epoch, step int) {
-	mt.Logger.Info("Evaluating model", map[string]interface{}{
-		"epoch": epoch,
-		"step":  step,
-	})
+	mt.Logger.Info(fmt.Sprintf("Evaluating model at epoch %d, step %d", epoch, step))
 
 	// In a real implementation, this would run evaluation on a validation set
 	// For now, we'll just log that evaluation occurred
 	
 	evaluationDir := filepath.Join(config.OutputPath, "evaluations")
 	if err := os.MkdirAll(evaluationDir, 0755); err != nil {
-		mt.Logger.Error("Failed to create evaluation directory", map[string]interface{}{
-			"error": err.Error(),
-		})
+		mt.Logger.Error(fmt.Sprintf("Failed to create evaluation directory: %v", err))
 		return
 	}
 
@@ -349,9 +325,7 @@ func (mt *ModelTrainer) evaluateModel(config TrainingConfig, state *TrainingStat
 
 	evaluationFile := filepath.Join(evaluationDir, fmt.Sprintf("eval_epoch_%d_step_%d.json", epoch, step))
 	if err := mt.saveJSON(evaluationFile, evaluationResult); err != nil {
-		mt.Logger.Error("Failed to save evaluation result", map[string]interface{}{
-			"error": err.Error(),
-		})
+		mt.Logger.Error(fmt.Sprintf("Failed to save evaluation result: %v", err))
 	}
 }
 
@@ -359,9 +333,7 @@ func (mt *ModelTrainer) evaluateModel(config TrainingConfig, state *TrainingStat
 func (mt *ModelTrainer) saveFinalModel(config TrainingConfig, state *TrainingState) {
 	finalModelDir := filepath.Join(config.OutputPath, "final_model")
 	if err := os.MkdirAll(finalModelDir, 0755); err != nil {
-		mt.Logger.Error("Failed to create final model directory", map[string]interface{}{
-			"error": err.Error(),
-		})
+		mt.Logger.Error(fmt.Sprintf("Failed to create final model directory: %v", err))
 		return
 	}
 
@@ -380,25 +352,18 @@ func (mt *ModelTrainer) saveFinalModel(config TrainingConfig, state *TrainingSta
 
 	modelInfoFile := filepath.Join(finalModelDir, "model_info.json")
 	if err := mt.saveJSON(modelInfoFile, modelInfo); err != nil {
-		mt.Logger.Error("Failed to save model info", map[string]interface{}{
-			"error": err.Error(),
-		})
+		mt.Logger.Error(fmt.Sprintf("Failed to save model info: %v", err))
 		return
 	}
 
-	mt.Logger.Info("Saved final model", map[string]interface{}{
-		"dir":     finalModelDir,
-		"metrics": state.Metrics[len(state.Metrics)-1],
-	})
+	mt.Logger.Info(fmt.Sprintf("Saved final model to %s", finalModelDir))
 }
 
 // saveTrainingState saves the current training state
 func (mt *ModelTrainer) saveTrainingState(state *TrainingState) {
 	stateFile := filepath.Join(mt.Environment.OutputDir, "training_state.json")
 	if err := mt.saveJSON(stateFile, state); err != nil {
-		mt.Logger.Error("Failed to save training state", map[string]interface{}{
-			"error": err.Error(),
-		})
+		mt.Logger.Error(fmt.Sprintf("Failed to save training state: %v", err))
 	}
 }
 

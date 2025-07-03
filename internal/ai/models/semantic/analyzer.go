@@ -4,9 +4,6 @@ package semantic
 import (
 	"context"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"regexp"
 	"strings"
 
@@ -15,7 +12,7 @@ import (
 
 // SemanticAnalyzer provides intelligent analysis of NixOS configurations
 type SemanticAnalyzer struct {
-	Logger logger.Logger
+	Logger *logger.Logger
 }
 
 // AnalysisResult contains the results of semantic analysis
@@ -187,16 +184,13 @@ type MigrationStep struct {
 // NewSemanticAnalyzer creates a new semantic analyzer
 func NewSemanticAnalyzer() *SemanticAnalyzer {
 	return &SemanticAnalyzer{
-		Logger: logger.NewLogger("semantic-analyzer"),
+		Logger: logger.NewLogger(),
 	}
 }
 
 // AnalyzeConfiguration performs comprehensive semantic analysis of a NixOS configuration
 func (sa *SemanticAnalyzer) AnalyzeConfiguration(ctx context.Context, configPath string, content string) (*AnalysisResult, error) {
-	sa.Logger.Info("Starting semantic analysis", map[string]interface{}{
-		"config_path": configPath,
-		"content_length": len(content),
-	})
+	sa.Logger.Info(fmt.Sprintf("Starting semantic analysis for %s with content length %d", configPath, len(content)))
 
 	result := &AnalysisResult{
 		ConfigPath: configPath,
@@ -216,7 +210,7 @@ func (sa *SemanticAnalyzer) AnalyzeConfiguration(ctx context.Context, configPath
 	// Detect issues
 	issues, err := sa.detectIssues(content)
 	if err != nil {
-		sa.Logger.Error("Failed to detect issues", map[string]interface{}{"error": err.Error()})
+		sa.Logger.Error(fmt.Sprintf("Failed to detect issues: %v", err))
 	} else {
 		result.Issues = issues
 	}
@@ -224,7 +218,7 @@ func (sa *SemanticAnalyzer) AnalyzeConfiguration(ctx context.Context, configPath
 	// Generate suggestions
 	suggestions, err := sa.generateSuggestions(content, intent)
 	if err != nil {
-		sa.Logger.Error("Failed to generate suggestions", map[string]interface{}{"error": err.Error()})
+		sa.Logger.Error(fmt.Sprintf("Failed to generate suggestions: %v", err))
 	} else {
 		result.Suggestions = suggestions
 	}
@@ -232,7 +226,7 @@ func (sa *SemanticAnalyzer) AnalyzeConfiguration(ctx context.Context, configPath
 	// Analyze dependencies
 	dependencies, err := sa.analyzeDependencies(content)
 	if err != nil {
-		sa.Logger.Error("Failed to analyze dependencies", map[string]interface{}{"error": err.Error()})
+		sa.Logger.Error(fmt.Sprintf("Failed to analyze dependencies: %v", err))
 	} else {
 		result.Dependencies = dependencies
 	}
@@ -240,7 +234,7 @@ func (sa *SemanticAnalyzer) AnalyzeConfiguration(ctx context.Context, configPath
 	// Perform security analysis
 	securityAnalysis, err := sa.performSecurityAnalysis(content)
 	if err != nil {
-		sa.Logger.Error("Failed to perform security analysis", map[string]interface{}{"error": err.Error()})
+		sa.Logger.Error(fmt.Sprintf("Failed to perform security analysis: %v", err))
 	} else {
 		result.SecurityAnalysis = securityAnalysis
 	}
@@ -248,7 +242,7 @@ func (sa *SemanticAnalyzer) AnalyzeConfiguration(ctx context.Context, configPath
 	// Perform performance analysis
 	performanceAnalysis, err := sa.performPerformanceAnalysis(content, intent)
 	if err != nil {
-		sa.Logger.Error("Failed to perform performance analysis", map[string]interface{}{"error": err.Error()})
+		sa.Logger.Error(fmt.Sprintf("Failed to perform performance analysis: %v", err))
 	} else {
 		result.Performance = performanceAnalysis
 	}
@@ -256,18 +250,13 @@ func (sa *SemanticAnalyzer) AnalyzeConfiguration(ctx context.Context, configPath
 	// Perform compatibility analysis
 	compatibilityAnalysis, err := sa.performCompatibilityAnalysis(content)
 	if err != nil {
-		sa.Logger.Error("Failed to perform compatibility analysis", map[string]interface{}{"error": err.Error()})
+		sa.Logger.Error(fmt.Sprintf("Failed to perform compatibility analysis: %v", err))
 	} else {
 		result.Compatibility = compatibilityAnalysis
 	}
 
-	sa.Logger.Info("Semantic analysis completed", map[string]interface{}{
-		"issues_found":     len(result.Issues),
-		"suggestions":      len(result.Suggestions),
-		"dependencies":     len(result.Dependencies),
-		"security_score":   result.SecurityAnalysis.Score,
-		"performance_score": result.Performance.Score,
-	})
+	sa.Logger.Info(fmt.Sprintf("Semantic analysis completed: %d issues, %d suggestions, %d dependencies, security score: %.2f, performance score: %.2f",
+		len(result.Issues), len(result.Suggestions), len(result.Dependencies), result.SecurityAnalysis.Score, result.Performance.Score))
 
 	return result, nil
 }
