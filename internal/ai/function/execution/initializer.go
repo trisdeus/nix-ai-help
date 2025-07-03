@@ -2,6 +2,8 @@ package execution
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/security"
@@ -75,7 +77,11 @@ func (ei *ExecutionInitializer) InitializeFromConfig(userConfig *config.UserConf
 	}
 
 	if ei.auditLogger == nil {
-		auditLogger, err := security.NewAuditLogger("/var/log/nixai/audit.log", true, ei.logger)
+		auditLogPath, err := getUserAuditLogPath()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get audit log path: %w", err)
+		}
+		auditLogger, err := security.NewAuditLogger(auditLogPath, true, ei.logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create audit logger: %w", err)
 		}
@@ -146,6 +152,26 @@ func GetDefaultConfig() *config.ExecutionConfig {
 	}
 }
 
+// getUserAuditLogPath returns a user-writable path for audit logs
+func getUserAuditLogPath() (string, error) {
+	// Try user config directory first
+	configDir, err := os.UserConfigDir()
+	if err == nil {
+		auditDir := filepath.Join(configDir, "nixai", "logs")
+		return filepath.Join(auditDir, "audit.log"), nil
+	}
+	
+	// Fallback to user home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Last resort - use /tmp (not ideal but works)
+		return "/tmp/nixai-audit.log", nil
+	}
+	
+	auditDir := filepath.Join(homeDir, ".nixai", "logs")
+	return filepath.Join(auditDir, "audit.log"), nil
+}
+
 // CreateSecurityComponents creates security components with default configuration
 func CreateSecurityComponents(logger *logger.Logger) (*security.PermissionManager, *security.AuditLogger, *security.SudoManager, error) {
 	execConfig := GetDefaultConfig()
@@ -153,8 +179,12 @@ func CreateSecurityComponents(logger *logger.Logger) (*security.PermissionManage
 	// Create permission manager
 	permissionManager := security.NewPermissionManager(execConfig, logger)
 
-	// Create audit logger
-	auditLogger, err := security.NewAuditLogger("/var/log/nixai/audit.log", true, logger)
+	// Create audit logger with user-writable path
+	auditLogPath, err := getUserAuditLogPath()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to get audit log path: %w", err)
+	}
+	auditLogger, err := security.NewAuditLogger(auditLogPath, true, logger)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create audit logger: %w", err)
 	}
