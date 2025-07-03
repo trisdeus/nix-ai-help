@@ -4,7 +4,7 @@
   installShellFiles,
   fetchFromGitHub,
   # Optional parameters for version/commit overrides
-  version ? "2.0.0",
+  version ? "2.0.1",
   src ? null,
   srcOverride ? null,
   rev ? null,
