@@ -2555,6 +2555,17 @@ func handleMCPServerStart(cfg *config.UserConfig, daemon bool, ephemeral bool, s
 	fmt.Println(utils.FormatHeader("🚀 Starting MCP Server"))
 	fmt.Println()
 
+	// Auto-detect nix run usage and suggest ephemeral mode
+	if !ephemeral && !daemon {
+		// Check if running under nix (binary path contains /nix/store)
+		if strings.Contains(os.Args[0], "/nix/store") {
+			fmt.Println(utils.FormatWarning("Detected nix run usage!"))
+			fmt.Println(utils.FormatTip("Consider using ephemeral mode for better nix run compatibility:"))
+			fmt.Println(utils.FormatTip("  nix run github:olafkfreund/nix-ai-help -- mcp-server start -e"))
+			fmt.Println()
+		}
+	}
+
 	// Handle ephemeral mode (good for nix run)
 	if ephemeral {
 		fmt.Println(utils.FormatInfo("Running in ephemeral mode (nix run compatible)"))
