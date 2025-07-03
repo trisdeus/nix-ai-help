@@ -322,22 +322,8 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 
 **TUI Interface Preview:**
 
-```text
-┌─ Commands (40+ total) ─────────────┬─ Execution Panel ─────────────────┐
-│                                    │                                   │
-│ ask [INPUT]                        │ Welcome to nixai TUI!             │
-│   Ask any NixOS question           │ Select a command from the left    │
-│ search [INPUT]                     │ panel to get started.            │
-│   Search for packages/services     │                                   │
-│ explain-option [INPUT]             │ Latest Updates:                   │
-│   Explain a NixOS option           │ • Icon-free accessible design    │
-│ hardware detect                    │ • Enhanced typography             │
-│   Comprehensive hardware analysis  │ • Smart scrolling system         │
-│                                    │ • Version display                │
-│ (Showing 1-8 of 24)               │ • ? changelog popup             │
-└────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.1
-```
+![alt text](tui_1.png)
+![alt text](tui_2.png)
 
 ### 🤖 AI-Powered Command System
 
