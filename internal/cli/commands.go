@@ -3762,6 +3762,9 @@ func initializeCommands() {
 
 	// Add Phase 3.1 - Safe Configuration Testing
 	rootCmd.AddCommand(CreateTestCommands())
+	
+	// Add Phase 3.3 - Developer Experience Revolution
+	rootCmd.AddCommand(CreateDevCommands())
 
 	commandsInitialized = true
 }

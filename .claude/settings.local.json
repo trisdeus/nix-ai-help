@@ -58,7 +58,12 @@
       "Bash(PWD=/tmp /home/olafkfreund/Source/NIX/nix-ai-help/nixai mcp-server start --help)",
       "Bash(PWD=/tmp /home/olafkfreund/Source/NIX/nix-ai-help/nixai ask \"test config loading\")",
       "Bash(for f in *.go)",
-      "Bash(do mv \"$f\" \"$f%.go.go.disabled\")"
+      "Bash(do mv \"$f\" \"$f%.go.go.disabled\")",
+      "Bash(nix flake check:*)",
+      "Bash(nix log:*)",
+      "Bash(wait)",
+      "Bash(git reset:*)",
+      "Bash(PWD=/home/olafkfreund/Source/NIX/nix-ai-help/test-dev /home/olafkfreund/Source/NIX/nix-ai-help/nixai dev setup test-project --template go-web-api --editor vscode --path /home/olafkfreund/Source/NIX/nix-ai-help/test-dev)"
     ],
     "deny": []
   }
