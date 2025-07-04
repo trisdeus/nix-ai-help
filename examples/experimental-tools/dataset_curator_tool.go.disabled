@@ -1,0 +1,91 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"os"
+
+	"nix-ai-help/internal/ai/models/fine_tuning"
+	"nix-ai-help/internal/config"
+)
+
+// DatasetCuratorTool provides a command-line interface for dataset curation
+func runDatasetCurator() error {
+	fmt.Println("🧠 NixAI Dataset Curator - Phase 1.1 Implementation")
+	fmt.Println("=====================================")
+
+	// Load configuration using proper config loading mechanism
+	userCfg, err := config.LoadUserConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load user config: %w", err)
+	}
+
+	// Initialize fine-tuning environment
+	env, err := fine_tuning.NewFineTuningEnvironment(userCfg)
+	if err != nil {
+		return fmt.Errorf("failed to create fine-tuning environment: %w", err)
+	}
+
+	ctx := context.Background()
+
+	// Initialize environment
+	fmt.Println("📁 Setting up fine-tuning environment...")
+	if err := env.Initialize(ctx); err != nil {
+		return fmt.Errorf("failed to initialize environment: %w", err)
+	}
+
+	// Validate environment
+	if err := env.ValidateEnvironment(); err != nil {
+		return fmt.Errorf("environment validation failed: %w", err)
+	}
+
+	fmt.Printf("✅ Environment initialized at: %s\n", env.BaseDir)
+
+	// Create dataset curator
+	curator := fine_tuning.NewDatasetCurator(env)
+
+	// Start dataset curation
+	fmt.Println("\n📊 Starting dataset curation process...")
+	if err := curator.CurateDatasets(ctx); err != nil {
+		return fmt.Errorf("dataset curation failed: %w", err)
+	}
+
+	// Display statistics
+	stats, err := curator.GetDatasetStats()
+	if err != nil {
+		return fmt.Errorf("failed to get dataset stats: %w", err)
+	}
+
+	fmt.Println("\n📈 Dataset Curation Complete!")
+	fmt.Printf("Total examples: %v\n", stats["total_examples"])
+	fmt.Printf("Categories: %v\n", stats["categories"])
+	fmt.Printf("Dataset files: %v\n", stats["dataset_files"])
+
+	// Display environment status
+	fmt.Println("\n🔍 Environment Status:")
+	status := env.GetStatus()
+	for key, value := range status {
+		fmt.Printf("  %s: %v\n", key, value)
+	}
+
+	// Display next steps
+	fmt.Println("\n🚀 Next Steps:")
+	fmt.Println("1. Review curated datasets in:", env.DatasetDir)
+	fmt.Println("2. Run model training: nixai train --model llama2 --dataset configuration")
+	fmt.Println("3. Evaluate model performance: nixai evaluate --model trained/nixos-llama2")
+	fmt.Println("4. Deploy fine-tuned model: nixai deploy --model trained/nixos-llama2")
+
+	return nil
+}
+
+func main() {
+	if len(os.Args) > 1 && os.Args[1] == "curate-datasets" {
+		if err := runDatasetCurator(); err != nil {
+			log.Fatalf("Dataset curation failed: %v", err)
+		}
+		return
+	}
+
+	fmt.Println("Usage: go run dataset_curator_tool.go curate-datasets")
+}

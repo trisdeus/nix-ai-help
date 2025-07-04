@@ -328,6 +328,12 @@ func (f *McpServerFunction) handleStartOperation(ctx context.Context, request *M
 		}, nil
 	}
 
+	// Get the actual config path being used
+	configPath, _ := config.ConfigFilePath()
+	if configPath == "" {
+		configPath = "~/.config/nixai/config.yaml"
+	}
+
 	// Start the server in a goroutine (non-blocking)
 	go func() {
 		if err := server.Start(); err != nil {

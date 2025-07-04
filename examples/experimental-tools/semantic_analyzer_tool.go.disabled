@@ -1,0 +1,230 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+
+	"nix-ai-help/internal/ai/models/semantic"
+)
+
+// SemanticAnalyzerTool provides a command-line interface for semantic analysis
+func runSemanticAnalyzer() error {
+	fmt.Println("🧠 NixAI Semantic Configuration Analyzer - Phase 1.2 Implementation")
+	fmt.Println("================================================================")
+
+	// Create semantic engine
+	engine := semantic.NewNixOSSemanticEngine()
+
+	ctx := context.Background()
+
+	// Test with sample NixOS configuration
+	sampleConfig := `# Sample NixOS Configuration
+{ config, pkgs, ... }:
+
+{
+  imports = [
+    ./hardware-configuration.nix
+  ];
+
+  # Boot configuration
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
+  # Networking
+  networking.hostName = "nixos-server";
+  networking.firewall.enable = true;
+  networking.firewall.allowedTCPPorts = [ 22 80 443 ];
+
+  # Services
+  services.openssh = {
+    enable = true;
+    settings = {
+      PasswordAuthentication = false;
+      PermitRootLogin = "no";
+    };
+  };
+
+  services.nginx = {
+    enable = true;
+    recommendedProxySettings = true;
+    recommendedTlsSettings = true;
+    virtualHosts."example.com" = {
+      enableACME = true;
+      forceSSL = true;
+      locations."/" = {
+        proxyPass = "http://localhost:3000";
+      };
+    };
+  };
+
+  services.postgresql = {
+    enable = true;
+    package = pkgs.postgresql_15;
+    port = 5432;
+    authentication = pkgs.lib.mkOverride 10 ''
+      local all all trust
+      host all all 127.0.0.1/32 md5
+    '';
+  };
+
+  # Security
+  services.fail2ban.enable = true;
+
+  # Performance
+  zramSwap.enable = true;
+  services.fstrim.enable = true;
+
+  # Users
+  users.users.webuser = {
+    isNormalUser = true;
+    extraGroups = [ "wheel" "nginx" ];
+    openssh.authorizedKeys.keys = [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJbPQDH1pN8q3qT5L7Z0k7T2+9YjQ3xV4j0K2h8C1f9n user@example.com"
+    ];
+  };
+
+  # System packages
+  environment.systemPackages = with pkgs; [
+    htop
+    git
+    curl
+    tree
+  ];
+
+  system.stateVersion = "24.05";
+}`
+
+	// Perform semantic analysis
+	fmt.Println("\n📊 Analyzing configuration semantics...")
+	result, err := engine.AnalyzeSemanticIntent(ctx, "sample-server.nix", sampleConfig)
+	if err != nil {
+		return fmt.Errorf("semantic analysis failed: %w", err)
+	}
+
+	// Display results
+	fmt.Println("\n🎯 Configuration Intent Analysis:")
+	fmt.Printf("  Purpose: %s\n", result.Purpose)
+	fmt.Printf("  Environment: %s\n", result.Environment)
+	fmt.Printf("  User Profile: %s\n", result.UserProfile)
+	fmt.Printf("  Architecture: %s\n", result.Architecture)
+	fmt.Printf("  Confidence: %.2f\n", result.Confidence)
+
+	fmt.Println("\n🏗️  Advanced Semantic Analysis:")
+	fmt.Printf("  Architectural Pattern: %s\n", result.ArchitecturalPattern)
+	fmt.Printf("  Deployment Model: %s\n", result.DeploymentModel)
+	fmt.Printf("  Security Posture: %s\n", result.SecurityPosture)
+	fmt.Printf("  Maintenance Level: %s\n", result.MaintenanceLevel)
+	fmt.Printf("  Scalability Rating: %.2f\n", result.ScalabilityRating)
+
+	fmt.Println("\n📈 Complexity Metrics:")
+	fmt.Printf("  Cyclomatic Complexity: %d\n", result.ComplexityMetrics.CyclomaticComplexity)
+	fmt.Printf("  Configuration Depth: %d\n", result.ComplexityMetrics.ConfigurationDepth)
+	fmt.Printf("  Service Density: %.2f%%\n", result.ComplexityMetrics.ServiceDensity)
+	fmt.Printf("  Dependency Complexity: %.2f\n", result.ComplexityMetrics.DependencyComplexity)
+	fmt.Printf("  Overall Score: %.2f\n", result.ComplexityMetrics.OverallScore)
+
+	if len(result.TechnicalDebt) > 0 {
+		fmt.Println("\n⚠️  Technical Debt:")
+		for i, debt := range result.TechnicalDebt {
+			fmt.Printf("  %d. %s (%s)\n", i+1, debt.Description, debt.Priority)
+			fmt.Printf("     Type: %s, Impact: %s, Effort: %s\n", debt.Type, debt.Impact, debt.Effort)
+		}
+	}
+
+	if len(result.EvolutionPath) > 0 {
+		fmt.Println("\n🚀 Evolution Path:")
+		for i, suggestion := range result.EvolutionPath {
+			fmt.Printf("  %d. %s (%s)\n", i+1, suggestion.Description, suggestion.Phase)
+			fmt.Printf("     Type: %s, Benefits: %s, Effort: %s\n", suggestion.Type, suggestion.Benefits, suggestion.Effort)
+		}
+	}
+
+	// Get basic semantic analysis too
+	fmt.Println("\n🔍 Basic Semantic Analysis (Standard Analyzer):")
+	analyzer := semantic.NewSemanticAnalyzer()
+	basicResult, err := analyzer.AnalyzeConfiguration(ctx, "sample-server.nix", sampleConfig)
+	if err == nil {
+		fmt.Printf("  Detected Services: %v\n", basicResult.Intent.Services)
+		fmt.Printf("  Issues Found: %d\n", len(basicResult.Issues))
+		fmt.Printf("  Suggestions: %d\n", len(basicResult.Suggestions))
+		fmt.Printf("  Dependencies: %d\n", len(basicResult.Dependencies))
+		fmt.Printf("  Security Score: %.2f\n", basicResult.SecurityAnalysis.Score)
+		fmt.Printf("  Performance Score: %.2f\n", basicResult.Performance.Score)
+		fmt.Printf("  Security Risk: %s\n", basicResult.SecurityAnalysis.Risk)
+
+		if len(basicResult.Issues) > 0 {
+			fmt.Println("\n⚠️  Issues Detected:")
+			for i, issue := range basicResult.Issues {
+				fmt.Printf("    %d. [%s] %s: %s\n", i+1, issue.Severity, issue.Type, issue.Title)
+				if issue.Fix != nil {
+					fmt.Printf("       Fix: %s\n", issue.Fix.Description)
+				}
+			}
+		}
+
+		if len(basicResult.Suggestions) > 0 {
+			fmt.Println("\n💡 Optimization Suggestions:")
+			for i, suggestion := range basicResult.Suggestions {
+				fmt.Printf("    %d. [%s] %s: %s\n", i+1, suggestion.Priority, suggestion.Type, suggestion.Title)
+				fmt.Printf("       %s\n", suggestion.Description)
+			}
+		}
+	}
+
+	// Export knowledge base
+	fmt.Println("\n📚 Knowledge Base Export:")
+	kbJSON, err := engine.ExportKnowledgeBase()
+	if err != nil {
+		fmt.Printf("  Failed to export knowledge base: %v\n", err)
+	} else {
+		fmt.Printf("  Knowledge base exported (%d bytes)\n", len(kbJSON))
+		
+		// Save to file
+		kbFile := "/tmp/nixos-knowledge-base.json"
+		if err := os.WriteFile(kbFile, []byte(kbJSON), 0644); err != nil {
+			fmt.Printf("  Failed to save knowledge base: %v\n", err)
+		} else {
+			fmt.Printf("  Knowledge base saved to: %s\n", kbFile)
+		}
+	}
+
+	// Save analysis result
+	fmt.Println("\n💾 Saving Analysis Results:")
+	resultJSON, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		fmt.Printf("  Failed to marshal results: %v\n", err)
+	} else {
+		resultFile := "/tmp/semantic-analysis-result.json"
+		if err := os.WriteFile(resultFile, resultJSON, 0644); err != nil {
+			fmt.Printf("  Failed to save results: %v\n", err)
+		} else {
+			fmt.Printf("  Analysis results saved to: %s\n", resultFile)
+		}
+	}
+
+	fmt.Println("\n✅ Semantic Analysis Complete!")
+	fmt.Println("\n🎯 Key Achievements:")
+	fmt.Println("  • Advanced intent recognition beyond syntax")
+	fmt.Println("  • Architectural pattern detection")
+	fmt.Println("  • Security posture assessment") 
+	fmt.Println("  • Performance optimization identification")
+	fmt.Println("  • Technical debt analysis")
+	fmt.Println("  • Evolution path suggestions")
+	fmt.Println("  • NixOS-specific knowledge base integration")
+
+	return nil
+}
+
+func main() {
+	if len(os.Args) > 1 && os.Args[1] == "analyze-semantic" {
+		if err := runSemanticAnalyzer(); err != nil {
+			log.Fatalf("Semantic analysis failed: %v", err)
+		}
+		return
+	}
+
+	fmt.Println("Usage: go run semantic_analyzer_tool.go analyze-semantic")
+}

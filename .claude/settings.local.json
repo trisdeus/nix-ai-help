@@ -56,7 +56,9 @@
       "Bash(nixai health:*)",
       "Bash(PWD=/tmp /home/olafkfreund/Source/NIX/nix-ai-help/nixai health status)",
       "Bash(PWD=/tmp /home/olafkfreund/Source/NIX/nix-ai-help/nixai mcp-server start --help)",
-      "Bash(PWD=/tmp /home/olafkfreund/Source/NIX/nix-ai-help/nixai ask \"test config loading\")"
+      "Bash(PWD=/tmp /home/olafkfreund/Source/NIX/nix-ai-help/nixai ask \"test config loading\")",
+      "Bash(for f in *.go)",
+      "Bash(do mv \"$f\" \"$f%.go.go.disabled\")"
     ],
     "deny": []
   }
