@@ -3765,6 +3765,9 @@ func initializeCommands() {
 	
 	// Add Phase 3.3 - Developer Experience Revolution
 	rootCmd.AddCommand(CreateDevCommands())
+	
+	// Add Phase 3.2 - Enterprise Fleet Intelligence
+	rootCmd.AddCommand(CreateFleetEnterpriseCommands())
 
 	commandsInitialized = true
 }

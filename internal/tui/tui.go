@@ -288,6 +288,13 @@ func getAvailableCommands() []Command {
 			Examples:    []string{"nixai fleet list", "nixai fleet deploy", "nixai fleet status"},
 		},
 		{
+			Name:        "fleet-enterprise",
+			Description: "Enterprise Fleet Intelligence - advanced analytics, canary deployments, compliance automation, and cost optimization",
+			Category:    "Enterprise",
+			Usage:       "nixai fleet-enterprise [action]",
+			Examples:    []string{"nixai fleet-enterprise analytics --fleet prod", "nixai fleet-enterprise canary deploy --traffic 10%", "nixai fleet-enterprise compliance assess --framework soc2", "nixai fleet-enterprise optimize --type cost"},
+		},
+		{
 			Name:        "machines",
 			Description: "Manage and deploy NixOS configurations across multiple machines",
 			Category:    "Fleet Management",
@@ -794,10 +801,29 @@ func (t *TUI) intelligentCommandSearch(query string) []CommandSuggestion {
 		"errors":     {"error", "diagnose", "logs", "doctor"},
 		
 		// Fleet & Machines
-		"fleet":      {"fleet", "machines"},
-		"deploy":     {"fleet", "machines", "workflow"},
-		"machine":    {"machines", "fleet", "hardware"},
-		"machines":   {"machines", "fleet"},
+		"fleet":      {"fleet", "fleet-enterprise", "machines"},
+		"deploy":     {"fleet", "fleet-enterprise", "machines", "workflow"},
+		"machine":    {"machines", "fleet", "fleet-enterprise", "hardware"},
+		"machines":   {"machines", "fleet", "fleet-enterprise"},
+		
+		// Enterprise Fleet Intelligence
+		"enterprise": {"fleet-enterprise"},
+		"analytics":  {"fleet-enterprise", "intelligence", "performance"},
+		"canary":     {"fleet-enterprise"},
+		"compliance": {"fleet-enterprise"},
+		"soc2":       {"fleet-enterprise"},
+		"hipaa":      {"fleet-enterprise"},
+		"pci":        {"fleet-enterprise"},
+		"iso27001":   {"fleet-enterprise"},
+		"cost":       {"fleet-enterprise", "performance"},
+		"optimize":   {"fleet-enterprise", "performance", "intelligence"},
+		"optimization": {"fleet-enterprise", "performance", "intelligence"},
+		"security":   {"fleet-enterprise", "doctor", "health"},
+		"rollback":   {"fleet-enterprise", "version-control"},
+		"promote":    {"fleet-enterprise"},
+		"assessment": {"fleet-enterprise", "doctor"},
+		"audit":      {"fleet-enterprise", "compliance"},
+		"remediate":  {"fleet-enterprise", "doctor"},
 		
 		// Storage & Cleanup
 		"storage":    {"store", "gc", "performance"},

@@ -2,8 +2,13 @@
 
 ---
 
-## 🚀 v2.0.7 Release Highlights (July 2025)
+## 🚀 v2.0.8 Release Highlights (July 2025)
 
+- **🏢 Enterprise Fleet Intelligence**: Advanced analytics, intelligent canary deployments, automated compliance (SOC2, HIPAA, PCI-DSS, ISO 27001), and cost optimization
+- **🛡️ Intelligent Canary Deployments**: AI-powered deployment decisions with statistical analysis, automated rollback triggers, and progressive traffic routing
+- **📊 Advanced Fleet Analytics**: ML-driven insights for performance, cost, security, and capacity with predictive recommendations and ROI analysis
+- **⚖️ Compliance Automation**: Automated assessment and remediation for 4 enterprise frameworks with continuous monitoring and audit trails
+- **💰 Cost Optimization Engine**: Infrastructure cost analysis with automated right-sizing, storage optimization, and ROI calculations
 - **🚀 Developer Experience Revolution**: One-command project setup with intelligent templates, automatic dependency detection, and comprehensive IDE integration
 - **🧪 Safe Configuration Testing**: Enterprise-grade testing infrastructure with virtual environments, A/B testing, chaos engineering, and automated rollback
 - **🌐 Modern Web Interface**: Responsive dashboard with configuration builder and team collaboration
@@ -68,6 +73,7 @@ Welcome to the nixai Command Manual. Each command has its own dedicated document
 - [templates](templates.md) - Configuration templates
 - [test](test.md) - Safe configuration testing **NEW**
 - [dev](dev.md) - Developer Experience Revolution **NEW**
+- [fleet-enterprise](fleet-enterprise.md) - Enterprise Fleet Intelligence **NEW**
 
 ### New 2.0.0 Features
 - [web](web.md) - Modern web interface **NEW**
