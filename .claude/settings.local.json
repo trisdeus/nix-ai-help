@@ -42,7 +42,12 @@
       "Bash(just test:*)",
       "Bash(nix build:*)",
       "Bash(nix flake lock:*)",
-      "Bash(./result/bin/nixai:*)"
+      "Bash(./result/bin/nixai:*)",
+      "Bash(echo:*)",
+      "Bash(comm:*)",
+      "Bash(cat:*)",
+      "Bash(nproc)",
+      "Bash(git tag:*)"
     ],
     "deny": []
   }

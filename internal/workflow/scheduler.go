@@ -374,8 +374,7 @@ func (s *Scheduler) executeTask(task *Task, execution *TaskExecution, ctx *Execu
 }
 
 func (s *Scheduler) executeAction(action *Action, ctx *ExecutionContext) (*ActionExecution, error) {
-	// This is a simplified action execution
-	// In a real implementation, this would delegate to the ActionExecutor
+	// Delegate to the actual ActionExecutor for real action execution
 	s.logger.Debug("Executing action: %s (type: %s)", action.ID, action.Type)
 
 	startTime := time.Now()
@@ -385,38 +384,38 @@ func (s *Scheduler) executeAction(action *Action, ctx *ExecutionContext) (*Actio
 		ExitCode:  0,
 	}
 
-	// Simulate action execution based on type
-	switch action.Type {
-	case ActionTypeCommand:
-		// Simulate command execution
-		time.Sleep(100 * time.Millisecond)
-		execution.Output = fmt.Sprintf("Command executed: %s", action.Command)
-
-	case ActionTypeNixOSRebuild:
-		// Simulate NixOS rebuild
-		time.Sleep(500 * time.Millisecond)
-		execution.Output = "NixOS rebuild completed"
-
-	case ActionTypeFileEdit:
-		// Simulate file edit
-		time.Sleep(50 * time.Millisecond)
-		execution.Output = "File edited successfully"
-
-	case ActionTypeValidation:
-		// Simulate validation
-		time.Sleep(200 * time.Millisecond)
-		execution.Output = "Validation passed"
-
-	default:
-		execution.Error = fmt.Sprintf("Unknown action type: %s", action.Type)
+	// Create a real action executor to handle the action
+	executor := NewActionExecutor(s.logger)
+	
+	// Execute the action using the real executor
+	result, err := executor.ExecuteAction(action, ctx)
+	if err != nil {
+		execution.Error = err.Error()
 		execution.ExitCode = 1
+		if result != nil && result.ExitCode != 0 {
+			execution.ExitCode = result.ExitCode
+		}
 		endTime := time.Now()
 		execution.EndTime = &endTime
-		return execution, fmt.Errorf("unknown action type: %s", action.Type)
+		return execution, err
 	}
 
-	endTime := time.Now()
-	execution.EndTime = &endTime
+	// Copy results from the executor's result
+	if result != nil {
+		execution.Output = result.Output
+		execution.Error = result.Error
+		execution.ExitCode = result.ExitCode
+		if result.EndTime != nil {
+			execution.EndTime = result.EndTime
+		} else {
+			endTime := time.Now()
+			execution.EndTime = &endTime
+		}
+	} else {
+		endTime := time.Now()
+		execution.EndTime = &endTime
+	}
+
 	return execution, nil
 }
 

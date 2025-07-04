@@ -34,6 +34,8 @@
 - **🔧 Interactive Parameter Input**: All complex commands now support TUI parameter configuration
 - **📊 Real-Time Output**: Command execution with live output display within TUI
 - **🎯 Command Discovery**: Enhanced command browser with `[INPUT]` indicators for configurable commands
+- **🤖 Intelligent Command Search**: AI-powered natural language query understanding with smart suggestions
+- **💬 Natural Language Interface**: Ask questions like "help me with health status" and get intelligent command recommendations
 
 ### 🚀 **Enhanced Command System** - **8 MAJOR COMMANDS UPGRADED!**
 
@@ -73,6 +75,8 @@ nixai offers two powerful TUI interfaces to suit different preferences:
 - **Real-time suggestions** and auto-completion
 - **Live output display** above the command input
 - **Clean, minimalist design** focused on efficiency
+- **🤖 Intelligent Command Search**: Natural language query understanding
+- **💬 Smart Suggestions**: AI-powered command recommendations with usage hints
 
 ![alt text](tui_1.png)
 ![alt text](tui_2.png)
@@ -85,6 +89,8 @@ nixai offers two powerful TUI interfaces to suit different preferences:
 - **📰 Feature Discovery**: ? popup shows latest updates and changelog
 - **⌨️ Keyboard Efficient**: Complete keyboard navigation without mouse requirement
 - **🎨 Professional Design**: Clean two-panel layout with status bar and real-time feedback
+- **🤖 Intelligent Command Search**: Natural language query understanding with AI-powered suggestions
+- **💬 Smart Assistance**: Ask questions like "help me with health status" and get relevant command recommendations with usage hints
 
 ### 🧠 **Context-Aware Intelligence**
 
@@ -941,6 +947,7 @@ nix run github:olafkfreund/nix-ai-help -- mcp-server start -e  # Start MCP serve
 # Tab: Switch between panels  
 # Enter: Select/execute commands
 # /: Search commands
+# Type natural questions: "help me with health status" for AI suggestions
 # ?: Show changelog and latest features
 # Ctrl+C: Exit
 ```
@@ -1152,7 +1159,7 @@ nixai config reset
 After installation, verify everything works:
 
 ```zsh
-nixai --version              # Should show "nixai version 2.0.1"
+nixai --version              # Should show "nixai version 2.0.4"
 nixai doctor                 # Run comprehensive health check
 nixai hardware detect       # Test hardware detection
 nixai -a "test question"     # Test AI functionality
@@ -1195,10 +1202,11 @@ nixai revolutionizes how you interact with NixOS by providing AI-powered assista
 # Step 1: Start with nixai (install first: nix profile install github:olafkfreund/nix-ai-help)
 nixai --help
 
-# Step 2: Launch the modern TUI for guided exploration
+# Step 2: Launch the modern TUI for guided exploration with intelligent search
 nixai tui
+# In TUI: Type "help me with system health" for intelligent command suggestions
 
-# Step 3: Ask questions in natural language
+# Step 3: Ask questions in natural language (or use intelligent TUI search)
 nixai ask "What is a NixOS configuration and how do I modify it?"
 
 # Step 4: Access the built-in manual system

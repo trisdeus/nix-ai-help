@@ -7,12 +7,14 @@ import (
 	"regexp"
 	"strings"
 
+	"nix-ai-help/internal/nixlang"
 	"nix-ai-help/pkg/logger"
 )
 
 // SemanticAnalyzer provides intelligent analysis of NixOS configurations
 type SemanticAnalyzer struct {
-	Logger *logger.Logger
+	Logger               *logger.Logger
+	inconsistencyDetector *nixlang.InconsistencyDetector
 }
 
 // AnalysisResult contains the results of semantic analysis
@@ -255,8 +257,30 @@ func (sa *SemanticAnalyzer) AnalyzeConfiguration(ctx context.Context, configPath
 		result.Compatibility = compatibilityAnalysis
 	}
 
-	sa.Logger.Info(fmt.Sprintf("Semantic analysis completed: %d issues, %d suggestions, %d dependencies, security score: %.2f, performance score: %.2f",
-		len(result.Issues), len(result.Suggestions), len(result.Dependencies), result.SecurityAnalysis.Score, result.Performance.Score))
+	// Perform logical inconsistency detection (enhanced feature)
+	if sa.inconsistencyDetector == nil {
+		// Initialize if not already done
+		analyzer := nixlang.NewNixAnalyzer()
+		sa.inconsistencyDetector = nixlang.NewInconsistencyDetector(analyzer)
+	}
+	
+	inconsistencyResult, err := sa.inconsistencyDetector.DetectInconsistencies(content)
+	if err != nil {
+		sa.Logger.Error(fmt.Sprintf("Failed to detect logical inconsistencies: %v", err))
+	} else if inconsistencyResult != nil {
+		// Add inconsistency findings to metadata for now
+		// In a full implementation, this would be integrated into the AnalysisResult structure
+		result.Metadata["logical_inconsistencies"] = inconsistencyResult
+		sa.Logger.Info(fmt.Sprintf("Detected %d logical inconsistencies", len(inconsistencyResult.Inconsistencies)))
+	}
+
+	inconsistencyCount := 0
+	if inconsistencyResult != nil {
+		inconsistencyCount = len(inconsistencyResult.Inconsistencies)
+	}
+
+	sa.Logger.Info(fmt.Sprintf("Semantic analysis completed: %d issues, %d suggestions, %d dependencies, %d inconsistencies, security score: %.2f, performance score: %.2f",
+		len(result.Issues), len(result.Suggestions), len(result.Dependencies), inconsistencyCount, result.SecurityAnalysis.Score, result.Performance.Score))
 
 	return result, nil
 }

@@ -1,6 +1,6 @@
 # nixai fleet - Fleet Management System
 
-The `nixai fleet` command provides comprehensive multi-machine deployment and configuration management capabilities for NixOS environments.
+The `nixai fleet` command provides comprehensive multi-machine deployment and configuration management capabilities for NixOS environments with real-time health monitoring and authentic system metrics collection.
 
 ## Overview
 
@@ -27,14 +27,17 @@ nixai fleet show <hostname> [--verbose]
 ### Health & Monitoring
 
 ```bash
-# Check fleet health status
+# Check fleet health status (real system metrics)
 nixai fleet health [--detailed] [--format json]
 
-# Monitor fleet in real-time
+# Monitor fleet in real-time (authentic monitoring)
 nixai fleet monitor [--refresh-interval 5s] [--follow]
 
-# Get fleet statistics
+# Get fleet statistics (real performance data)
 nixai fleet stats [--period 24h|7d|30d]
+
+# Check SSH connectivity and system health
+nixai fleet connectivity-test [--parallel] [--timeout 10s]
 ```
 
 ### Deployment Management

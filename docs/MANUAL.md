@@ -6,10 +6,10 @@
 
 - **🌐 Modern Web Interface**: Responsive dashboard with configuration builder and team collaboration
 - **🔌 Comprehensive Plugin System**: 14 plugin management commands with secure dynamic loading
-- **🎯 Enhanced TUI Experience**: Claude Code-style and classic interfaces with improved navigation
+- **🎯 Enhanced TUI Experience**: Claude Code-style and classic interfaces with AI-powered intelligent command search
 - **⚙️ Fleet Management**: Multi-machine deployment and configuration management
 - **🚀 Version Control System**: Git-like workflow for NixOS configurations with branching and history
-- **📊 System Monitoring**: Advanced package monitoring, performance analysis, and intelligence gathering
+- **📊 System Monitoring**: Real-time system health monitoring with accurate CPU-aware thresholds and network utilization
 - **🤖 Enhanced AI Integration**: GitHub Copilot support and improved provider ecosystem
 - **🛡️ Security & Performance**: Improved security sandbox and optimized architecture
 
@@ -50,6 +50,7 @@ Welcome to the nixai Command Manual. Each command has its own dedicated document
 - [flake](flake.md) - Flake management
 - [gc](gc.md) - Garbage collection
 - [hardware](hardware.md) - Hardware management
+- [health](health.md) - System health monitoring **UPDATED**
 - [help](help.md) - Help system
 - [interactive](interactive.md) - TUI interface
 - [learn](learn.md) - Learning modules
@@ -66,17 +67,17 @@ Welcome to the nixai Command Manual. Each command has its own dedicated document
 
 ### New 2.0.0 Features
 - [web](web.md) - Modern web interface **NEW**
-- [tui](tui.md) - Enhanced terminal interface **NEW**
+- [tui](tui.md) - Enhanced terminal interface with AI-powered intelligent search **UPDATED**
 - [plugin](plugin.md) - Plugin system management **NEW**
-- [fleet](fleet.md) - Fleet management **NEW**
+- [fleet](fleet.md) - Fleet management with real monitoring **UPDATED**
 - [version-control](version-control.md) - Configuration version control **NEW**
 
 ### System Commands
 - [deps](deps.md) - Dependency analysis **NEW**
-- [performance](performance.md) - Performance monitoring **NEW**
+- [performance](performance.md) - Performance monitoring with real cache statistics **UPDATED**
 - [error](error.md) - Error management **NEW**
 - [intelligence](intelligence.md) - Intelligence analysis **NEW**
-- [workflow](workflow.md) - Workflow management **NEW**
+- [workflow](workflow.md) - Workflow management with real action execution **UPDATED**
 - [integration](integration.md) - Integration commands **NEW**
 - [system-info](system-info.md) - System information **NEW**
 - [package-monitor](package-monitor.md) - Package monitoring **NEW**

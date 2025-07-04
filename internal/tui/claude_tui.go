@@ -105,7 +105,7 @@ func getAllCommandSuggestions() []string {
 		"build", "devenv", "import", "templates",
 		
 		// Diagnostics and troubleshooting
-		"diagnose", "doctor", "error", "logs", "performance",
+		"diagnose", "doctor", "error", "logs", "performance", "health",
 		
 		// Package and dependency management
 		"deps", "package-repo", "search", "store", "gc",
@@ -169,6 +169,12 @@ func getAllCommandSuggestions() []string {
 		"hardware optimize",
 		"performance stats",
 		"performance cache",
+		"health status",
+		"health predict --timeline 7d",
+		"health anomalies",
+		"health forecast --resource cpu --timeline 3d",
+		"health remediate",
+		"health monitor --interval 5m",
 		"mcp-server start",
 		"mcp-server status",
 		"neovim-setup install",

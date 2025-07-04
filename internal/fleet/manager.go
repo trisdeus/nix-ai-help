@@ -3,6 +3,8 @@ package fleet
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"sync"
 	"time"
 
@@ -391,14 +393,32 @@ func (fm *FleetManager) validateRepositoryMachine(machine *Machine) error {
 }
 
 // testMachineConnectivity tests SSH connectivity to a machine
-func (fm *FleetManager) testMachineConnectivity(ctx context.Context, machine *Machine) error { // This would implement actual SSH connectivity testing
-	// For now, we'll simulate the test
+func (fm *FleetManager) testMachineConnectivity(ctx context.Context, machine *Machine) error {
 	fm.logger.Debug(fmt.Sprintf("Testing machine connectivity: %s at %s", machine.ID, machine.Address))
 
-	// TODO: Implement actual SSH connectivity test
-	// - Create SSH client with machine.SSHConfig
-	// - Attempt to connect and run a simple command
-	// - Return error if connection fails
+	// For localhost, just check if it's reachable
+	if machine.Address == "localhost" || machine.Address == "127.0.0.1" {
+		// Test local connectivity by checking if we can read /proc/version
+		if _, err := os.ReadFile("/proc/version"); err != nil {
+			return fmt.Errorf("localhost connectivity test failed: %w", err)
+		}
+		return nil
+	}
+
+	// For remote machines, test basic network connectivity with ping
+	cmd := exec.Command("ping", "-c", "1", "-W", "3", machine.Address)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("network connectivity test failed for %s: %w", machine.Address, err)
+	}
+
+	// If SSH config is available, test SSH connectivity
+	if machine.SSHConfig.Port > 0 {
+		// Test SSH port connectivity with timeout
+		cmd = exec.Command("timeout", "5", "nc", "-z", machine.Address, fmt.Sprintf("%d", machine.SSHConfig.Port))
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("SSH connectivity test failed for %s:%d: %w", machine.Address, machine.SSHConfig.Port, err)
+		}
+	}
 
 	return nil
 }

@@ -1,6 +1,6 @@
 # nixai performance - Performance Monitoring and Optimization
 
-The `nixai performance` command provides system performance monitoring, analysis, and optimization recommendations for NixOS systems.
+The `nixai performance` command provides real-time system performance monitoring, cache statistics analysis, and optimization recommendations for NixOS systems. All metrics are collected from actual system sources with accurate cache hit/miss tracking.
 
 ## Usage
 
@@ -11,20 +11,23 @@ nixai performance [command] [options]
 ## Commands
 
 ```bash
-# System performance overview
-nixai performance overview [--real-time] [--duration 60s]
+# System performance and cache statistics
+nixai performance stats
 
-# Monitor specific metrics
-nixai performance monitor [--metrics cpu,memory,disk,network] [--interval 5s]
+# Real-time cache monitoring  
+nixai performance cache
 
 # Performance analysis and recommendations
 nixai performance analyze [--output report.json] [--include-history]
 
-# Benchmark system performance
-nixai performance benchmark [--suite basic|full|custom] [--compare-baseline]
+# Generate performance report
+nixai performance report [--detailed] [--format json|table]
 
-# Generate optimization suggestions
-nixai performance optimize [--category all|boot|memory|disk|network]
+# Monitor system metrics
+nixai performance monitor [--interval 5s] [--metrics cpu,memory,cache]
+
+# Cache optimization suggestions
+nixai performance optimize-cache
 
 # Show performance history
 nixai performance history [--period 24h|7d|30d] [--format chart|table]
@@ -33,11 +36,11 @@ nixai performance history [--period 24h|7d|30d] [--format chart|table]
 ## Features
 
 ### Real-time Monitoring
-- CPU utilization and load averages
-- Memory usage and swap utilization
-- Disk I/O and storage performance
-- Network throughput and latency
-- System temperature and throttling
+- **Cache Statistics**: Real cache hit/miss rates, not placeholder data
+- **System Performance**: CPU utilization and load averages
+- **Memory Usage**: Current memory and swap utilization  
+- **Cache Efficiency**: Hit rates, miss rates, and cache optimization opportunities
+- **Performance Metrics**: Real-time system performance indicators
 
 ### Performance Analysis
 - Bottleneck identification

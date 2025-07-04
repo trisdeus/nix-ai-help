@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -498,26 +499,120 @@ func (p *SystemMonitorPlugin) collectMetrics() {
 }
 
 func (p *SystemMonitorPlugin) getCPUUsage() float64 {
-	// Simplified CPU usage calculation
-	// In a real implementation, you'd use more sophisticated methods
-	return float64(runtime.NumGoroutine()) * 2.5 // Mock value
+	// Read CPU usage from /proc/stat
+	data, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return 0.0
+	}
+	
+	lines := strings.Split(string(data), "\n")
+	if len(lines) == 0 {
+		return 0.0
+	}
+	
+	// Parse first line which contains overall CPU stats
+	fields := strings.Fields(lines[0])
+	if len(fields) < 8 || fields[0] != "cpu" {
+		return 0.0
+	}
+	
+	// Calculate CPU usage (simplified)
+	var idle, total float64
+	for i := 1; i < len(fields); i++ {
+		val, err := strconv.ParseFloat(fields[i], 64)
+		if err != nil {
+			continue
+		}
+		total += val
+		if i == 4 { // idle time is the 4th field
+			idle = val
+		}
+	}
+	
+	if total == 0 {
+		return 0.0
+	}
+	
+	usage := (total - idle) / total * 100
+	if usage < 0 {
+		usage = 0
+	}
+	if usage > 100 {
+		usage = 100
+	}
+	
+	return usage
 }
 
 func (p *SystemMonitorPlugin) getMemoryUsage() float64 {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return 0.0
+	}
 	
-	// Convert to percentage (mock calculation)
-	totalMemory := uint64(8 * 1024 * 1024 * 1024) // Assume 8GB total
-	usedMemory := m.Alloc
+	lines := strings.Split(string(data), "\n")
+	var memTotal, memAvailable float64
 	
-	return float64(usedMemory) / float64(totalMemory) * 100
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		
+		switch fields[0] {
+		case "MemTotal:":
+			if val, err := strconv.ParseFloat(fields[1], 64); err == nil {
+				memTotal = val
+			}
+		case "MemAvailable:":
+			if val, err := strconv.ParseFloat(fields[1], 64); err == nil {
+				memAvailable = val
+			}
+		}
+	}
+	
+	if memTotal == 0 {
+		return 0.0
+	}
+	
+	usage := (memTotal - memAvailable) / memTotal * 100
+	if usage < 0 {
+		usage = 0
+	}
+	if usage > 100 {
+		usage = 100
+	}
+	
+	return usage
 }
 
 func (p *SystemMonitorPlugin) getDiskUsage() float64 {
-	// Read disk usage from /proc/diskstats or similar
-	// This is a simplified mock implementation
-	return 45.0 // Mock 45% disk usage
+	// Get disk usage using df command for root partition
+	cmd := exec.Command("df", "/")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0.0
+	}
+	
+	lines := strings.Split(string(output), "\n")
+	if len(lines) < 2 {
+		return 0.0
+	}
+	
+	// Parse the second line which contains the root filesystem info
+	fields := strings.Fields(lines[1])
+	if len(fields) < 5 {
+		return 0.0
+	}
+	
+	// Extract usage percentage (field 4, remove % suffix)
+	usagePct := strings.TrimSuffix(fields[4], "%")
+	usage, err := strconv.ParseFloat(usagePct, 64)
+	if err != nil {
+		return 0.0
+	}
+	
+	return usage
 }
 
 func (p *SystemMonitorPlugin) getLoadAverage() float64 {

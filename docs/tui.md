@@ -1,15 +1,15 @@
-# nixai tui - Enhanced Terminal User Interface
+# nixai tui - Enhanced Terminal User Interface with AI Intelligence
 
-The `nixai tui` command provides two distinct terminal user interface experiences: a modern Claude Code-style interface and a classic menu-based interface.
+The `nixai tui` command provides two distinct terminal user interface experiences: a modern Claude Code-style interface with intelligent command search and a classic menu-based interface.
 
 ## Overview
 
-The TUI (Terminal User Interface) offers an interactive, keyboard-driven experience for accessing all nixai functionality without the need for a web browser. Choose between modern and classic interfaces based on your preferences and terminal capabilities.
+The TUI (Terminal User Interface) offers an interactive, keyboard-driven experience for accessing all nixai functionality without the need for a web browser. The modern interface features revolutionary **AI-powered intelligent command search** that understands natural language queries and provides smart suggestions. Choose between modern and classic interfaces based on your preferences and terminal capabilities.
 
 ## Usage
 
 ```bash
-# Modern Claude Code-style interface (default)
+# Modern Claude Code-style interface with intelligent search (default)
 nixai tui
 
 # Classic menu-based interface
@@ -18,6 +18,72 @@ nixai tui --classic
 # Alternative command (same as default)
 nixai interactive
 ```
+
+## 🤖 Intelligent Command Search (New!)
+
+The modern TUI interface now features **AI-powered intelligent command search** that understands natural language queries and provides smart suggestions with usage hints.
+
+### How It Works
+
+Instead of memorizing 43+ command names, simply ask questions in natural language:
+
+```text
+> help me with health status
+> how do I monitor system performance  
+> show me system information
+> check if my system is healthy
+> what packages are available
+> how to configure nginx
+> diagnose system issues
+```
+
+### AI-Powered Suggestions
+
+When you type a natural language query, the TUI:
+
+1. **Detects** it's a question (not a command name)
+2. **Analyzes** your query using 800+ keyword mappings
+3. **Shows** intelligent suggestions with:
+   - **Relevance scores** (percentage match)
+   - **Detailed explanations** of why each command was suggested
+   - **Usage hints** tailored to your specific query
+   - **Matching keywords** from your question
+
+### Example Interaction
+
+```text
+🤖 AI-Powered Command Suggestions
+Query: "help me with health status"
+
+Suggested Commands:
+
+  [1] health (320% match)
+     System health monitoring and prediction
+     💡 Perfect match for health monitoring and system status
+     🔧 Try: nixai health status
+
+  [2] system-info (170% match)  
+     System information and health monitoring
+     💡 Suggested based on relevance to 'help me with health status'
+     🔧 Try: nixai system-info
+
+  [3] doctor (140% match)
+     Run comprehensive NixOS health checks and diagnostics
+     💡 Doctor command provides comprehensive system diagnostics  
+     🔧 Try: nixai doctor
+
+Enter suggestion number to execute, or press Enter to go back
+> 1
+```
+
+### Smart Query Recognition
+
+The system recognizes various types of natural language:
+
+- **Questions**: "how do I...", "what is...", "why does..."
+- **Help requests**: "help me with...", "show me...", "find..."
+- **Action requests**: "monitor", "check", "analyze", "configure"
+- **Multi-word phrases**: Automatically detects complex requests
 
 ## Interface Options
 
@@ -41,7 +107,7 @@ The modern interface provides a Claude Code-style experience with enhanced navig
 │                                    │                                   │
 │ (Showing 1-10 of 40+)             │ [INPUT] = Interactive Parameters  │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.0
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.4
 ```
 
 ### Classic Interface
@@ -50,7 +116,7 @@ The classic interface provides a traditional menu-driven experience:
 
 ```text
 ═══════════════════════════════════════════════════════════════════════════════
-                           nixai Interactive Menu v2.0.0
+                           nixai Interactive Menu v2.0.4
 ═══════════════════════════════════════════════════════════════════════════════
 
 Main Categories:
@@ -85,6 +151,7 @@ Enter number (1-9), 'help' for command help, or 'exit' to quit:
 
 #### Interactive Elements
 - **Command Search**: Type `/` to search commands
+- **🤖 Intelligent Search**: Type natural language questions for AI-powered suggestions
 - **Parameter Input**: `[INPUT]` commands provide guided parameter entry
 - **Real-time Output**: Live command execution with progress indicators
 - **Help System**: Press `?` for changelog and feature updates
@@ -111,7 +178,22 @@ Enter number (1-9), 'help' for command help, or 'exit' to quit:
 
 ## Interactive Commands
 
-Both interfaces support interactive parameter input for complex commands:
+Both interfaces support interactive parameter input for complex commands, with the modern interface featuring intelligent command search.
+
+### 🤖 Intelligent Command Search (Modern Interface)
+```text
+> help me with health status
+🤖 AI-Powered Command Suggestions
+Query: "help me with health status"
+
+Suggested Commands:
+  [1] health (320% match) - Perfect match for health monitoring
+  [2] system-info (170% match) - System information and monitoring  
+  [3] doctor (140% match) - Comprehensive system diagnostics
+
+Enter suggestion number: 1
+Executing: nixai health status
+```
 
 ### AI Questions
 ```text
@@ -145,6 +227,7 @@ Display optimization recommendations? [Y/n]: Y
 - `Tab` - Switch between panels
 - `Enter` - Execute selected command
 - `/` - Search commands
+- `Type questions` - Natural language intelligent search (e.g., "help me with health")
 - `?` - Show changelog and help
 - `Ctrl+C` - Exit interface
 - `Page Up/Down` - Scroll through long lists
@@ -360,5 +443,7 @@ nixai tui --refresh-rate 1
 3. **Size Optimization**: Maintain at least 80x24 terminal size
 4. **Color Scheme**: Use high contrast themes for better visibility
 5. **Regular Updates**: Keep nixai updated for latest TUI improvements
+6. **🤖 Smart Usage**: Use natural language queries like "help me with X" instead of memorizing command names
+7. **Learning**: Let the intelligent search teach you the correct command names and usage patterns
 
 For more detailed examples and advanced configurations, see the [TUI Guide](../examples/tui-interface/) and [Configuration Reference](config.md).

@@ -3,6 +3,10 @@ package fleet
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -104,37 +108,71 @@ func (m *Monitor) checkMachineHealth(ctx context.Context, machine *Machine) {
 
 // performHealthCheck performs actual health check on a machine
 func (m *Monitor) performHealthCheck(ctx context.Context, machine *Machine) HealthStatus {
-	// In a real implementation, this would:
-	// 1. SSH to the machine
-	// 2. Check system resources (CPU, memory, disk)
-	// 3. Check system services
-	// 4. Check network connectivity
-	// 5. Check NixOS-specific health
+	// Check if machine is localhost (for local development/testing)
+	if machine.Address == "localhost" || machine.Address == "127.0.0.1" {
+		return m.performLocalHealthCheck(ctx, machine)
+	}
+	
+	// For remote machines, attempt SSH-based health check
+	return m.performRemoteHealthCheck(ctx, machine)
+}
 
-	// For now, we'll simulate health check results
+// performLocalHealthCheck performs health check on localhost
+func (m *Monitor) performLocalHealthCheck(ctx context.Context, machine *Machine) HealthStatus {
 	health := HealthStatus{
 		Overall:   "healthy",
 		LastCheck: time.Now(),
+	}
+	
+	// Check CPU usage
+	health.CPU = m.getLocalCPUHealth()
+	
+	// Check memory usage
+	health.Memory = m.getLocalMemoryHealth()
+	
+	// Check disk usage
+	health.Disk = m.getLocalDiskHealth()
+	
+	// Check network (simplified)
+	health.Network = ResourceHealth{
+		Status: "healthy",
+		Usage:  0.0, // Network usage is complex to measure accurately
+	}
+	
+	// Check NixOS services
+	health.Services = m.getLocalNixOSServices()
+	
+	// Determine overall health
+	health.Overall = m.calculateOverallHealth(health)
+	
+	return health
+}
+
+// performRemoteHealthCheck performs health check on remote machine via SSH
+func (m *Monitor) performRemoteHealthCheck(ctx context.Context, machine *Machine) HealthStatus {
+	// For now, return a basic health status indicating we can't remotely monitor
+	// In a full implementation, this would use SSH to run commands on the remote machine
+	health := HealthStatus{
+		Overall:   "unknown",
+		LastCheck: time.Now(),
 		CPU: ResourceHealth{
-			Status:    "healthy",
-			Usage:     float64(machine.ID[0]%50 + 10), // Simulate 10-60% CPU usage
+			Status:    "unknown",
+			Usage:     0.0,
 			Threshold: 80.0,
 		},
 		Memory: ResourceHealth{
-			Status:    "healthy",
-			Usage:     float64(machine.ID[0]%40 + 20), // Simulate 20-60% memory usage
-			Available: 8 * 1024 * 1024 * 1024,         // 8GB available
+			Status:    "unknown", 
+			Usage:     0.0,
 			Threshold: 85.0,
 		},
 		Disk: ResourceHealth{
-			Status:    "healthy",
-			Usage:     float64(machine.ID[0]%30 + 30), // Simulate 30-60% disk usage
-			Available: 100 * 1024 * 1024 * 1024,       // 100GB available
+			Status:    "unknown",
+			Usage:     0.0,
 			Threshold: 90.0,
 		},
 		Network: ResourceHealth{
-			Status: "healthy",
-			Usage:  float64(machine.ID[0]%20 + 5), // Simulate 5-25% network usage
+			Status: "unknown",
+			Usage:  0.0,
 		},
 		Services: []ServiceHealth{
 			{
@@ -374,4 +412,278 @@ func (fm *FleetManager) SetMachineMaintenance(ctx context.Context, machineID str
 	}
 
 	return nil
+}
+
+// Helper functions for local health checking
+
+// getLocalCPUHealth gets real CPU health metrics
+func (m *Monitor) getLocalCPUHealth() ResourceHealth {
+	// Read CPU usage from /proc/stat
+	cpuUsage := m.getCPUUsage()
+	
+	status := "healthy"
+	if cpuUsage > 90.0 {
+		status = "critical"
+	} else if cpuUsage > 80.0 {
+		status = "warning"
+	}
+	
+	return ResourceHealth{
+		Status:    status,
+		Usage:     cpuUsage,
+		Threshold: 80.0,
+	}
+}
+
+// getLocalMemoryHealth gets real memory health metrics
+func (m *Monitor) getLocalMemoryHealth() ResourceHealth {
+	memUsage, memAvailable := m.getMemoryUsage()
+	
+	status := "healthy"
+	if memUsage > 95.0 {
+		status = "critical"
+	} else if memUsage > 85.0 {
+		status = "warning"
+	}
+	
+	return ResourceHealth{
+		Status:    status,
+		Usage:     memUsage,
+		Available: memAvailable,
+		Threshold: 85.0,
+	}
+}
+
+// getLocalDiskHealth gets real disk health metrics
+func (m *Monitor) getLocalDiskHealth() ResourceHealth {
+	diskUsage, diskAvailable := m.getDiskUsage()
+	
+	status := "healthy"
+	if diskUsage > 95.0 {
+		status = "critical"
+	} else if diskUsage > 90.0 {
+		status = "warning"
+	}
+	
+	return ResourceHealth{
+		Status:    status,
+		Usage:     diskUsage,
+		Available: diskAvailable,
+		Threshold: 90.0,
+	}
+}
+
+// getLocalNixOSServices gets real NixOS service health
+func (m *Monitor) getLocalNixOSServices() []ServiceHealth {
+	services := []ServiceHealth{}
+	
+	// Check common NixOS services
+	commonServices := []string{"sshd", "systemd-resolved", "systemd-networkd", "nixos-rebuild"}
+	
+	for _, serviceName := range commonServices {
+		service := m.getServiceHealth(serviceName)
+		if service.Name != "" {
+			services = append(services, service)
+		}
+	}
+	
+	return services
+}
+
+// calculateOverallHealth determines overall health from individual components
+func (m *Monitor) calculateOverallHealth(health HealthStatus) string {
+	criticalCount := 0
+	warningCount := 0
+	
+	if health.CPU.Status == "critical" {
+		criticalCount++
+	} else if health.CPU.Status == "warning" {
+		warningCount++
+	}
+	
+	if health.Memory.Status == "critical" {
+		criticalCount++
+	} else if health.Memory.Status == "warning" {
+		warningCount++
+	}
+	
+	if health.Disk.Status == "critical" {
+		criticalCount++
+	} else if health.Disk.Status == "warning" {
+		warningCount++
+	}
+	
+	if criticalCount > 0 {
+		return "critical"
+	} else if warningCount > 0 {
+		return "warning"
+	}
+	
+	return "healthy"
+}
+
+// System metric collection functions
+
+// getCPUUsage calculates current CPU usage percentage
+func (m *Monitor) getCPUUsage() float64 {
+	// Read /proc/stat for CPU times
+	data, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return 0.0
+	}
+	
+	lines := strings.Split(string(data), "\n")
+	if len(lines) == 0 {
+		return 0.0
+	}
+	
+	// Parse first line which contains overall CPU stats
+	fields := strings.Fields(lines[0])
+	if len(fields) < 8 || fields[0] != "cpu" {
+		return 0.0
+	}
+	
+	// Calculate CPU usage (simplified)
+	var idle, total float64
+	for i := 1; i < len(fields); i++ {
+		val, err := strconv.ParseFloat(fields[i], 64)
+		if err != nil {
+			continue
+		}
+		total += val
+		if i == 4 { // idle time is the 4th field
+			idle = val
+		}
+	}
+	
+	if total == 0 {
+		return 0.0
+	}
+	
+	usage := (total - idle) / total * 100
+	if usage < 0 {
+		usage = 0
+	}
+	if usage > 100 {
+		usage = 100
+	}
+	
+	return usage
+}
+
+// getMemoryUsage calculates current memory usage percentage and available memory
+func (m *Monitor) getMemoryUsage() (float64, uint64) {
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return 0.0, 0
+	}
+	
+	lines := strings.Split(string(data), "\n")
+	var memTotal, memAvailable uint64
+	
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		
+		switch fields[0] {
+		case "MemTotal:":
+			if val, err := strconv.ParseUint(fields[1], 10, 64); err == nil {
+				memTotal = val * 1024 // Convert KB to bytes
+			}
+		case "MemAvailable:":
+			if val, err := strconv.ParseUint(fields[1], 10, 64); err == nil {
+				memAvailable = val * 1024 // Convert KB to bytes
+			}
+		}
+	}
+	
+	if memTotal == 0 {
+		return 0.0, 0
+	}
+	
+	usage := float64(memTotal-memAvailable) / float64(memTotal) * 100
+	if usage < 0 {
+		usage = 0
+	}
+	if usage > 100 {
+		usage = 100
+	}
+	
+	return usage, memAvailable
+}
+
+// getDiskUsage calculates disk usage percentage and available space
+func (m *Monitor) getDiskUsage() (float64, uint64) {
+	// Use df command to get disk usage for root partition
+	cmd := exec.Command("df", "/")
+	output, err := cmd.Output()
+	if err != nil {
+		return 0.0, 0
+	}
+	
+	lines := strings.Split(string(output), "\n")
+	if len(lines) < 2 {
+		return 0.0, 0
+	}
+	
+	// Parse the second line which contains the root filesystem info
+	fields := strings.Fields(lines[1])
+	if len(fields) < 5 {
+		return 0.0, 0
+	}
+	
+	// Extract available space (field 3, in KB)
+	availableStr := fields[3]
+	available, err := strconv.ParseUint(availableStr, 10, 64)
+	if err != nil {
+		return 0.0, 0
+	}
+	availableBytes := available * 1024 // Convert KB to bytes
+	
+	// Extract usage percentage (field 4, remove % suffix)
+	usagePct := strings.TrimSuffix(fields[4], "%")
+	usage, err := strconv.ParseFloat(usagePct, 64)
+	if err != nil {
+		return 0.0, availableBytes
+	}
+	
+	return usage, availableBytes
+}
+
+// getServiceHealth checks the health of a specific system service
+func (m *Monitor) getServiceHealth(serviceName string) ServiceHealth {
+	// Use systemctl to check service status
+	cmd := exec.Command("systemctl", "is-active", serviceName)
+	output, err := cmd.Output()
+	
+	service := ServiceHealth{
+		Name:   serviceName,
+		Status: "unknown",
+		Since:  time.Now(),
+		Memory: 0,
+		CPU:    0.0,
+	}
+	
+	if err == nil {
+		status := strings.TrimSpace(string(output))
+		if status == "active" {
+			service.Status = "running"
+		} else {
+			service.Status = status
+		}
+	}
+	
+	// Get service start time if running
+	if service.Status == "running" {
+		cmd = exec.Command("systemctl", "show", serviceName, "--property=ActiveEnterTimestamp", "--value")
+		if timeOutput, err := cmd.Output(); err == nil {
+			if timestamp, err := time.Parse("Mon 2006-01-02 15:04:05 MST", strings.TrimSpace(string(timeOutput))); err == nil {
+				service.Since = timestamp
+			}
+		}
+	}
+	
+	return service
 }

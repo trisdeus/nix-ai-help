@@ -8,23 +8,25 @@ import (
 
 // NixAnalyzer provides comprehensive analysis of Nix expressions
 type NixAnalyzer struct {
-	parser           *NixParser
-	patterns         map[string]*AnalysisPattern
-	securityRules    []SecurityRule
-	optimizationRules []OptimizationRule
+	parser               *NixParser
+	patterns             map[string]*AnalysisPattern
+	securityRules        []SecurityRule
+	optimizationRules    []OptimizationRule
+	inconsistencyDetector *InconsistencyDetector
 }
 
 // AnalysisResult contains the results of Nix expression analysis
 type AnalysisResult struct {
-	Expression       *NixExpression      `json:"expression"`
-	Issues           []Issue             `json:"issues"`
-	Suggestions      []Suggestion        `json:"suggestions"`
-	SecurityFindings []SecurityFinding   `json:"security_findings"`
-	Optimizations    []Optimization      `json:"optimizations"`
-	Intent           IntentAnalysis      `json:"intent"`
-	Complexity       ComplexityAnalysis  `json:"complexity"`
-	Dependencies     DependencyAnalysis  `json:"dependencies"`
-	Quality          QualityMetrics      `json:"quality"`
+	Expression       *NixExpression         `json:"expression"`
+	Issues           []Issue                `json:"issues"`
+	Suggestions      []Suggestion           `json:"suggestions"`
+	SecurityFindings []SecurityFinding      `json:"security_findings"`
+	Optimizations    []Optimization         `json:"optimizations"`
+	Intent           IntentAnalysis         `json:"intent"`
+	Complexity       ComplexityAnalysis     `json:"complexity"`
+	Dependencies     DependencyAnalysis     `json:"dependencies"`
+	Quality          QualityMetrics         `json:"quality"`
+	Inconsistencies  *InconsistencyResult   `json:"inconsistencies,omitempty"`
 }
 
 // Issue represents a problem found in the Nix expression
@@ -213,6 +215,9 @@ func NewNixAnalyzer() *NixAnalyzer {
 	analyzer.initializeSecurityRules()
 	analyzer.initializeOptimizationRules()
 	
+	// Initialize inconsistency detector
+	analyzer.inconsistencyDetector = NewInconsistencyDetector(analyzer)
+	
 	return analyzer
 }
 
@@ -240,6 +245,12 @@ func (a *NixAnalyzer) AnalyzeExpression(source string) (*AnalysisResult, error) 
 	a.analyzeOptimizations(expr, result)
 	a.analyzeQuality(expr, result)
 	a.detectAntiPatterns(expr, result)
+	
+	// Perform logical inconsistency detection
+	inconsistencies, err := a.inconsistencyDetector.DetectInconsistencies(source)
+	if err == nil && inconsistencies != nil {
+		result.Inconsistencies = inconsistencies
+	}
 	
 	return result, nil
 }

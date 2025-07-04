@@ -1,6 +1,6 @@
 # nixai workflow - Workflow Management and Automation
 
-The `nixai workflow` command provides workflow automation, task orchestration, and process management for NixOS administration tasks.
+The `nixai workflow` command provides workflow automation, task orchestration, and process management for NixOS administration tasks with real action execution and authentic system operations.
 
 ## Usage
 
@@ -33,16 +33,18 @@ nixai workflow schedule <workflow-name> [--cron "0 2 * * *"] [--timezone UTC]
 ## Features
 
 ### Workflow Automation
-- Pre-built workflow templates
-- Custom workflow creation
-- Task orchestration and sequencing
-- Conditional execution logic
+- **Real Action Execution**: Authentic file operations, package management, and service control
+- **Pre-built workflow templates** for common NixOS tasks
+- **Custom workflow creation** with actual system command execution
+- **Task orchestration and sequencing** with real progress tracking
+- **Conditional execution logic** based on actual system state
 
 ### Process Management
-- Workflow execution monitoring
-- Progress tracking and reporting
-- Error handling and recovery
-- Parallel task execution
+- **Real Command Execution**: Using `nix-env`, `systemctl`, and file operations
+- **Workflow execution monitoring** with authentic progress feedback
+- **Progress tracking and reporting** from actual system operations
+- **Error handling and recovery** with real exit codes and system responses
+- **Parallel task execution** with proper process management
 
 ### Scheduling and Triggers
 - Cron-based scheduling
