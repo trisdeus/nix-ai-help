@@ -2625,12 +2625,7 @@ func handleMCPServerStart(cfg *config.UserConfig, daemon bool, ephemeral bool, s
 	}
 
 	// Create MCP server from config
-	configPath, _ := config.ConfigFilePath()
-	if configPath == "" {
-		configPath = "configs/default.yaml" // fallback
-	}
-
-	server, err := mcp.NewServerFromConfig(configPath)
+	server, err := mcp.NewServerFromConfig("")
 	if err != nil {
 		return fmt.Errorf("failed to create MCP server: %v", err)
 	}

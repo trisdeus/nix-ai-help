@@ -319,16 +319,8 @@ func (f *McpServerFunction) handleStartOperation(ctx context.Context, request *M
 		}, nil
 	}
 
-	// Create MCP server from config
-	configPath := request.ConfigPath
-	if configPath == "" {
-		configPath, _ = config.ConfigFilePath()
-		if configPath == "" {
-			configPath = "configs/default.yaml" // fallback
-		}
-	}
-
-	server, err := mcp.NewServerFromConfig(configPath)
+	// Create MCP server from config (configPath parameter is ignored by NewServerFromConfig)
+	server, err := mcp.NewServerFromConfig("")
 	if err != nil {
 		return &McpServerResponse{
 			Success: false,

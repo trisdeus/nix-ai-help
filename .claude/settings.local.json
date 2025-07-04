@@ -48,7 +48,15 @@
       "Bash(cat:*)",
       "Bash(nproc)",
       "Bash(git tag:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(../nixai health predict --timeline 7d)",
+      "Bash(../nixai health status)",
+      "Bash(./test_dir/../nixai health status)",
+      "Bash(export PATH=/home/olafkfreund/Source/NIX/nix-ai-help:$PATH)",
+      "Bash(nixai health:*)",
+      "Bash(PWD=/tmp /home/olafkfreund/Source/NIX/nix-ai-help/nixai health status)",
+      "Bash(PWD=/tmp /home/olafkfreund/Source/NIX/nix-ai-help/nixai mcp-server start --help)",
+      "Bash(PWD=/tmp /home/olafkfreund/Source/NIX/nix-ai-help/nixai ask \"test config loading\")"
     ],
     "deny": []
   }

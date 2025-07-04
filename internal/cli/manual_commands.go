@@ -785,7 +785,7 @@ Supported Providers:
 - GitHub Copilot       GitHub integration
 
 Provider Configuration:
-All providers are configured through configs/default.yaml.
+All providers are configured through the user config file (~/.config/nixai/config.yaml).
 Set your preferred provider and model for different use cases.
 
 Quality Recommendations:
@@ -794,7 +794,7 @@ Quality Recommendations:
 - Groq: Fast iteration and development
 - Ollama: Privacy-first local inference`,
 		Examples: []string{
-			`# Configure in configs/default.yaml`,
+			`# Configure in ~/.config/nixai/config.yaml`,
 			`ai_provider: gemini`,
 			`ai_model: gemini-2.5-pro`,
 			`export GEMINI_API_KEY="your-key"`,
@@ -822,7 +822,7 @@ Key Commands to Try:
 - nixai diagnose          System diagnostics
 
 Configuration:
-- Default config: configs/default.yaml
+- System config: /etc/nixai/config.yaml
 - User config: ~/.config/nixai/config.yaml
 - AI providers: Multiple options available
 

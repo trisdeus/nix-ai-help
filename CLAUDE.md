@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**nixai** is a revolutionary NixOS AI assistant written in Go 1.23+ that provides intelligent system administration through natural language commands. It uses clean architecture with modular AI provider management and specializes in NixOS configuration, troubleshooting, and hardware optimization. **Current version: 2.0.5**
+**nixai** is a revolutionary NixOS AI assistant written in Go 1.23+ that provides intelligent system administration through natural language commands. It uses clean architecture with modular AI provider management and specializes in NixOS configuration, troubleshooting, and hardware optimization. **Current version: 2.0.6**
 
 ## Development Environment
 
@@ -24,13 +24,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Build Commands
 ```bash
-# Recommended: Nix flake build (clean version 2.0.4)
+# Recommended: Nix flake build (clean version 2.0.6)
 nix build
-./result/bin/nixai --version  # Shows: nixai version 2.0.4
+./result/bin/nixai --version  # Shows: nixai version 2.0.6
 
 # Development build (with git info)
 just build
-./nixai --version             # Shows: nixai version v2.0.4-dirty
+./nixai --version             # Shows: nixai version v2.0.6-dirty
 
 # Production build with optimizations  
 just build-prod
@@ -77,7 +77,7 @@ nix run . -- ask "help me with health status"  # Natural language queries
 nix run . -- tui           # Intelligent TUI interface
 ```
 
-## Latest Major Features (v2.0.4)
+## Latest Major Features (v2.0.6)
 
 ### 🤖 Intelligent TUI with AI-Powered Command Search
 - **Location**: `/internal/tui/tui.go`
@@ -120,7 +120,7 @@ nix run . -- tui           # Intelligent TUI interface
 
 ## Development Guidelines
 
-### Latest Code Changes (v2.0.4)
+### Latest Code Changes (v2.0.6)
 1. **All mock data eliminated** - Health, performance, fleet, and workflow systems now use real data
 2. **Intelligent TUI implemented** - Natural language command search with AI suggestions
 3. **CPU-aware thresholds** - System monitoring adapts to hardware capabilities
@@ -185,8 +185,8 @@ nix run . -- tui           # Intelligent TUI interface
 - **Dependencies**: All managed through Nix flakes
 
 ### Build System Strategy
-- **Development**: `just build` uses git tags with dirty status (v2.0.4-dirty)
-- **Distribution**: `nix build` uses clean version numbers (2.0.4)
+- **Development**: `just build` uses git tags with dirty status (v2.0.6-dirty)
+- **Distribution**: `nix build` uses clean version numbers (2.0.6)
 - **CI/Package**: Nix flakes provide reproducible builds
 
 ### AI Function Development
@@ -215,13 +215,13 @@ nix run . -- tui           # Intelligent TUI interface
 
 ## Latest Changes Tracking
 
-### Completed in v2.0.4
+### Completed in v2.0.6
 - ✅ Intelligent TUI with AI-powered command search
 - ✅ Real system monitoring (eliminated all mock data)
 - ✅ CPU-aware threshold calculations
 - ✅ Accurate network utilization measurement
 - ✅ Real workflow action execution
-- ✅ Version update to 2.0.4 across all build systems
+- ✅ Version update to 2.0.6 across all build systems
 - ✅ Comprehensive documentation updates
 
 ### Current Priorities
@@ -244,7 +244,7 @@ nix build              # Clean production build
 ### Version Management
 - **Git Tags**: Used by justfile for development builds (shows dirty status)
 - **Nix Flakes**: Provide clean version numbers for distribution
-- **Current Version**: 2.0.4 (updated across all systems)
+- **Current Version**: 2.0.6 (updated across all systems)
 
 ## Best Practices for Contributors
 

@@ -154,27 +154,9 @@ func runHealthStatus(cmd *cobra.Command, args []string) error {
 	log.Info("Analyzing system health...")
 
 	// Load config
-	yamlCfg, err := config.LoadYAMLConfig("configs/default.yaml")
+	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Convert YAML config to UserConfig
-	userCfg := &config.UserConfig{
-		AIProvider:  yamlCfg.AIProvider,
-		LogLevel:    yamlCfg.LogLevel,
-		AIModels:    yamlCfg.AIModels,
-		MCPServer:   yamlCfg.MCPServer,
-		Nixos:       yamlCfg.Nixos,
-		Diagnostics: yamlCfg.Diagnostics,
-		Commands:    yamlCfg.Commands,
-		AITimeouts:  yamlCfg.AITimeouts,
-		Devenv:      yamlCfg.Devenv,
-		CustomAI:    yamlCfg.CustomAI,
-		Discourse:   yamlCfg.Discourse,
-		Cache:       yamlCfg.Cache,
-		Plugin:      yamlCfg.Plugin,
-		Execution:   yamlCfg.Execution,
 	}
 
 	// Create health predictor
@@ -208,27 +190,9 @@ func runHealthPredict(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load config
-	yamlCfg, err := config.LoadYAMLConfig("configs/default.yaml")
+	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Convert YAML config to UserConfig
-	userCfg := &config.UserConfig{
-		AIProvider:  yamlCfg.AIProvider,
-		LogLevel:    yamlCfg.LogLevel,
-		AIModels:    yamlCfg.AIModels,
-		MCPServer:   yamlCfg.MCPServer,
-		Nixos:       yamlCfg.Nixos,
-		Diagnostics: yamlCfg.Diagnostics,
-		Commands:    yamlCfg.Commands,
-		AITimeouts:  yamlCfg.AITimeouts,
-		Devenv:      yamlCfg.Devenv,
-		CustomAI:    yamlCfg.CustomAI,
-		Discourse:   yamlCfg.Discourse,
-		Cache:       yamlCfg.Cache,
-		Plugin:      yamlCfg.Plugin,
-		Execution:   yamlCfg.Execution,
 	}
 
 	// Create health predictor
@@ -256,27 +220,9 @@ func runHealthAnomalies(cmd *cobra.Command, args []string) error {
 	log.Info("Detecting system anomalies...")
 
 	// Load config
-	yamlCfg, err := config.LoadYAMLConfig("configs/default.yaml")
+	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Convert YAML config to UserConfig
-	userCfg := &config.UserConfig{
-		AIProvider:  yamlCfg.AIProvider,
-		LogLevel:    yamlCfg.LogLevel,
-		AIModels:    yamlCfg.AIModels,
-		MCPServer:   yamlCfg.MCPServer,
-		Nixos:       yamlCfg.Nixos,
-		Diagnostics: yamlCfg.Diagnostics,
-		Commands:    yamlCfg.Commands,
-		AITimeouts:  yamlCfg.AITimeouts,
-		Devenv:      yamlCfg.Devenv,
-		CustomAI:    yamlCfg.CustomAI,
-		Discourse:   yamlCfg.Discourse,
-		Cache:       yamlCfg.Cache,
-		Plugin:      yamlCfg.Plugin,
-		Execution:   yamlCfg.Execution,
 	}
 
 	// Create health predictor
@@ -310,27 +256,9 @@ func runHealthForecast(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load config
-	yamlCfg, err := config.LoadYAMLConfig("configs/default.yaml")
+	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Convert YAML config to UserConfig
-	userCfg := &config.UserConfig{
-		AIProvider:  yamlCfg.AIProvider,
-		LogLevel:    yamlCfg.LogLevel,
-		AIModels:    yamlCfg.AIModels,
-		MCPServer:   yamlCfg.MCPServer,
-		Nixos:       yamlCfg.Nixos,
-		Diagnostics: yamlCfg.Diagnostics,
-		Commands:    yamlCfg.Commands,
-		AITimeouts:  yamlCfg.AITimeouts,
-		Devenv:      yamlCfg.Devenv,
-		CustomAI:    yamlCfg.CustomAI,
-		Discourse:   yamlCfg.Discourse,
-		Cache:       yamlCfg.Cache,
-		Plugin:      yamlCfg.Plugin,
-		Execution:   yamlCfg.Execution,
 	}
 
 	// Create health predictor
@@ -358,27 +286,9 @@ func runHealthRemediate(cmd *cobra.Command, args []string) error {
 	log.Info("Generating remediation suggestions...")
 
 	// Load config
-	yamlCfg, err := config.LoadYAMLConfig("configs/default.yaml")
+	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Convert YAML config to UserConfig
-	userCfg := &config.UserConfig{
-		AIProvider:  yamlCfg.AIProvider,
-		LogLevel:    yamlCfg.LogLevel,
-		AIModels:    yamlCfg.AIModels,
-		MCPServer:   yamlCfg.MCPServer,
-		Nixos:       yamlCfg.Nixos,
-		Diagnostics: yamlCfg.Diagnostics,
-		Commands:    yamlCfg.Commands,
-		AITimeouts:  yamlCfg.AITimeouts,
-		Devenv:      yamlCfg.Devenv,
-		CustomAI:    yamlCfg.CustomAI,
-		Discourse:   yamlCfg.Discourse,
-		Cache:       yamlCfg.Cache,
-		Plugin:      yamlCfg.Plugin,
-		Execution:   yamlCfg.Execution,
 	}
 
 	// Create health predictor
@@ -423,27 +333,9 @@ func runHealthMonitor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Load config
-	yamlCfg, err := config.LoadYAMLConfig("configs/default.yaml")
+	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Convert YAML config to UserConfig
-	userCfg := &config.UserConfig{
-		AIProvider:  yamlCfg.AIProvider,
-		LogLevel:    yamlCfg.LogLevel,
-		AIModels:    yamlCfg.AIModels,
-		MCPServer:   yamlCfg.MCPServer,
-		Nixos:       yamlCfg.Nixos,
-		Diagnostics: yamlCfg.Diagnostics,
-		Commands:    yamlCfg.Commands,
-		AITimeouts:  yamlCfg.AITimeouts,
-		Devenv:      yamlCfg.Devenv,
-		CustomAI:    yamlCfg.CustomAI,
-		Discourse:   yamlCfg.Discourse,
-		Cache:       yamlCfg.Cache,
-		Plugin:      yamlCfg.Plugin,
-		Execution:   yamlCfg.Execution,
 	}
 
 	// Create health predictor
