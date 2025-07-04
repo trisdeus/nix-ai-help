@@ -2,8 +2,9 @@
 
 ---
 
-## 🚀 v2.0.6 Release Highlights (July 2025)
+## 🚀 v2.0.7 Release Highlights (July 2025)
 
+- **🚀 Developer Experience Revolution**: One-command project setup with intelligent templates, automatic dependency detection, and comprehensive IDE integration
 - **🧪 Safe Configuration Testing**: Enterprise-grade testing infrastructure with virtual environments, A/B testing, chaos engineering, and automated rollback
 - **🌐 Modern Web Interface**: Responsive dashboard with configuration builder and team collaboration
 - **🔌 Comprehensive Plugin System**: 14 plugin management commands with secure dynamic loading
@@ -66,6 +67,7 @@ Welcome to the nixai Command Manual. Each command has its own dedicated document
 - [store](store.md) - Nix store management
 - [templates](templates.md) - Configuration templates
 - [test](test.md) - Safe configuration testing **NEW**
+- [dev](dev.md) - Developer Experience Revolution **NEW**
 
 ### New 2.0.0 Features
 - [web](web.md) - Modern web interface **NEW**
