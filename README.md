@@ -1159,7 +1159,7 @@ nixai config reset
 After installation, verify everything works:
 
 ```zsh
-nixai --version              # Should show "nixai version 2.0.4"
+nixai --version              # Should show "nixai version 2.0.5"
 nixai doctor                 # Run comprehensive health check
 nixai hardware detect       # Test hardware detection
 nixai -a "test question"     # Test AI functionality

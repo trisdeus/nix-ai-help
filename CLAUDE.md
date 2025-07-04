@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**nixai** is a revolutionary NixOS AI assistant written in Go 1.23+ that provides intelligent system administration through natural language commands. It uses clean architecture with modular AI provider management and specializes in NixOS configuration, troubleshooting, and hardware optimization. **Current version: 2.0.4**
+**nixai** is a revolutionary NixOS AI assistant written in Go 1.23+ that provides intelligent system administration through natural language commands. It uses clean architecture with modular AI provider management and specializes in NixOS configuration, troubleshooting, and hardware optimization. **Current version: 2.0.5**
 
 ## Development Environment
 

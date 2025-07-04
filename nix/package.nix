@@ -4,7 +4,7 @@
   installShellFiles,
   fetchFromGitHub,
   # Optional parameters for version/commit overrides
-  version ? "2.0.4",
+  version ? "2.0.5",
   src ? null,
   srcOverride ? null,
   rev ? null,
@@ -34,7 +34,7 @@ in
 
     src = sourceToUse;
 
-    vendorHash = "sha256-JdRZLaAiNzorYjpWkKKoq4b68dakSGwSWbOWSWAG2Hk=";
+    vendorHash = "sha256-JdRZLaAiNzorYjpWkKKoq4b68dakSGwSWbOWSWAG2Hk="; # May need updating after dependency changes
     doCheck = false;
     proxyVendor = true;
 

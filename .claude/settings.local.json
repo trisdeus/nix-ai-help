@@ -47,7 +47,8 @@
       "Bash(comm:*)",
       "Bash(cat:*)",
       "Bash(nproc)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }

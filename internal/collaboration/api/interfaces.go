@@ -309,3 +309,224 @@ type Comment struct {
 	Timestamp time.Time `json:"timestamp"`
 	Votes     int       `json:"votes"`
 }
+
+// ExternalLearningAPI handles learning from external sources like GitHub
+type ExternalLearningAPI interface {
+	// GitHub code search integration
+	SearchGitHubConfigurations(ctx context.Context, query *GitHubSearchQuery) (*GitHubSearchResults, error)
+	AnalyzeGitHubRepository(ctx context.Context, repo *GitHubRepository) (*RepositoryAnalysis, error)
+	ValidateExternalContent(ctx context.Context, content *ExternalContent) (*ContentValidation, error)
+	
+	// Quality control
+	FilterHighQualityResults(ctx context.Context, results *GitHubSearchResults) (*GitHubSearchResults, error)
+	ExtractConfigurationPatterns(ctx context.Context, content *ExternalContent) (*ConfigurationPatterns, error)
+	
+	// Privacy and anonymization
+	AnonymizeGitHubData(ctx context.Context, data *GitHubData) (*AnonymizedData, error)
+	ApplyPrivacyFilters(ctx context.Context, content *ExternalContent) (*ExternalContent, error)
+}
+
+// GitHub integration types
+type GitHubSearchQuery struct {
+	Keywords    []string          `json:"keywords"`
+	Language    string            `json:"language,omitempty"`
+	FileType    string            `json:"file_type,omitempty"`
+	Stars       *IntRange         `json:"stars,omitempty"`
+	Forks       *IntRange         `json:"forks,omitempty"`
+	Updated     *TimeRange        `json:"updated,omitempty"`
+	Filters     map[string]string `json:"filters,omitempty"`
+	MaxResults  int               `json:"max_results,omitempty"`
+	SortBy      string            `json:"sort_by,omitempty"`
+}
+
+type IntRange struct {
+	Min *int `json:"min,omitempty"`
+	Max *int `json:"max,omitempty"`
+}
+
+type TimeRange struct {
+	After  *time.Time `json:"after,omitempty"`
+	Before *time.Time `json:"before,omitempty"`
+}
+
+type GitHubSearchResults struct {
+	Query       *GitHubSearchQuery  `json:"query"`
+	Repositories []GitHubRepository `json:"repositories"`
+	TotalCount  int                `json:"total_count"`
+	SearchTime  time.Duration      `json:"search_time"`
+	QualityScore float64           `json:"quality_score"`
+	GeneratedAt time.Time         `json:"generated_at"`
+}
+
+type GitHubRepository struct {
+	ID           string            `json:"id"`
+	Name         string            `json:"name"`
+	FullName     string            `json:"full_name"`
+	Description  string            `json:"description"`
+	URL          string            `json:"url"`
+	CloneURL     string            `json:"clone_url"`
+	Language     string            `json:"language"`
+	Stars        int               `json:"stars"`
+	Forks        int               `json:"forks"`
+	Topics       []string          `json:"topics"`
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+	Owner        GitHubUser        `json:"owner"`
+	License      *GitHubLicense    `json:"license,omitempty"`
+	Files        []GitHubFile      `json:"files,omitempty"`
+	QualityScore float64           `json:"quality_score"`
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
+type GitHubUser struct {
+	Login     string `json:"login"`
+	ID        int    `json:"id"`
+	AvatarURL string `json:"avatar_url"`
+	URL       string `json:"url"`
+	Type      string `json:"type"`
+}
+
+type GitHubLicense struct {
+	Key    string `json:"key"`
+	Name   string `json:"name"`
+	SPDXID string `json:"spdx_id"`
+}
+
+type GitHubFile struct {
+	Path        string    `json:"path"`
+	Name        string    `json:"name"`
+	Type        string    `json:"type"`
+	Size        int64     `json:"size"`
+	Content     string    `json:"content,omitempty"`
+	SHA         string    `json:"sha"`
+	DownloadURL string    `json:"download_url"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type RepositoryAnalysis struct {
+	Repository      *GitHubRepository     `json:"repository"`
+	ConfigFiles     []ConfigFileAnalysis  `json:"config_files"`
+	Patterns        []ConfigurationPattern `json:"patterns"`
+	SecurityIssues  []SecurityIssue       `json:"security_issues"`
+	BestPractices   []BestPractice        `json:"best_practices"`
+	QualityMetrics  QualityMetrics        `json:"quality_metrics"`
+	Recommendations []string              `json:"recommendations"`
+	AnalyzedAt      time.Time             `json:"analyzed_at"`
+}
+
+type ConfigFileAnalysis struct {
+	File            *GitHubFile           `json:"file"`
+	FileType        string                `json:"file_type"`
+	Complexity      ComplexityMetrics     `json:"complexity"`
+	Dependencies    []string              `json:"dependencies"`
+	Services        []string              `json:"services"`
+	SecurityConfig  []SecurityConfig      `json:"security_config"`
+	PerformanceHints []PerformanceHint    `json:"performance_hints"`
+	Documentation   DocumentationLevel    `json:"documentation"`
+	Maintainability float64               `json:"maintainability"`
+}
+
+type ComplexityMetrics struct {
+	Lines         int     `json:"lines"`
+	Functions     int     `json:"functions"`
+	CyclomaticComplexity int `json:"cyclomatic_complexity"`
+	NestingDepth  int     `json:"nesting_depth"`
+	Score         float64 `json:"score"`
+}
+
+type SecurityConfig struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Severity    string `json:"severity"`
+	Compliant   bool   `json:"compliant"`
+}
+
+type PerformanceHint struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Impact      string `json:"impact"`
+	Suggestion  string `json:"suggestion"`
+}
+
+type DocumentationLevel struct {
+	Score    float64 `json:"score"`
+	Comments int     `json:"comments"`
+	README   bool    `json:"readme"`
+	Examples bool    `json:"examples"`
+}
+
+type SecurityIssue struct {
+	ID          string    `json:"id"`
+	Type        string    `json:"type"`
+	Severity    string    `json:"severity"`
+	Description string    `json:"description"`
+	File        string    `json:"file"`
+	Line        int       `json:"line,omitempty"`
+	Suggestion  string    `json:"suggestion"`
+	References  []string  `json:"references"`
+	DetectedAt  time.Time `json:"detected_at"`
+}
+
+type BestPractice struct {
+	ID          string   `json:"id"`
+	Category    string   `json:"category"`
+	Description string   `json:"description"`
+	Applied     bool     `json:"applied"`
+	Benefit     string   `json:"benefit"`
+	References  []string `json:"references"`
+}
+
+type QualityMetrics struct {
+	OverallScore    float64 `json:"overall_score"`
+	Maintainability float64 `json:"maintainability"`
+	Security        float64 `json:"security"`
+	Performance     float64 `json:"performance"`
+	Documentation   float64 `json:"documentation"`
+	TestCoverage    float64 `json:"test_coverage"`
+	CodeComplexity  float64 `json:"code_complexity"`
+}
+
+type ExternalContent struct {
+	Source      string                 `json:"source"`
+	Type        string                 `json:"type"`
+	Content     string                 `json:"content"`
+	Metadata    map[string]interface{} `json:"metadata"`
+	Retrieved   time.Time              `json:"retrieved"`
+	Fingerprint string                 `json:"fingerprint"`
+}
+
+type ContentValidation struct {
+	Valid         bool              `json:"valid"`
+	QualityScore  float64           `json:"quality_score"`
+	Issues        []ValidationIssue `json:"issues"`
+	Suggestions   []string          `json:"suggestions"`
+	SafetyLevel   string            `json:"safety_level"`
+	ValidatedAt   time.Time         `json:"validated_at"`
+}
+
+type ValidationIssue struct {
+	Type        string `json:"type"`
+	Severity    string `json:"severity"`
+	Description string `json:"description"`
+	Location    string `json:"location,omitempty"`
+}
+
+type ConfigurationPatterns struct {
+	Patterns    []ConfigurationPattern `json:"patterns"`
+	Categories  []string               `json:"categories"`
+	Confidence  float64                `json:"confidence"`
+	ExtractedAt time.Time              `json:"extracted_at"`
+}
+
+type GitHubData struct {
+	Repositories []GitHubRepository `json:"repositories"`
+	Users        []GitHubUser       `json:"users"`
+	Metadata     map[string]interface{} `json:"metadata"`
+}
+
+type AnonymizedData struct {
+	Data        interface{} `json:"data"`
+	Anonymized  []string    `json:"anonymized_fields"`
+	Method      string      `json:"anonymization_method"`
+	ProcessedAt time.Time   `json:"processed_at"`
+}

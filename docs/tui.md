@@ -107,7 +107,7 @@ The modern interface provides a Claude Code-style experience with enhanced navig
 │                                    │                                   │
 │ (Showing 1-10 of 40+)             │ [INPUT] = Interactive Parameters  │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.4
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v2.0.5
 ```
 
 ### Classic Interface
@@ -116,7 +116,7 @@ The classic interface provides a traditional menu-driven experience:
 
 ```text
 ═══════════════════════════════════════════════════════════════════════════════
-                           nixai Interactive Menu v2.0.4
+                           nixai Interactive Menu v2.0.5
 ═══════════════════════════════════════════════════════════════════════════════
 
 Main Categories:

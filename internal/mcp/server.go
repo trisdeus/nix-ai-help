@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"nix-ai-help/internal/collaboration/api"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/neovim"
 	"nix-ai-help/pkg/errors"
@@ -65,6 +66,8 @@ type MCPServer struct {
 	mu             sync.Mutex
 	lspProvider    *NixLSPProvider
 	neovimHandlers *NeovimHandlers
+	semanticTools  *SemanticMCPTools
+	healthTools    *HealthMCPTools
 	ctx            context.Context
 	cancel         context.CancelFunc
 	shutdown       chan struct{}
@@ -297,6 +300,39 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			{
 				Name:        "get_configuration_templates",
 				Description: "Get pre-built NixOS configuration templates",
+			},
+			// Phase 4: AI-Powered Intelligence Tools (New)
+			{
+				Name:        "analyze_configuration_semantics",
+				Description: "AI-powered semantic analysis of NixOS configurations with intent recognition",
+			},
+			{
+				Name:        "search_github_configurations",
+				Description: "Search GitHub for high-quality NixOS configurations with privacy protection",
+			},
+			{
+				Name:        "extract_configuration_patterns",
+				Description: "Extract reusable configuration patterns from code or repositories",
+			},
+			{
+				Name:        "predict_system_failures",
+				Description: "ML-powered prediction of potential system failures and maintenance needs",
+			},
+			{
+				Name:        "check_system_health_ai",
+				Description: "Comprehensive AI-enhanced system health monitoring with trend analysis",
+			},
+			{
+				Name:        "validate_content_security",
+				Description: "Validate external content for security issues and malicious patterns",
+			},
+			{
+				Name:        "analyze_performance_insights",
+				Description: "AI-powered performance analysis with optimization suggestions",
+			},
+			{
+				Name:        "generate_smart_recommendations",
+				Description: "Generate intelligent recommendations based on configuration analysis",
 			},
 			{
 				Name:        "get_configuration_snippets",
@@ -1423,6 +1459,261 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				},
 			})
 
+		// AI-Powered Intelligence Tools
+		case "analyze_configuration_semantics":
+			var configText, analysisType, context string
+			if configTextArg, ok := params.Arguments["configuration_text"].(string); ok {
+				configText = configTextArg
+			}
+			if analysisTypeArg, ok := params.Arguments["analysis_type"].(string); ok {
+				analysisType = analysisTypeArg
+			}
+			if contextArg, ok := params.Arguments["context"].(string); ok {
+				context = contextArg
+			}
+
+			if m.semanticTools == nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "Semantic analysis tools not available",
+				})
+				return
+			}
+
+			request := &MCPSemanticAnalysisRequest{
+				ConfigurationText: configText,
+				AnalysisType:     analysisType,
+				Context:          context,
+			}
+
+			result, err := m.semanticTools.AnalyzeConfigurationSemantics(ctx, request)
+			if err != nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: fmt.Sprintf("Semantic analysis failed: %v", err),
+				})
+				return
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": m.formatSemanticAnalysisResult(result),
+					},
+				},
+			})
+
+		case "search_github_configurations":
+			var query, language string
+			var keywords []string
+			var maxResults int
+			var qualityThreshold float64
+
+			if queryArg, ok := params.Arguments["query"].(string); ok {
+				query = queryArg
+			}
+			if languageArg, ok := params.Arguments["language"].(string); ok {
+				language = languageArg
+			}
+			if keywordsArg, ok := params.Arguments["keywords"].([]interface{}); ok {
+				for _, k := range keywordsArg {
+					if keywordStr, ok := k.(string); ok {
+						keywords = append(keywords, keywordStr)
+					}
+				}
+			}
+			if maxResultsArg, ok := params.Arguments["max_results"].(float64); ok {
+				maxResults = int(maxResultsArg)
+			}
+			if qualityThresholdArg, ok := params.Arguments["quality_threshold"].(float64); ok {
+				qualityThreshold = qualityThresholdArg
+			}
+
+			if m.semanticTools == nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "GitHub learning tools not available",
+				})
+				return
+			}
+
+			request := &MCPGitHubSearchRequest{
+				Query:           query,
+				Keywords:        keywords,
+				Language:        language,
+				MaxResults:      maxResults,
+				QualityThreshold: qualityThreshold,
+			}
+
+			result, err := m.semanticTools.SearchGitHubConfigurations(ctx, request)
+			if err != nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: fmt.Sprintf("GitHub search failed: %v", err),
+				})
+				return
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": m.formatGitHubSearchResult(result),
+					},
+				},
+			})
+
+		case "extract_configuration_patterns":
+			var source, content, repository, category string
+			if sourceArg, ok := params.Arguments["source"].(string); ok {
+				source = sourceArg
+			}
+			if contentArg, ok := params.Arguments["content"].(string); ok {
+				content = contentArg
+			}
+			if repositoryArg, ok := params.Arguments["repository"].(string); ok {
+				repository = repositoryArg
+			}
+			if categoryArg, ok := params.Arguments["category"].(string); ok {
+				category = categoryArg
+			}
+
+			if m.semanticTools == nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "Pattern extraction tools not available",
+				})
+				return
+			}
+
+			request := &MCPPatternExtractionRequest{
+				Source:     source,
+				Content:    content,
+				Repository: repository,
+				Category:   category,
+			}
+
+			result, err := m.semanticTools.ExtractConfigurationPatterns(ctx, request)
+			if err != nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: fmt.Sprintf("Pattern extraction failed: %v", err),
+				})
+				return
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": m.formatPatternExtractionResult(result),
+					},
+				},
+			})
+
+		case "predict_system_failures":
+			var timeline string
+			var components []string
+			var includeActions bool
+
+			if timelineArg, ok := params.Arguments["timeline"].(string); ok {
+				timeline = timelineArg
+			}
+			if componentsArg, ok := params.Arguments["components"].([]interface{}); ok {
+				for _, c := range componentsArg {
+					if componentStr, ok := c.(string); ok {
+						components = append(components, componentStr)
+					}
+				}
+			}
+			if includeActionsArg, ok := params.Arguments["include_actions"].(bool); ok {
+				includeActions = includeActionsArg
+			}
+
+			if m.healthTools == nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "Health prediction tools not available",
+				})
+				return
+			}
+
+			request := &MCPPredictionRequest{
+				Timeline:      timeline,
+				Components:    components,
+				IncludeActions: includeActions,
+			}
+
+			result, err := m.healthTools.PredictSystemFailures(ctx, request)
+			if err != nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: fmt.Sprintf("Failure prediction failed: %v", err),
+				})
+				return
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": m.formatPredictionResult(result),
+					},
+				},
+			})
+
+		case "check_system_health_ai":
+			var components []string
+			var detailed bool
+			var timeout int
+
+			if componentsArg, ok := params.Arguments["components"].([]interface{}); ok {
+				for _, c := range componentsArg {
+					if componentStr, ok := c.(string); ok {
+						components = append(components, componentStr)
+					}
+				}
+			}
+			if detailedArg, ok := params.Arguments["detailed"].(bool); ok {
+				detailed = detailedArg
+			}
+			if timeoutArg, ok := params.Arguments["timeout"].(float64); ok {
+				timeout = int(timeoutArg)
+			}
+
+			if m.healthTools == nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "Health monitoring tools not available",
+				})
+				return
+			}
+
+			request := &MCPHealthCheckRequest{
+				Components: components,
+				Detailed:   detailed,
+				Timeout:    timeout,
+			}
+
+			result, err := m.healthTools.CheckSystemHealth(ctx, request)
+			if err != nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: fmt.Sprintf("Health check failed: %v", err),
+				})
+				return
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": m.formatHealthCheckResult(result),
+					},
+				},
+			})
+
 		default:
 			_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 				Code:    jsonrpc2.CodeMethodNotFound,
@@ -1872,10 +2163,12 @@ func NewServer(addr string, documentationSources []string) *Server {
 		logger:               log,
 		debugLogging:         false,
 		mcpServer: &MCPServer{
-			logger:       *log,
-			lspProvider:  lspProvider,
-			shutdown:     make(chan struct{}),
-			errorManager: errorManager,
+			logger:        *log,
+			lspProvider:   lspProvider,
+			semanticTools: NewSemanticMCPTools(log),
+			healthTools:   NewHealthMCPTools(log),
+			shutdown:      make(chan struct{}),
+			errorManager:  errorManager,
 		},
 	}
 
@@ -1914,10 +2207,12 @@ func NewServerWithDebug(addr string, documentationSources []string) *Server {
 		logger:               log,
 		debugLogging:         true,
 		mcpServer: &MCPServer{
-			logger:       *log,
-			lspProvider:  lspProvider,
-			shutdown:     make(chan struct{}),
-			errorManager: errorManager,
+			logger:        *log,
+			lspProvider:   lspProvider,
+			semanticTools: NewSemanticMCPTools(log),
+			healthTools:   NewHealthMCPTools(log),
+			shutdown:      make(chan struct{}),
+			errorManager:  errorManager,
 		},
 	}
 
@@ -1986,10 +2281,12 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		logger:               log,
 		debugLogging:         debugMode,
 		mcpServer: &MCPServer{
-			logger:       *log,
-			lspProvider:  lspProvider,
-			shutdown:     make(chan struct{}),
-			errorManager: errorManager,
+			logger:        *log,
+			lspProvider:   lspProvider,
+			semanticTools: NewSemanticMCPTools(log),
+			healthTools:   NewHealthMCPTools(log),
+			shutdown:      make(chan struct{}),
+			errorManager:  errorManager,
 		},
 		configPath: configPath,
 		watcher:    nil,
@@ -3097,6 +3394,314 @@ func (m *MCPServer) formatSnippetsForMCP(snippets map[string]neovim.Snippet) str
 		}
 	}
 
+	return builder.String()
+}
+
+// AI-powered tool result formatting methods
+
+func (m *MCPServer) formatSemanticAnalysisResult(result *MCPSemanticAnalysisResponse) string {
+	var builder strings.Builder
+	
+	builder.WriteString(fmt.Sprintf("# Semantic Analysis Results\n\n"))
+	builder.WriteString(fmt.Sprintf("**Quality Score:** %.2f/1.0\n\n", result.QualityScore))
+	
+	if result.Intent != nil {
+		builder.WriteString("## Intent Analysis\n")
+		builder.WriteString(fmt.Sprintf("- **Primary Purpose:** %s\n", result.Intent.Purpose))
+		builder.WriteString(fmt.Sprintf("- **Environment:** %s\n", result.Intent.Environment))
+		builder.WriteString(fmt.Sprintf("- **Confidence:** %.2f\n\n", result.Intent.Confidence))
+	}
+	
+	if result.ArchitecturalStyle != "" {
+		builder.WriteString(fmt.Sprintf("**Architectural Pattern:** %s\n\n", result.ArchitecturalStyle))
+	}
+	
+	if len(result.SecurityIssues) > 0 {
+		builder.WriteString("## Security Issues\n")
+		for _, issue := range result.SecurityIssues {
+			builder.WriteString(fmt.Sprintf("- **%s** (%s): %s\n", issue.Type, issue.Severity, issue.Description))
+			if issue.Suggestion != "" {
+				builder.WriteString(fmt.Sprintf("  - *Suggestion:* %s\n", issue.Suggestion))
+			}
+		}
+		builder.WriteString("\n")
+	}
+	
+	if len(result.PerformanceHints) > 0 {
+		builder.WriteString("## Performance Optimization Hints\n")
+		for _, hint := range result.PerformanceHints {
+			builder.WriteString(fmt.Sprintf("- **%s** (%s impact): %s\n", hint.Type, hint.Impact, hint.Description))
+			if hint.Suggestion != "" {
+				builder.WriteString(fmt.Sprintf("  - *Suggestion:* %s\n", hint.Suggestion))
+			}
+		}
+		builder.WriteString("\n")
+	}
+	
+	if len(result.Patterns) > 0 {
+		builder.WriteString("## Configuration Patterns\n")
+		for _, pattern := range result.Patterns {
+			builder.WriteString(fmt.Sprintf("- **%s** (%s): %s\n", pattern.Name, pattern.Category, pattern.Description))
+		}
+		builder.WriteString("\n")
+	}
+	
+	if len(result.Recommendations) > 0 {
+		builder.WriteString("## Recommendations\n")
+		for _, rec := range result.Recommendations {
+			builder.WriteString(fmt.Sprintf("- %s\n", rec))
+		}
+	}
+	
+	return builder.String()
+}
+
+func (m *MCPServer) formatGitHubSearchResult(result *MCPGitHubSearchResponse) string {
+	var builder strings.Builder
+	
+	builder.WriteString(fmt.Sprintf("# GitHub Configuration Search Results\n\n"))
+	builder.WriteString(fmt.Sprintf("**Found:** %d repositories (avg quality: %.2f)\n", result.TotalFound, result.AverageQuality))
+	builder.WriteString(fmt.Sprintf("**Search Time:** %s\n\n", result.SearchTime))
+	
+	if len(result.Repositories) > 0 {
+		builder.WriteString("## High-Quality Repositories\n\n")
+		for i, repo := range result.Repositories {
+			builder.WriteString(fmt.Sprintf("### %d. %s\n", i+1, repo.Name))
+			builder.WriteString(fmt.Sprintf("**URL:** %s\n", repo.URL))
+			builder.WriteString(fmt.Sprintf("**Quality Score:** %.2f/1.0\n", repo.QualityScore))
+			builder.WriteString(fmt.Sprintf("**Stars:** %d | **Forks:** %d\n", repo.Stars, repo.Forks))
+			if repo.Description != "" {
+				builder.WriteString(fmt.Sprintf("**Description:** %s\n", repo.Description))
+			}
+			if len(repo.Topics) > 0 {
+				builder.WriteString(fmt.Sprintf("**Topics:** %s\n", strings.Join(repo.Topics, ", ")))
+			}
+			builder.WriteString(fmt.Sprintf("**Last Updated:** %s\n\n", repo.UpdatedAt.Format("2006-01-02")))
+		}
+	}
+	
+	if len(result.Recommendations) > 0 {
+		builder.WriteString("## Recommendations\n")
+		for _, rec := range result.Recommendations {
+			builder.WriteString(fmt.Sprintf("- %s\n", rec))
+		}
+	}
+	
+	return builder.String()
+}
+
+func (m *MCPServer) formatPatternExtractionResult(result *MCPPatternExtractionResponse) string {
+	var builder strings.Builder
+	
+	builder.WriteString(fmt.Sprintf("# Configuration Pattern Analysis\n\n"))
+	builder.WriteString(fmt.Sprintf("**Patterns Found:** %d\n", len(result.Patterns)))
+	builder.WriteString(fmt.Sprintf("**Categories:** %s\n", strings.Join(result.Categories, ", ")))
+	builder.WriteString(fmt.Sprintf("**Confidence:** %.2f\n\n", result.Confidence))
+	
+	if len(result.Patterns) > 0 {
+		builder.WriteString("## Extracted Patterns\n\n")
+		
+		// Group patterns by category
+		categoryMap := make(map[string][]api.ConfigurationPattern)
+		for _, pattern := range result.Patterns {
+			categoryMap[pattern.Category] = append(categoryMap[pattern.Category], pattern)
+		}
+		
+		for category, patterns := range categoryMap {
+			builder.WriteString(fmt.Sprintf("### %s Patterns\n", strings.Title(strings.ReplaceAll(category, "_", " "))))
+			for _, pattern := range patterns {
+				builder.WriteString(fmt.Sprintf("- **%s**: %s\n", pattern.Name, pattern.Description))
+				builder.WriteString(fmt.Sprintf("  - Pattern: `%s`\n", pattern.Pattern))
+				builder.WriteString(fmt.Sprintf("  - Success Rate: %.1f%%\n", pattern.Success*100))
+				if pattern.UseCase != "" {
+					builder.WriteString(fmt.Sprintf("  - Use Case: %s\n", pattern.UseCase))
+				}
+			}
+			builder.WriteString("\n")
+		}
+	}
+	
+	if len(result.Insights) > 0 {
+		builder.WriteString("## Insights\n")
+		for _, insight := range result.Insights {
+			builder.WriteString(fmt.Sprintf("- %s\n", insight))
+		}
+		builder.WriteString("\n")
+	}
+	
+	if len(result.UsageTips) > 0 {
+		builder.WriteString("## Usage Tips\n")
+		for _, tip := range result.UsageTips {
+			builder.WriteString(fmt.Sprintf("- %s\n", tip))
+		}
+	}
+	
+	return builder.String()
+}
+
+func (m *MCPServer) formatPredictionResult(result *MCPPredictionResponse) string {
+	var builder strings.Builder
+	
+	builder.WriteString(fmt.Sprintf("# System Failure Prediction\n\n"))
+	builder.WriteString(fmt.Sprintf("**Timeline:** %s\n", result.Timeline))
+	builder.WriteString(fmt.Sprintf("**Overall Risk:** %s\n", strings.ToUpper(result.OverallRisk)))
+	builder.WriteString(fmt.Sprintf("**Confidence:** %.2f\n", result.Confidence))
+	builder.WriteString(fmt.Sprintf("**Generated:** %s\n\n", result.GeneratedAt.Format("2006-01-02 15:04:05")))
+	
+	if len(result.PredictedFailures) > 0 {
+		builder.WriteString("## Predicted Failures\n\n")
+		for i, failure := range result.PredictedFailures {
+			builder.WriteString(fmt.Sprintf("### %d. %s Failure\n", i+1, strings.Title(failure.Type)))
+			builder.WriteString(fmt.Sprintf("**Component:** %s\n", failure.Component))
+			builder.WriteString(fmt.Sprintf("**Probability:** %.1f%%\n", failure.Probability*100))
+			builder.WriteString(fmt.Sprintf("**Impact:** %s\n", strings.Title(failure.Impact)))
+			builder.WriteString(fmt.Sprintf("**Estimated Time:** %s\n", failure.EstimatedTime.Format("2006-01-02 15:04")))
+			builder.WriteString(fmt.Sprintf("**Description:** %s\n", failure.Description))
+			
+			if len(failure.Indicators) > 0 {
+				builder.WriteString("**Warning Signs:**\n")
+				for _, indicator := range failure.Indicators {
+					builder.WriteString(fmt.Sprintf("- %s\n", indicator))
+				}
+			}
+			builder.WriteString("\n")
+		}
+	}
+	
+	if len(result.PreventiveActions) > 0 {
+		builder.WriteString("## Recommended Preventive Actions\n\n")
+		for i, action := range result.PreventiveActions {
+			builder.WriteString(fmt.Sprintf("### %d. %s\n", i+1, action.Title))
+			builder.WriteString(fmt.Sprintf("**Priority:** %s\n", strings.Title(action.Priority)))
+			builder.WriteString(fmt.Sprintf("**ETA:** %s\n", action.ETA))
+			builder.WriteString(fmt.Sprintf("**Description:** %s\n", action.Description))
+			
+			if len(action.Commands) > 0 {
+				builder.WriteString("**Commands:**\n")
+				for _, cmd := range action.Commands {
+					builder.WriteString(fmt.Sprintf("```bash\n%s\n```\n", cmd))
+				}
+			}
+			
+			if action.AutoApply {
+				builder.WriteString("*This action can be applied automatically.*\n")
+			}
+			builder.WriteString("\n")
+		}
+	}
+	
+	if len(result.ResourceForecasts) > 0 {
+		builder.WriteString("## Resource Forecasts\n\n")
+		for _, forecast := range result.ResourceForecasts {
+			builder.WriteString(fmt.Sprintf("- **%s**: %.1f%% → %.1f%% (%s trend)\n", 
+				strings.Title(forecast.Resource), 
+				forecast.Current*100, 
+				forecast.Predicted*100, 
+				forecast.Trend))
+		}
+		builder.WriteString("\n")
+	}
+	
+	if len(result.Recommendations) > 0 {
+		builder.WriteString("## Recommendations\n")
+		for _, rec := range result.Recommendations {
+			builder.WriteString(fmt.Sprintf("- %s\n", rec))
+		}
+	}
+	
+	return builder.String()
+}
+
+func (m *MCPServer) formatHealthCheckResult(result *MCPHealthCheckResponse) string {
+	var builder strings.Builder
+	
+	builder.WriteString(fmt.Sprintf("# System Health Report\n\n"))
+	builder.WriteString(fmt.Sprintf("**Overall Status:** %s\n", strings.ToUpper(result.OverallStatus)))
+	builder.WriteString(fmt.Sprintf("**Health Score:** %.2f/1.0\n", result.HealthScore))
+	builder.WriteString(fmt.Sprintf("**Last Updated:** %s\n\n", result.LastUpdated.Format("2006-01-02 15:04:05")))
+	
+	if len(result.Components) > 0 {
+		builder.WriteString("## Component Status\n\n")
+		for _, component := range result.Components {
+			statusIcon := "✅"
+			switch component.Status {
+			case "warning":
+				statusIcon = "⚠️"
+			case "critical":
+				statusIcon = "❌"
+			case "unknown":
+				statusIcon = "❓"
+			}
+			
+			builder.WriteString(fmt.Sprintf("### %s %s\n", statusIcon, strings.Title(component.Name)))
+			builder.WriteString(fmt.Sprintf("**Status:** %s\n", strings.Title(component.Status)))
+			builder.WriteString(fmt.Sprintf("**Message:** %s\n", component.Message))
+			builder.WriteString(fmt.Sprintf("**Last Checked:** %s\n", component.LastChecked.Format("15:04:05")))
+			
+			if len(component.Trends) > 0 {
+				builder.WriteString("**Trends:**\n")
+				for _, trend := range component.Trends {
+					builder.WriteString(fmt.Sprintf("- %s\n", trend))
+				}
+			}
+			
+			if len(component.Metrics) > 0 {
+				builder.WriteString("**Metrics:**\n")
+				for key, value := range component.Metrics {
+					builder.WriteString(fmt.Sprintf("- %s: %v\n", strings.Title(key), value))
+				}
+			}
+			builder.WriteString("\n")
+		}
+	}
+	
+	if result.SystemMetrics != nil {
+		metrics := result.SystemMetrics
+		builder.WriteString("## Detailed System Metrics\n\n")
+		
+		// CPU Metrics
+		builder.WriteString(fmt.Sprintf("**CPU:** %.1f%% usage, %d cores\n", metrics.CPU.Usage, metrics.CPU.Cores))
+		if len(metrics.CPU.LoadAverage) >= 3 {
+			builder.WriteString(fmt.Sprintf("**Load Average:** %.2f, %.2f, %.2f (1m, 5m, 15m)\n", 
+				metrics.CPU.LoadAverage[0], metrics.CPU.LoadAverage[1], metrics.CPU.LoadAverage[2]))
+		}
+		
+		// Memory Metrics
+		builder.WriteString(fmt.Sprintf("**Memory:** %.1f%% used (%.1f GB / %.1f GB)\n", 
+			metrics.Memory.UsagePercent, 
+			float64(metrics.Memory.Used)/(1024*1024*1024),
+			float64(metrics.Memory.Total)/(1024*1024*1024)))
+		
+		// Disk Metrics
+		if len(metrics.Disk) > 0 {
+			builder.WriteString("**Disk Usage:**\n")
+			for _, disk := range metrics.Disk {
+				builder.WriteString(fmt.Sprintf("- %s (%s): %.1f%% used (%.1f GB / %.1f GB)\n",
+					disk.Mountpoint, disk.Device, disk.UsagePercent,
+					float64(disk.Used)/(1024*1024*1024),
+					float64(disk.Total)/(1024*1024*1024)))
+			}
+		}
+		
+		// Nix Store Metrics
+		builder.WriteString(fmt.Sprintf("**Nix Store:** %.1f GB, %d live paths, %d dead paths\n",
+			float64(metrics.NixStore.TotalSize)/(1024*1024*1024),
+			metrics.NixStore.LivePaths,
+			metrics.NixStore.DeadPaths))
+		
+		if metrics.NixStore.GCRecommended {
+			builder.WriteString("*Garbage collection recommended*\n")
+		}
+		builder.WriteString("\n")
+	}
+	
+	if len(result.Recommendations) > 0 {
+		builder.WriteString("## Recommendations\n")
+		for _, rec := range result.Recommendations {
+			builder.WriteString(fmt.Sprintf("- %s\n", rec))
+		}
+	}
+	
 	return builder.String()
 }
 
