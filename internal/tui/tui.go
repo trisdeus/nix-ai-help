@@ -99,6 +99,13 @@ func getAvailableCommands() []Command {
 			Examples:    []string{"nixai devenv create", "nixai devenv shell", "nixai devenv status"},
 		},
 		{
+			Name:        "dev",
+			Description: "Developer Experience Revolution - intelligent development environment management",
+			Category:    "Development",
+			Usage:       "nixai dev [action]",
+			Examples:    []string{"nixai dev setup my-app --language go --editor vscode", "nixai dev template list", "nixai dev env create web-app --template react-typescript"},
+		},
+		{
 			Name:        "flake",
 			Description: "Manage NixOS flakes and configurations",
 			Category:    "Flakes",
@@ -736,8 +743,8 @@ func (t *TUI) intelligentCommandSearch(query string) []CommandSuggestion {
 		// Configuration
 		"config":     {"configure", "config", "ai-config", "explain-option"},
 		"configure":  {"configure", "ai-config", "config"},
-		"setup":      {"configure", "neovim-setup", "ai-config"},
-		"generate":   {"configure", "ai-config", "templates"},
+		"setup":      {"dev", "configure", "neovim-setup", "ai-config"},
+		"generate":   {"dev", "configure", "ai-config", "templates"},
 		
 		// Package Management
 		"package":    {"search", "package-monitor", "package-repo", "gc"},
@@ -750,8 +757,18 @@ func (t *TUI) intelligentCommandSearch(query string) []CommandSuggestion {
 		// Build & Development
 		"build":      {"build", "devenv", "flake"},
 		"compile":    {"build", "devenv"},
-		"develop":    {"devenv", "build", "flake"},
-		"environment": {"devenv", "configure"},
+		"develop":    {"dev", "devenv", "build", "flake"},
+		"development": {"dev", "devenv", "build"},
+		"environment": {"dev", "devenv", "configure"},
+		"project":    {"dev", "devenv"},
+		"scaffold":   {"dev", "templates"},
+		"deps":       {"dev"},
+		"ide":        {"dev"},
+		"editor":     {"dev"},
+		"vscode":     {"dev"},
+		"neovim":     {"dev"},
+		"vim":        {"dev"},
+		"emacs":      {"dev"},
 		
 		// Flakes
 		"flake":      {"flake", "migrate", "build"},
@@ -794,8 +811,8 @@ func (t *TUI) intelligentCommandSearch(query string) []CommandSuggestion {
 		"history":    {"version-control"},
 		
 		// Templates & Snippets
-		"template":   {"templates", "snippets", "import"},
-		"templates":  {"templates", "snippets", "import"},
+		"template":   {"dev", "templates", "snippets", "import"},
+		"templates":  {"dev", "templates", "snippets", "import"},
 		"snippet":    {"snippets", "templates"},
 		"snippets":   {"snippets", "templates"},
 		
@@ -807,7 +824,7 @@ func (t *TUI) intelligentCommandSearch(query string) []CommandSuggestion {
 		"conflict":   {"intelligence", "deps", "diagnose"},
 		"conflicts":  {"intelligence", "deps", "diagnose"},
 		"dependency": {"deps", "intelligence"},
-		"dependencies": {"deps", "intelligence"},
+		"dependencies": {"dev", "deps", "intelligence"},
 		
 		// Migration & Import
 		"migrate":    {"migrate", "import", "flake"},

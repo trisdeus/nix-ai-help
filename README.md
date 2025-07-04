@@ -10,7 +10,7 @@
 
 ## 🆕 Latest Updates (July 2025)
 
-### 🚀 **v2.0.6: Revolutionary AI-Powered NixOS Management Platform**
+### 🚀 **v2.0.7: Revolutionary AI-Powered NixOS Management Platform**
 
 - **⚡ Instant Access**: Run directly with `nix run github:olafkfreund/nix-ai-help` - no installation required!
 - **🧪 Safe Configuration Testing**: Enterprise-grade testing infrastructure with virtual environments, A/B testing, chaos engineering, and automated rollback
