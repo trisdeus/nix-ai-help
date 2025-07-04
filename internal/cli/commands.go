@@ -3760,6 +3760,9 @@ func initializeCommands() {
 	// Add comprehensive built-in manual system
 	rootCmd.AddCommand(CreateManualCommand())
 
+	// Add Phase 3.1 - Safe Configuration Testing
+	rootCmd.AddCommand(CreateTestCommands())
+
 	commandsInitialized = true
 }
 
