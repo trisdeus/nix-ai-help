@@ -10,9 +10,10 @@
 
 ## 🆕 Latest Updates (July 2025)
 
-### 🚀 **v2.0.0: Revolutionary AI-Powered NixOS Management Platform**
+### 🚀 **v2.0.6: Revolutionary AI-Powered NixOS Management Platform**
 
 - **⚡ Instant Access**: Run directly with `nix run github:olafkfreund/nix-ai-help` - no installation required!
+- **🧪 Safe Configuration Testing**: Enterprise-grade testing infrastructure with virtual environments, A/B testing, chaos engineering, and automated rollback
 - **🌐 Modern Web Interface**: Responsive dashboard with visual configuration builder, team collaboration, and real-time monitoring
 - **📚 Built-in Manual System**: 28+ comprehensive documentation topics with interactive navigation and offline access
 - **🤖 Multi-Provider AI**: 7 AI providers including OpenAI, Claude, Gemini, Groq, Ollama, and GitHub Copilot
@@ -36,6 +37,18 @@
 - **🎯 Command Discovery**: Enhanced command browser with `[INPUT]` indicators for configurable commands
 - **🤖 Intelligent Command Search**: AI-powered natural language query understanding with smart suggestions
 - **💬 Natural Language Interface**: Ask questions like "help me with health status" and get intelligent command recommendations
+
+### 🧪 **Phase 3.1 - Safe Configuration Testing** - **NEWLY COMPLETED!**
+
+- **🛡️ Virtual Environment Testing**: Isolated NixOS container-based testing environments with real system monitoring
+- **⚖️ A/B Testing Framework**: Statistical comparison between configurations with confidence intervals and effect size analysis
+- **💥 Chaos Engineering**: Resilience testing with 12+ attack types including service kills, network issues, and resource stress
+- **🔄 Automated Rollback**: Risk assessment and step-by-step recovery with success probability calculation
+- **📈 Performance Simulation**: Workload modeling and capacity planning with bottleneck analysis and projections
+- **📊 Statistical Analysis**: Comprehensive metrics with p-values, confidence intervals, and performance benchmarking
+- **🎯 CLI Integration**: Complete command-line interface with `nixai test` for all testing operations
+- **🔍 Real System Monitoring**: Authentic data collection from `/proc/*`, no mock responses
+- **⚡ Quick Testing**: One-command comprehensive test suites for rapid configuration validation
 
 ### 🚀 **Enhanced Command System** - **8 MAJOR COMMANDS UPGRADED!**
 
@@ -136,6 +149,12 @@ nix run github:olafkfreund/nix-ai-help -- mcp-server start --ephemeral
 
 # Browse built-in manual
 nix run github:olafkfreund/nix-ai-help -- manual
+
+# Test configuration safely
+nix run github:olafkfreund/nix-ai-help -- test quick /etc/nixos/configuration.nix
+
+# Start chaos engineering experiment
+nix run github:olafkfreund/nix-ai-help -- test chaos create env123
 ```
 
 ### 📦 Traditional Installation
@@ -260,7 +279,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 ### 🎯 Revolutionary Features at a Glance
 
 - **Instant Access**: Run with `nix run github:olafkfreund/nix-ai-help` - no installation required
-- **40+ Specialized Commands**: Complete AI-powered toolkit for all NixOS operations
+- **40+ Specialized Commands**: Complete AI-powered toolkit for all NixOS operations including safe configuration testing
 - **Built-in Manual System**: 28+ comprehensive documentation topics with interactive navigation
 - **Multi-Provider AI**: 7 AI providers including Claude, Groq, Gemini 2.5 Flash, OpenAI, and local Ollama
 - **Fleet Management**: Multi-machine deployment with enterprise-grade features
@@ -290,7 +309,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 
 ### 🤖 AI-Powered Command System
 
-- **40+ Specialized Commands**: Complete command-line toolkit for all NixOS tasks and operations
+- **40+ Specialized Commands**: Complete command-line toolkit for all NixOS tasks and operations including enterprise-grade testing
 - **Intelligent Agent Architecture**: Role-based AI behavior with specialized expertise domains
 - **Direct Question Interface**: `nixai -a "your question"` for instant AI-powered assistance
 - **Context-Aware Responses**: Commands adapt behavior based on detected system configuration, role, and context

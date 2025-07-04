@@ -2,8 +2,9 @@
 
 ---
 
-## 🚀 v2.0.0 Release Highlights (July 2025)
+## 🚀 v2.0.6 Release Highlights (July 2025)
 
+- **🧪 Safe Configuration Testing**: Enterprise-grade testing infrastructure with virtual environments, A/B testing, chaos engineering, and automated rollback
 - **🌐 Modern Web Interface**: Responsive dashboard with configuration builder and team collaboration
 - **🔌 Comprehensive Plugin System**: 14 plugin management commands with secure dynamic loading
 - **🎯 Enhanced TUI Experience**: Claude Code-style and classic interfaces with AI-powered intelligent command search
@@ -64,6 +65,7 @@ Welcome to the nixai Command Manual. Each command has its own dedicated document
 - [snippets](snippets.md) - Configuration snippets
 - [store](store.md) - Nix store management
 - [templates](templates.md) - Configuration templates
+- [test](test.md) - Safe configuration testing **NEW**
 
 ### New 2.0.0 Features
 - [web](web.md) - Modern web interface **NEW**
