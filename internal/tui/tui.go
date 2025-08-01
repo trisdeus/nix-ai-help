@@ -47,6 +47,7 @@ func NewTUI() *TUI {
 	// Create plugin integration
 	logger := logger.NewLogger()
 	pluginIntegration := NewPluginIntegration(logger)
+	pluginIntegration.Initialize()
 	
 	tui := &TUI{
 		commands: getAvailableCommands(),

@@ -50,6 +50,7 @@ func NewClaudeTUI() *ClaudeTUI {
 	// Create plugin integration
 	logger := logger.NewLogger()
 	pluginIntegration := NewPluginIntegration(logger)
+	pluginIntegration.Initialize()
 
 	// Initialize plugin integration
 	tui := &ClaudeTUI{

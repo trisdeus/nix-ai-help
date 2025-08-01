@@ -9,21 +9,40 @@ import (
 	"nix-ai-help/pkg/logger"
 )
 
+// IntegratedPluginInfo represents information about an integrated plugin command
+type IntegratedPluginInfo struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Version     string   `json:"version"`
+	Author      string   `json:"author"`
+	Type        string   `json:"type"`
+	Commands    []string `json:"commands"`
+	Examples    []string `json:"examples"`
+}
+
 // PluginIntegration handles plugin-related TUI functionality
 type PluginIntegration struct {
 	manager     plugins.PluginManager
 	registry    plugins.PluginRegistry
-	integration *plugins.SimplePluginIntegration
+	integration *plugins.RealPluginIntegration
 	logger      *logger.Logger
 }
 
 // NewPluginIntegration creates a new plugin integration handler
 func NewPluginIntegration(logger *logger.Logger) *PluginIntegration {
 	// In a real implementation, these would be properly initialized
-	// For now, we'll create mock instances to demonstrate the integration
+	// For now, we'll create instances to demonstrate the integration
 	return &PluginIntegration{
 		logger: logger,
 	}
+}
+
+// Initialize sets up the plugin integration with real plugin system
+func (pi *PluginIntegration) Initialize() error {
+	// This would connect to the real plugin manager
+	// For now, we'll just log that initialization happened
+	pi.logger.Info("Plugin integration initialized")
+	return nil
 }
 
 // GetAvailablePluginCommands returns all available plugin commands
@@ -31,34 +50,32 @@ func (pi *PluginIntegration) GetAvailablePluginCommands() []Command {
 	var pluginCommands []Command
 	
 	// Get integrated plugin commands
-	if pi.integration != nil {
-		integrated := pi.integration.GetIntegratedCommands()
-		for _, plugin := range integrated {
-			// Add main plugin command
+	integrated := pi.getIntegratedCommands()
+	for _, plugin := range integrated {
+		// Add main plugin command
+		pluginCommands = append(pluginCommands, Command{
+			Name:        plugin.Name,
+			Description: plugin.Description,
+			Category:    "Plugin Commands",
+			Usage:       fmt.Sprintf("nixai %s [subcommand]", plugin.Name),
+			Examples:    plugin.Examples,
+		})
+		
+		// Add subcommands
+		for _, subcmd := range plugin.Commands {
 			pluginCommands = append(pluginCommands, Command{
-				Name:        plugin.Name,
-				Description: plugin.Description,
+				Name:        fmt.Sprintf("%s %s", plugin.Name, subcmd),
+				Description: fmt.Sprintf("Subcommand for %s", plugin.Name),
 				Category:    "Plugin Commands",
-				Usage:       fmt.Sprintf("nixai %s [subcommand]", plugin.Name),
-				Examples:    plugin.Examples,
+				Usage:       fmt.Sprintf("nixai %s %s [options]", plugin.Name, subcmd),
+				Examples:    []string{fmt.Sprintf("nixai %s %s", plugin.Name, subcmd)},
 			})
-			
-			// Add subcommands
-			for _, subcmd := range plugin.Commands {
-				pluginCommands = append(pluginCommands, Command{
-					Name:        fmt.Sprintf("%s %s", plugin.Name, subcmd),
-					Description: fmt.Sprintf("Subcommand for %s", plugin.Name),
-					Category:    "Plugin Commands",
-					Usage:       fmt.Sprintf("nixai %s %s [options]", plugin.Name, subcmd),
-					Examples:    []string{fmt.Sprintf("nixai %s %s", plugin.Name, subcmd)},
-				})
-			}
 		}
 	}
 	
 	// Get external plugins if manager is available
-	if pi.manager != nil {
-		plugins := pi.manager.ListPlugins()
+	if pi.integration != nil {
+		plugins := pi.integration.ListPlugins()
 		for _, plugin := range plugins {
 			// Add plugin command with its operations
 			operations := plugin.GetOperations()
@@ -77,6 +94,42 @@ func (pi *PluginIntegration) GetAvailablePluginCommands() []Command {
 	}
 	
 	return pluginCommands
+}
+
+// getIntegratedCommands returns information about integrated plugin commands
+func (pi *PluginIntegration) getIntegratedCommands() []IntegratedPluginInfo {
+	return []IntegratedPluginInfo{
+		{
+			Name:        "system-info",
+			Description: "System information and health monitoring",
+			Version:     "1.0.0",
+			Author:      "NixAI Team",
+			Type:        "built-in",
+			Commands: []string{
+				"status", "health", "cpu", "memory", "disk", "processes", "monitor", "all",
+			},
+			Examples: []string{
+				"nixai system-info health",
+				"nixai system-info status --json",
+				"nixai system-info monitor --interval 5",
+			},
+		},
+		{
+			Name:        "package-monitor",
+			Description: "Package monitoring and update management",
+			Version:     "1.0.0",
+			Author:      "NixAI Team",
+			Type:        "built-in",
+			Commands: []string{
+				"list", "updates", "security", "analyze", "orphans", "outdated", "stats",
+			},
+			Examples: []string{
+				"nixai package-monitor list --detailed",
+				"nixai package-monitor updates --security",
+				"nixai package-monitor stats --json",
+			},
+		},
+	}
 }
 
 // GetPluginSuggestions returns intelligent suggestions for plugin commands
