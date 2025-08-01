@@ -1,219 +1,76 @@
-# nixai Plugin System
+# NixAI Plugin System
 
-The nixai Plugin System provides a comprehensive framework for extending nixai functionality through dynamically loadable plugins. This system supports secure execution, package management, community marketplace, and developer tools.
+The NixAI plugin system allows extending the functionality of nixai with custom commands and capabilities. This document explains how to use and develop plugins for nixai.
 
-## Features
+## Using Plugins
 
-### 🔌 Dynamic Loading
-- Hot-loading of plugins without restart
-- Runtime plugin discovery and loading
-- Plugin lifecycle management (load, start, stop, unload)
-- Configuration-driven plugin management
+### Listing Available Plugins
 
-### 🛡️ Security Sandbox
-- Isolated execution environment for plugins
-- Configurable security policies
-- Resource limits (memory, CPU, network)
-- Permission-based access control
-- Capability-based security model
-
-### 📦 Package Manager
-- Plugin distribution and update system
-- Multiple repository support (official, community, local)
-- Automatic dependency resolution
-- Signature verification and integrity checks
-- Version management and updates
-
-### 🤝 Community Marketplace
-- Community-contributed plugin ecosystem
-- Plugin discovery and search
-- Ratings and reviews system
-- Featured and popular plugins
-- Plugin submission and management
-
-### ⚡ Native Performance
-- High-performance plugin execution
-- Efficient resource utilization
-- Optimized loading and communication
-- Event-driven architecture
-
-## Architecture
-
-### Core Components
-
-1. **Plugin Manager** (`manager.go`)
-   - Central coordinator for plugin lifecycle
-   - Plugin loading, starting, stopping, and unloading
-   - Configuration management
-   - Health monitoring and metrics
-
-2. **Plugin Registry** (`registry.go`)
-   - Plugin discovery and registration
-   - Metadata management
-   - Capability indexing
-   - Search and filtering
-
-3. **Plugin Loader** (`loader.go`)
-   - Dynamic plugin loading from various sources
-   - Plugin validation and verification
-   - Go plugin support and extension points
-   - Dependency resolution
-
-4. **Security Sandbox** (`sandbox.go`)
-   - Secure execution environment
-   - Resource monitoring and limits
-   - Permission checking and enforcement
-   - Security policy management
-
-5. **Event System** (`events.go`)
-   - Event-driven plugin communication
-   - Event bus with filtering and routing
-   - Plugin event handling and publishing
-   - Metrics and monitoring events
-
-6. **Package Manager** (`package_manager.go`)
-   - Plugin distribution and updates
-   - Repository management
-   - Download and installation
-   - Version control and rollback
-
-7. **Marketplace** (`marketplace.go`)
-   - Community plugin ecosystem
-   - Search and discovery
-   - Ratings and reviews
-   - Plugin statistics and analytics
-
-8. **Template System** (`templates.go`)
-   - Plugin scaffolding and creation
-   - Built-in templates for different plugin types
-   - Code generation and project setup
-   - Developer tools and utilities
-
-## Configuration
-
-### Plugin System Configuration
-
-```yaml
-plugins:
-  enabled: true
-  directory: ~/.config/nixai/plugins
-  cache_directory: ~/.cache/nixai/plugins
-  config_directory: ~/.config/nixai/plugins/config
-  auto_discover: true
-  auto_update: false
-  sandbox_enabled: true
-  max_concurrent: 5
-  timeout: 30
-  
-  repositories:
-    - name: "official"
-      url: "https://plugins.nixai.dev"
-      type: "official"
-      enabled: true
-      priority: 1
-      verified: true
-    - name: "community"
-      url: "https://community.nixai.dev/plugins"
-      type: "community"
-      enabled: true
-      priority: 2
-      verified: false
-  
-  marketplace:
-    enabled: true
-    base_url: "https://marketplace.nixai.dev"
-    cache_duration: 3600
-    featured_plugins: 10
-    search_timeout: 15
-  
-  security:
-    sandbox_enabled: true
-    allow_network: false
-    allow_filesystem_write: false
-    allow_system_calls: false
-    max_memory_mb: 512
-    max_cpu_percent: 50
-    allowed_domains: []
-    blocked_capabilities: ["CAP_SYS_ADMIN", "CAP_NET_ADMIN"]
-  
-  package_manager:
-    verify_signatures: true
-    allow_unsigned: false
-    update_check_interval: 86400
-    download_timeout: 300
-    max_download_size_mb: 100
-```
-
-## CLI Commands
-
-### Plugin Management
+To see all available plugins, use:
 
 ```bash
-# List installed plugins
 nixai plugin list
-
-# Search for plugins
-nixai plugin search <query>
-
-# Install a plugin
-nixai plugin install <plugin-name>
-
-# Uninstall a plugin
-nixai plugin uninstall <plugin-name>
-
-# Enable/disable plugins
-nixai plugin enable <plugin-name>
-nixai plugin disable <plugin-name>
-
-# Get plugin information
-nixai plugin info <plugin-name>
-
-# Check plugin status
-nixai plugin status <plugin-name>
-
-# Execute plugin operations
-nixai plugin execute <plugin-name> <operation> [args...]
-
-# Discover available plugins
-nixai plugin discover
-
-# Validate plugin
-nixai plugin validate <plugin-path>
-
-# View plugin metrics
-nixai plugin metrics [plugin-name]
-
-# View plugin events
-nixai plugin events [--filter=<pattern>]
-
-# Create new plugin from template
-nixai plugin create <template-name> <output-directory>
 ```
 
-### Repository Management
+This will show both integrated plugins (built-in) and any external plugins that are installed.
+
+### Installing Plugins
+
+To install an external plugin:
 
 ```bash
-# List repositories
-nixai plugin repo list
-
-# Add repository
-nixai plugin repo add <name> <url> [--type=<type>]
-
-# Remove repository
-nixai plugin repo remove <name>
-
-# Update repositories
-nixai plugin repo update
-
-# Search in repositories
-nixai plugin repo search <query>
+nixai plugin install /path/to/plugin.so
 ```
 
-## Plugin Development
+### Managing Plugins
+
+Enable or disable plugins:
+
+```bash
+nixai plugin enable plugin-name
+nixai plugin disable plugin-name
+```
+
+Uninstall plugins:
+
+```bash
+nixai plugin uninstall plugin-name
+```
+
+## Integrated Plugins
+
+NixAI comes with two integrated plugins:
+
+### System Info (`system-info`)
+Provides system information and health monitoring capabilities:
+- `nixai system-info health`: Check system health
+- `nixai system-info status`: Show system status
+- `nixai system-info cpu`: CPU information
+- `nixai system-info memory`: Memory information
+- `nixai system-info disk`: Disk usage information
+- `nixai system-info processes`: Running processes
+- `nixai system-info monitor`: Monitor system in real-time
+- `nixai system-info all`: All system information
+
+### Package Monitor (`package-monitor`)
+Monitors packages and manages updates:
+- `nixai package-monitor list`: List installed packages
+- `nixai package-monitor updates`: Check for package updates
+- `nixai package-monitor security`: Security-related package information
+- `nixai package-monitor analyze`: Analyze packages
+- `nixai package-monitor stats`: Package statistics
+
+## Developing Plugins
+
+To develop a plugin for nixai, you need to:
+
+1. Implement the `PluginInterface` defined in `internal/plugins/api.go`
+2. Export a `NewPlugin()` function that returns an instance of your plugin
+3. Compile your plugin as a shared library (`.so` file on Linux)
 
 ### Plugin Interface
 
-All plugins must implement the `PluginInterface`:
+Plugins must implement the following interface:
 
 ```go
 type PluginInterface interface {
@@ -246,282 +103,99 @@ type PluginInterface interface {
 }
 ```
 
-### Creating a Plugin
+### Example Plugin
 
-1. **Use Template System**:
-   ```bash
-   nixai plugin create basic-go my-plugin
-   cd my-plugin
-   ```
-
-2. **Implement Plugin Interface**:
-   ```go
-   package main
-
-   import (
-       "context"
-       "nix-ai-help/internal/plugins"
-   )
-
-   type MyPlugin struct {
-       config plugins.PluginConfig
-       running bool
-   }
-
-   func (p *MyPlugin) Name() string { return "my-plugin" }
-   func (p *MyPlugin) Version() string { return "1.0.0" }
-   // ... implement other methods
-   ```
-
-3. **Build Plugin**:
-   ```bash
-   go build -buildmode=plugin -o my-plugin.so main.go
-   ```
-
-4. **Install Plugin**:
-   ```bash
-   nixai plugin install ./my-plugin.so
-   ```
-
-### Plugin Templates
-
-Available templates:
-- `basic-go`: Basic Go plugin template
-- `advanced-go`: Advanced Go plugin with full feature set
-- `nixos-integration`: NixOS-specific plugin template
-- `ai-provider`: AI provider integration plugin
-- `tool-integration`: External tool integration plugin
-
-## Security Model
-
-### Sandbox Execution
-
-Plugins run in a secure sandbox environment with:
-- **Process Isolation**: Separate process space
-- **Resource Limits**: CPU, memory, and time constraints
-- **Network Restrictions**: Configurable network access
-- **File System Controls**: Limited file system access
-- **Capability Restrictions**: Linux capability filtering
-
-### Permission System
-
-Plugins request specific permissions:
-- `network`: Network access
-- `filesystem.read`: File system read access
-- `filesystem.write`: File system write access
-- `system.exec`: Execute system commands
-- `ai.provider`: Access to AI providers
-- `nixos.config`: Access to NixOS configuration
-
-### Security Policies
-
-Configure security policies per plugin:
-```yaml
-plugins:
-  my-plugin:
-    security_policy:
-      allow_network: true
-      allowed_domains: ["api.github.com", "nixos.org"]
-      max_memory_mb: 256
-      max_cpu_percent: 25
-      permissions: ["network", "filesystem.read"]
-```
-
-## Event System
-
-### Event Types
-
-- `plugin.loaded`: Plugin loaded successfully
-- `plugin.started`: Plugin started
-- `plugin.stopped`: Plugin stopped
-- `plugin.error`: Plugin error occurred
-- `plugin.operation`: Plugin operation executed
-- `plugin.health`: Plugin health status change
-
-### Event Handling
+Here's a minimal example of a plugin:
 
 ```go
-// Subscribe to events
-eventBus.Subscribe(func(event plugins.PluginEvent) {
-    if event.Type == "plugin.error" {
-        log.Printf("Plugin error: %s", event.Data["error"])
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+    
+    "nix-ai-help/internal/plugins"
+)
+
+type ExamplePlugin struct {
+    name        string
+    version     string
+    description string
+    author      string
+    running     bool
+}
+
+func NewPlugin() plugins.PluginInterface {
+    return &ExamplePlugin{
+        name:        "example-plugin",
+        version:     "1.0.0",
+        description: "An example plugin for nixai",
+        author:      "Your Name",
     }
-})
+}
 
-// Publish events
-eventBus.Publish(plugins.PluginEvent{
-    Type: "plugin.operation",
-    PluginName: "my-plugin",
-    Data: map[string]interface{}{
-        "operation": "backup",
-        "status": "completed",
-    },
-})
+// Implement all required methods...
+
+func (p *ExamplePlugin) Name() string {
+    return p.name
+}
+
+func (p *ExamplePlugin) Version() string {
+    return p.version
+}
+
+// ... (implement all other required methods)
+
+func main() {
+    // This function is required but not used for plugins
+}
 ```
 
-## Monitoring and Metrics
+### Building Plugins
 
-### Health Monitoring
-
-- Plugin health checks
-- Resource usage monitoring
-- Performance metrics
-- Error tracking and reporting
-
-### Metrics Collection
-
-- Operation execution times
-- Resource consumption
-- Success/failure rates
-- Event statistics
-
-### Monitoring Integration
+To build a plugin, use:
 
 ```bash
-# View plugin metrics
-nixai plugin metrics my-plugin
-
-# Export metrics for monitoring systems
-nixai plugin metrics --export=prometheus
-
-# Real-time monitoring
-nixai plugin monitor --watch
+go build -buildmode=plugin -o example-plugin.so .
 ```
 
-## Best Practices
+### Installing Plugins
 
-### Plugin Development
-
-1. **Error Handling**: Implement robust error handling
-2. **Resource Management**: Clean up resources properly
-3. **Configuration**: Support flexible configuration
-4. **Testing**: Write comprehensive tests
-5. **Documentation**: Provide clear documentation
-6. **Security**: Follow security best practices
-
-### Performance
-
-1. **Lazy Loading**: Load resources only when needed
-2. **Caching**: Cache expensive operations
-3. **Async Operations**: Use async for long-running tasks
-4. **Resource Limits**: Respect resource constraints
-5. **Clean Shutdown**: Implement proper cleanup
-
-### Security
-
-1. **Minimal Permissions**: Request only necessary permissions
-2. **Input Validation**: Validate all inputs
-3. **Output Sanitization**: Sanitize outputs
-4. **Secure Communication**: Use secure protocols
-5. **Audit Logging**: Log security-relevant events
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Plugin Load Failures**:
-   - Check plugin compatibility
-   - Verify dependencies
-   - Check file permissions
-
-2. **Security Violations**:
-   - Review security policies
-   - Check permission requirements
-   - Verify allowed domains/capabilities
-
-3. **Performance Issues**:
-   - Monitor resource usage
-   - Check for memory leaks
-   - Profile plugin operations
-
-4. **Communication Errors**:
-   - Verify event bus connectivity
-   - Check network configurations
-   - Monitor event delivery
-
-### Debug Mode
-
-Enable debug logging:
-```bash
-nixai --log-level debug plugin status my-plugin
-```
-
-### Plugin Diagnostics
+Once built, install the plugin by copying it to the nixai plugins directory:
 
 ```bash
-# Check plugin health
-nixai plugin health my-plugin
-
-# Validate plugin configuration
-nixai plugin validate-config my-plugin
-
-# Test plugin operations
-nixai plugin test my-plugin operation-name
+cp example-plugin.so ~/.nixai/plugins/
 ```
 
-## Migration Guide
+Then load it with:
 
-### From Manual Integration
+```bash
+nixai plugin install ~/.nixai/plugins/example-plugin.so
+```
 
-1. **Extract Functionality**: Identify reusable components
-2. **Create Plugin**: Use template system
-3. **Implement Interface**: Follow plugin interface
-4. **Test Integration**: Validate functionality
-5. **Deploy**: Install and configure plugin
+## Plugin Security
 
-### Plugin Updates
+NixAI takes plugin security seriously:
 
-1. **Version Compatibility**: Check version requirements
-2. **Configuration Migration**: Update configuration files
-3. **Data Migration**: Migrate plugin data if needed
-4. **Testing**: Validate updated functionality
-5. **Rollback Plan**: Prepare rollback strategy
+1. All plugins must be validated before loading
+2. Plugins run in a restricted environment by default
+3. Network access can be controlled through security policies
+4. File system access is limited to approved paths
+5. Resource usage is monitored and limited
 
-## Contributing
+When installing third-party plugins, always:
+- Verify the source is trustworthy
+- Check the plugin code if possible
+- Review the permissions the plugin requests
+- Monitor the plugin's behavior after installation
 
-### Plugin Contributions
+## Plugin Directory Structure
 
-1. **Development**: Follow development guidelines
-2. **Testing**: Ensure comprehensive test coverage
-3. **Documentation**: Provide complete documentation
-4. **Review**: Submit for community review
-5. **Publication**: Publish to marketplace
+NixAI looks for plugins in the following directories:
 
-### Core System Contributions
+1. `~/.nixai/plugins/` (user plugins)
+2. `/usr/local/share/nixai/plugins/` (system plugins)
+3. `/usr/share/nixai/plugins/` (distribution plugins)
 
-1. **Issues**: Report bugs and feature requests
-2. **Pull Requests**: Submit improvements
-3. **Testing**: Contribute test cases
-4. **Documentation**: Improve documentation
-5. **Community**: Help other developers
-
-## Roadmap
-
-### Phase 1 (Current)
-- ✅ Core plugin system implementation
-- ✅ Security sandbox
-- ✅ Package manager
-- ✅ CLI integration
-- ✅ Template system
-
-### Phase 2 (Next)
-- 🔄 Web UI integration
-- 🔄 Advanced security features
-- 🔄 Plugin signing and verification
-- 🔄 Performance optimizations
-- 🔄 Marketplace launch
-
-### Phase 3 (Future)
-- 📋 Plugin composition and workflows
-- 📋 Advanced monitoring and analytics
-- 📋 Cross-platform support
-- 📋 Enterprise features
-- 📋 Plugin ecosystem expansion
-
-## Support
-
-- **Documentation**: [docs/plugins/](./plugins/)
-- **Examples**: [examples/plugins/](../examples/plugins/)
-- **Community**: [GitHub Discussions](https://github.com/nixai/discussions)
-- **Issues**: [GitHub Issues](https://github.com/nixai/issues)
-- **Discord**: [nixai Community](https://discord.gg/nixai)
+You can also specify custom plugin directories in the nixai configuration file.
