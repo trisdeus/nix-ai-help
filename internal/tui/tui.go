@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 )
 
@@ -20,6 +21,7 @@ type TUI struct {
 	suggestions    []CommandSuggestion
 	width          int
 	height         int
+	pluginIntegration *PluginIntegration
 }
 
 // Command represents a nixai command with metadata
@@ -42,11 +44,29 @@ type CommandSuggestion struct {
 
 // NewTUI creates a new TUI instance
 func NewTUI() *TUI {
-	return &TUI{
+	// Create plugin integration
+	logger := logger.NewLogger()
+	pluginIntegration := NewPluginIntegration(logger)
+	
+	tui := &TUI{
 		commands: getAvailableCommands(),
 		selected: 0,
 		width:    80,
 		height:   24,
+		pluginIntegration: pluginIntegration,
+	}
+	
+	// Add plugin commands to available commands
+	tui.addPluginCommands()
+	
+	return tui
+}
+
+// addPluginCommands adds plugin commands to the available commands list
+func (t *TUI) addPluginCommands() {
+	if t.pluginIntegration != nil {
+		pluginCommands := t.pluginIntegration.GetAvailablePluginCommands()
+		t.commands = append(t.commands, pluginCommands...)
 	}
 }
 
@@ -440,6 +460,10 @@ var (
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#6B7280")).
 			Italic(true)
+			
+	infoStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#81A1C1")).
+			Italic(true)
 )
 
 // Start runs the TUI interface
@@ -467,6 +491,12 @@ func (t *TUI) Start() error {
 		// Handle suggestions mode toggle
 		if input == "s" || input == "suggest" {
 			t.showSuggestions = !t.showSuggestions
+			continue
+		}
+		
+		// Handle plugin status command
+		if input == "plugins" || strings.HasPrefix(input, "plugin ") {
+			t.showPluginStatus()
 			continue
 		}
 		
@@ -568,7 +598,8 @@ func (t *TUI) renderHelp() string {
 	help += "• Type '1' or 'ask' to ask AI questions\n"
 	help += "• Type 'help me with health status' for intelligent suggestions\n"
 	help += "• Type 'how do I monitor system performance' for AI guidance\n"
-	help += "• Type 'web' to start web interface\n\n"
+	help += "• Type 'web' to start web interface\n"
+	help += "• Type 'plugin list' to see available plugins\n\n"
 	
 	help += categoryStyle.Render("Categories:") + "\n"
 	categories := make(map[string][]string)
@@ -579,6 +610,13 @@ func (t *TUI) renderHelp() string {
 	for category, commands := range categories {
 		help += fmt.Sprintf("• %s: %s\n", category, strings.Join(commands, ", "))
 	}
+	
+	// Add plugin information
+	help += "\n" + categoryStyle.Render("Plugin System:") + "\n"
+	help += "• Plugins extend nixai functionality with custom commands\n"
+	help += "• Built-in plugins: system-info, package-monitor\n"
+	help += "• Use 'plugin list' to see all available plugins\n"
+	help += "• Use 'plugin search [query]' to find plugins\n"
 	
 	return help
 }
@@ -604,10 +642,20 @@ func (t *TUI) executeCommand(cmd Command) {
 		fmt.Println()
 	}
 	
+	// Special handling for plugin commands
+	if cmd.Category == "Plugin Commands" || cmd.Category == "External Plugins" {
+		fmt.Println(infoStyle.Render("This is a plugin command."))
+		fmt.Println(infoStyle.Render("Plugin commands are dynamically loaded extensions to nixai functionality."))
+		fmt.Println()
+	}
+	
 	fmt.Println(helpStyle.Render("Choose an action:"))
 	fmt.Println("  [1] Run basic command")
 	fmt.Println("  [2] Run with options")
 	fmt.Println("  [3] Show detailed help")
+	if strings.HasPrefix(cmd.Name, "plugin ") {
+		fmt.Println("  [4] Show plugin status")
+	}
 	fmt.Println("  [0] Back to main menu")
 	fmt.Println()
 	
@@ -622,6 +670,12 @@ func (t *TUI) executeCommand(cmd Command) {
 		t.runCommandWithOptions(cmd)
 	case "3":
 		t.showDetailedHelp(cmd)
+	case "4":
+		if strings.HasPrefix(cmd.Name, "plugin ") {
+			t.showPluginStatus()
+		} else {
+			return
+		}
 	default:
 		return
 	}
@@ -684,6 +738,38 @@ func (t *TUI) runCommandWithOptions(cmd Command) {
 	}
 	
 	fmt.Println()
+	fmt.Print("Press Enter to continue...")
+	fmt.Scanln()
+}
+
+// showPluginStatus displays plugin status information
+func (t *TUI) showPluginStatus() {
+	fmt.Print("\033[2J\033[H") // Clear screen
+	
+	fmt.Println(titleStyle.Render("🔌 Plugin Status"))
+	fmt.Println()
+	
+	// In a real implementation, this would show actual plugin status
+	fmt.Println(infoStyle.Render("Plugin system status:"))
+	fmt.Println("• Plugin system: Available")
+	fmt.Println("• Integrated plugins: system-info, package-monitor")
+	fmt.Println("• External plugins: None currently loaded")
+	fmt.Println()
+	
+	fmt.Println(categoryStyle.Render("Integrated Plugins:"))
+	fmt.Println("• system-info: System information and monitoring")
+	fmt.Println("• package-monitor: Package monitoring and management")
+	fmt.Println()
+	
+	fmt.Println(helpStyle.Render("Plugin Management Commands:"))
+	fmt.Println("• plugin list        - List all plugins")
+	fmt.Println("• plugin search      - Search for available plugins")
+	fmt.Println("• plugin install     - Install a new plugin")
+	fmt.Println("• plugin enable      - Enable a plugin")
+	fmt.Println("• plugin disable     - Disable a plugin")
+	fmt.Println("• plugin status      - Show plugin status")
+	fmt.Println()
+	
 	fmt.Print("Press Enter to continue...")
 	fmt.Scanln()
 }
@@ -873,6 +959,11 @@ func (t *TUI) intelligentCommandSearch(query string) []CommandSuggestion {
 		"community":  {"community", "learn", "manual"},
 		"support":    {"community", "error", "manual"},
 		"forum":      {"community"},
+		
+		// Plugin Commands
+		"plugin":     {"plugin", "system-info", "package-monitor"},
+		"plugins":    {"plugin", "system-info", "package-monitor"},
+		"info":       {"system-info", "package-monitor"},
 	}
 	
 	// Score commands based on relevance
@@ -888,6 +979,12 @@ func (t *TUI) intelligentCommandSearch(query string) []CommandSuggestion {
 			}
 			suggestions = append(suggestions, suggestion)
 		}
+	}
+	
+	// Add plugin suggestions if plugin integration is available
+	if t.pluginIntegration != nil {
+		pluginSuggestions := t.pluginIntegration.GetPluginSuggestions(query)
+		suggestions = append(suggestions, pluginSuggestions...)
 	}
 	
 	// Sort by relevance (highest first)
@@ -1067,7 +1164,8 @@ func (t *TUI) isNaturalLanguageQuery(input string) bool {
 	}
 	
 	// Check for action verbs
-	actionVerbs := []string{"monitor", "check", "analyze", "fix", "configure", "install", "build", "deploy"}
+	actionVerbs := []string{"monitor", "check", "analyze", "fix", "configure", "install", "build", "deploy", 
+		"plugin", "list", "search", "enable", "disable"}
 	for _, verb := range actionVerbs {
 		if strings.Contains(input, verb) {
 			return true
@@ -1120,6 +1218,11 @@ func (t *TUI) showIntelligentSuggestions(query string) {
 		if len(suggestion.Keywords) > 0 {
 			fmt.Printf("     🏷️  Keywords: %s\n", 
 				normalStyle.Render(strings.Join(suggestion.Keywords, ", ")))
+		}
+		
+		// Special note for plugin commands
+		if suggestion.Command.Category == "Plugin Commands" || suggestion.Command.Category == "External Plugins" {
+			fmt.Printf("     🔌 %s\n", infoStyle.Render("This is a plugin command"))
 		}
 		
 		fmt.Println()

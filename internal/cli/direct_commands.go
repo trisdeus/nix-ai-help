@@ -2350,6 +2350,25 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 		_, _ = fmt.Fprintln(out, utils.FormatWarning("Context detection failed: "+err.Error()))
 		nixosCtx = nil
 	}
+	
+	// Initialize enhanced context manager
+	enhancedContextManager := nixoscontext.NewEnhancedContextManager(logger.NewLogger())
+	enhancedContext, err := enhancedContextManager.LoadContext()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("Enhanced context loading failed: "+err.Error()))
+		enhancedContext = &nixoscontext.EnhancedContext{
+			NixOSContext:           nixosCtx,
+			HistoricalInteractions: []nixoscontext.Interaction{},
+			UserPreferences:        nixoscontext.Preferences{},
+			SessionHistory:         []string{},
+			Timestamp:              time.Now(),
+		}
+	} else {
+		enhancedContext.NixOSContext = nixosCtx
+	}
+	
+	// Update user preferences based on current query
+	enhancedContextManager.UpdatePreferences(enhancedContext, question)
 
 	// Display detected context summary if available
 	if nixosCtx != nil && nixosCtx.CacheValid {
@@ -2637,6 +2656,14 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 	_, _ = fmt.Fprintln(out, utils.FormatTip("For package details, use: nixai search <package>"))
 	if qualityScore < 3 {
 		_, _ = fmt.Fprintln(out, utils.FormatWarning("Consider using more specific terms for better results"))
+	}
+	
+	// Add interaction to enhanced context
+	enhancedContextManager.AddInteraction(enhancedContext, question, response, "Enhanced context used")
+	
+	// Save enhanced context
+	if err := enhancedContextManager.SaveContext(enhancedContext); err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("Failed to save enhanced context: "+err.Error()))
 	}
 }
 

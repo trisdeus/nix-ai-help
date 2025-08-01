@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 	"nix-ai-help/pkg/version"
 )
@@ -28,7 +29,8 @@ type ClaudeTUI struct {
 	styles          ThemeStyles
 	
 	// Plugin integration
-	pluginCommands  []string
+	pluginIntegration *PluginIntegration
+	pluginCommands    []string
 	pluginSuggestions []string
 }
 
@@ -45,16 +47,21 @@ func NewClaudeTUI() *ClaudeTUI {
 	theme := themes[defaultTheme]
 	styles := createThemeStyles(theme)
 
+	// Create plugin integration
+	logger := logger.NewLogger()
+	pluginIntegration := NewPluginIntegration(logger)
+
 	// Initialize plugin integration
 	tui := &ClaudeTUI{
-		textInput:      ti,
-		output:         []string{},
-		commandHistory: []string{},
-		historyIndex:   -1,
-		suggestions:    getAllCommandSuggestions(),
-		currentTheme:   defaultTheme,
-		styles:         styles,
-		pluginCommands: []string{},
+		textInput:         ti,
+		output:            []string{},
+		commandHistory:    []string{},
+		historyIndex:      -1,
+		suggestions:       getAllCommandSuggestions(),
+		currentTheme:      defaultTheme,
+		styles:            styles,
+		pluginIntegration: pluginIntegration,
+		pluginCommands:    []string{},
 		pluginSuggestions: []string{},
 	}
 	
@@ -68,27 +75,50 @@ func NewClaudeTUI() *ClaudeTUI {
 func (m *ClaudeTUI) initializePluginIntegration() {
 	// Initialize the integrated plugin commands
 	m.updatePluginCommands()
+	
+	// Add plugin status to output on startup
+	if m.pluginIntegration != nil {
+		pluginStatus := m.pluginIntegration.RenderPluginStatus()
+		if pluginStatus != "" {
+			m.addOutput(pluginStatus)
+			m.addOutput("")
+		}
+	}
 }
 
 // updatePluginCommands refreshes the list of available plugin commands
 func (m *ClaudeTUI) updatePluginCommands() {
-	// This would query the plugin manager for available commands
-	// For now, add the built-in plugin commands we created
-	m.pluginCommands = []string{
-		"system-info", "system-info health", "system-info status", "system-info cpu",
-		"system-info memory", "system-info disk", "system-info processes", "system-info monitor",
-		"package-monitor", "package-monitor list", "package-monitor updates", "package-monitor security",
-		"package-monitor analyze", "package-monitor orphans", "package-monitor stats",
+	// Get plugin commands from plugin integration
+	if m.pluginIntegration != nil {
+		pluginCommands := m.pluginIntegration.GetAvailablePluginCommands()
+		
+		// Convert to string format for suggestions
+		for _, cmd := range pluginCommands {
+			m.pluginCommands = append(m.pluginCommands, cmd.Name)
+			
+			// Add examples if available
+			for _, example := range cmd.Examples {
+				m.pluginSuggestions = append(m.pluginSuggestions, example)
+			}
+		}
+	} else {
+		// Fallback to built-in plugin commands
+		m.pluginCommands = []string{
+			"system-info", "system-info health", "system-info status", "system-info cpu",
+			"system-info memory", "system-info disk", "system-info processes", "system-info monitor",
+			"package-monitor", "package-monitor list", "package-monitor updates", "package-monitor security",
+			"package-monitor analyze", "package-monitor orphans", "package-monitor stats",
+		}
+		
+		// Add plugin suggestions to the main suggestions list
+		m.pluginSuggestions = append(m.pluginCommands,
+			// Add example usage
+			"system-info health --json",
+			"system-info monitor --interval 3",
+			"package-monitor list --detailed",
+			"package-monitor updates --security",
+		)
 	}
-	
-	// Add plugin suggestions to the main suggestions list
-	m.pluginSuggestions = append(m.pluginCommands,
-		// Add example usage
-		"system-info health --json",
-		"system-info monitor --interval 3",
-		"package-monitor list --detailed",
-		"package-monitor updates --security",
-	)
 	
 	// Merge with main suggestions
 	allSuggestions := append(m.suggestions, m.pluginSuggestions...)
@@ -133,6 +163,12 @@ func getAllCommandSuggestions() []string {
 		
 		// Configuration management
 		"config", "completion", "tui",
+		
+		// Plugin management
+		"plugin list", "plugin search", "plugin install", "plugin uninstall",
+		"plugin enable", "plugin disable", "plugin status", "plugin info",
+		"plugin execute", "plugin discover", "plugin validate", "plugin metrics",
+		"plugin events", "plugin create",
 		
 		// Common command examples with options
 		"ask \"how to configure nginx?\"",
@@ -216,6 +252,12 @@ func getAllCommandSuggestions() []string {
 		"help web",
 		"help system-info",
 		"help package-monitor",
+		
+		// Plugin command examples
+		"plugin list",
+		"plugin search monitoring",
+		"plugin status system-info",
+		"plugin info package-monitor",
 	}
 }
 
@@ -319,6 +361,7 @@ type ThemeStyles struct {
 	accent      lipgloss.Style
 	logo        lipgloss.Style
 	versionInfo lipgloss.Style
+	info        lipgloss.Style
 }
 
 // createThemeStyles creates styled components from a theme
@@ -390,6 +433,10 @@ func createThemeStyles(theme Theme) ThemeStyles {
 			Italic(true).
 			Align(lipgloss.Right).
 			Padding(0, 1),
+			
+		info: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Secondary)).
+			Italic(true),
 	}
 }
 
@@ -723,6 +770,34 @@ func (m *ClaudeTUI) getValueSuggestions(command string, args []string, fullInput
 	return suggestions
 }
 
+// handlePluginCommand handles plugin-related commands
+func (m *ClaudeTUI) handlePluginCommand(input string) {
+	timestamp := time.Now().Format("15:04:05")
+	m.addOutput(fmt.Sprintf("[%s] %s", 
+		m.styles.timestamp.Render(timestamp),
+		m.styles.prompt.Render("$ nixai "+input)))
+	
+	// For now, we'll just show a message that plugin commands are handled
+	// In a real implementation, this would interact with the plugin system
+	if m.pluginIntegration != nil {
+		pluginStatus := m.pluginIntegration.RenderPluginStatus()
+		if pluginStatus != "" {
+			lines := strings.Split(pluginStatus, "\n")
+			for _, line := range lines {
+				if strings.TrimSpace(line) != "" {
+					m.addOutput(line)
+				}
+			}
+		} else {
+			m.addOutput(m.styles.info.Render("Plugin system is available but no plugins are currently loaded."))
+		}
+	} else {
+		m.addOutput(m.styles.info.Render("Plugin system is not available in this build."))
+	}
+	
+	m.addOutput("") // Add empty line for separation
+}
+
 // executeCommand executes the given nixai command
 func (m *ClaudeTUI) executeCommand(input string) {
 	timestamp := time.Now().Format("15:04:05")
@@ -744,6 +819,9 @@ func (m *ClaudeTUI) executeCommand(input string) {
 		return
 	case strings.HasPrefix(input, "theme"):
 		m.handleThemeCommand(input)
+		return
+	case input == "plugins" || strings.HasPrefix(input, "plugin "):
+		m.handlePluginCommand(input)
 		return
 	case input == "exit" || input == "quit":
 		m.addOutput("Goodbye!")
@@ -820,6 +898,7 @@ func (m *ClaudeTUI) showHelp() {
 	m.addOutput("  history - Show command history")
 	m.addOutput("  exit/quit - Exit nixai")
 	m.addOutput("  theme [name] - Change theme")
+	m.addOutput("  plugins - Show plugin status")
 	m.addOutput("")
 	m.addOutput(m.styles.prompt.Render("Navigation & Completion:"))
 	m.addOutput("  ↑/↓ - Navigate history and suggestions")
@@ -844,6 +923,15 @@ func (m *ClaudeTUI) showHelp() {
 		}
 	}
 	m.addOutput("")
+	
+	// Add plugin information if available
+	if m.pluginIntegration != nil {
+		m.addOutput(m.styles.accent.Render("Plugin Information:"))
+		m.addOutput("  The nixai plugin system allows extending functionality with custom commands.")
+		m.addOutput("  Use 'plugins' command to see currently loaded plugins.")
+		m.addOutput("  Built-in plugins include system-info and package-monitor for enhanced functionality.")
+		m.addOutput("")
+	}
 }
 
 // showHistory displays command history
