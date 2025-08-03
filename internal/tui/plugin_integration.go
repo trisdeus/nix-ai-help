@@ -31,7 +31,7 @@ type PluginIntegration struct {
 // NewPluginIntegration creates a new plugin integration handler
 func NewPluginIntegration(logger *logger.Logger) *PluginIntegration {
 	// In a real implementation, these would be properly initialized
-	// For now, we'll create instances to demonstrate the integration
+	// For now, we'll create mock instances to demonstrate the integration
 	return &PluginIntegration{
 		logger: logger,
 	}
@@ -45,7 +45,6 @@ func (pi *PluginIntegration) Initialize() error {
 	return nil
 }
 
-// GetAvailablePluginCommands returns all available plugin commands
 func (pi *PluginIntegration) GetAvailablePluginCommands() []Command {
 	var pluginCommands []Command
 	
@@ -68,12 +67,14 @@ func (pi *PluginIntegration) GetAvailablePluginCommands() []Command {
 				Description: fmt.Sprintf("Subcommand for %s", plugin.Name),
 				Category:    "Plugin Commands",
 				Usage:       fmt.Sprintf("nixai %s %s [options]", plugin.Name, subcmd),
-				Examples:    []string{fmt.Sprintf("nixai %s %s", plugin.Name, subcmd)},
+				Examples: []string{
+					fmt.Sprintf("nixai %s %s", plugin.Name, subcmd),
+				},
 			})
 		}
 	}
 	
-	// Get external plugins if manager is available
+	// Get external plugins if integration is available
 	if pi.integration != nil {
 		plugins := pi.integration.ListPlugins()
 		for _, plugin := range plugins {
@@ -165,7 +166,7 @@ func (pi *PluginIntegration) GetPluginSuggestions(query string) []CommandSuggest
 	
 	// Return top 5 suggestions
 	if len(suggestions) > 5 {
-			suggestions = suggestions[:5]
+		suggestions = suggestions[:5]
 	}
 	
 	return suggestions
@@ -181,23 +182,23 @@ func (pi *PluginIntegration) calculatePluginRelevance(query string, cmd Command)
 	
 	// Direct name match gets highest score
 	if strings.Contains(query, cmdName) || strings.Contains(cmdName, query) {
-			score += 1.0
+		score += 1.0
 	}
 	
 	// Description match gets good score
 	queryWords := strings.Fields(query)
 	for _, word := range queryWords {
 		if strings.Contains(cmdDesc, word) {
-				score += 0.3
+			score += 0.3
 		}
 		if strings.Contains(cmdName, word) {
-				score += 0.5
+			score += 0.5
 		}
 	}
 	
 	// Plugin-specific scoring
 	if strings.Contains(cmd.Category, "Plugin") {
-			score += 0.2
+		score += 0.2
 	}
 	
 	return score
@@ -280,9 +281,9 @@ func (pi *PluginIntegration) RenderPluginStatus() string {
 		}
 	}
 	
-	// External plugins (if manager is available)
-	if pi.manager != nil {
-		plugins := pi.manager.ListPlugins()
+	// External plugins (if integration is available)
+	if pi.integration != nil {
+		plugins := pi.integration.ListPlugins()
 		if len(plugins) > 0 {
 			sections = append(sections, "")
 			sections = append(sections, headerStyle.Render("📦 External Plugins"))

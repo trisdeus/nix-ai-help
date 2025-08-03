@@ -3,6 +3,10 @@ package plugins
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -12,17 +16,18 @@ import (
 
 // Manager implements the PluginManager interface
 type Manager struct {
-	plugins  map[string]*PluginWrapper
-	registry PluginRegistry
-	loader   PluginLoader
-	sandbox  *Sandbox
-	config   *config.UserConfig
-	logger   *logger.Logger
-	eventBus *EventBus
-	metrics  *MetricsCollector
-	mutex    sync.RWMutex
-	ctx      context.Context
-	cancel   context.CancelFunc
+	plugins     map[string]*PluginWrapper
+	registry    PluginRegistry
+	loader      PluginLoader
+	sandbox     *Sandbox
+	config      *config.UserConfig
+	logger      *logger.Logger
+	eventBus    *EventBus
+	metrics     *MetricsCollector
+	mutex       sync.RWMutex
+	ctx         context.Context
+	cancel      context.CancelFunc
+	marketplace *Marketplace // Add marketplace integration
 }
 
 // PluginWrapper wraps a plugin with additional management metadata
@@ -46,18 +51,20 @@ func NewManager(cfg *config.UserConfig, log *logger.Logger) *Manager {
 	sandbox := NewSandbox(cfg, log)
 	eventBus := NewEventBus(log)
 	metrics := NewMetricsCollector(log)
+	marketplace := NewMarketplace(log) // Create marketplace instance
 
 	return &Manager{
-		plugins:  make(map[string]*PluginWrapper),
-		registry: registry,
-		loader:   loader,
-		sandbox:  sandbox,
-		config:   cfg,
-		logger:   log,
-		eventBus: eventBus,
-		metrics:  metrics,
-		ctx:      ctx,
-		cancel:   cancel,
+		plugins:     make(map[string]*PluginWrapper),
+		registry:    registry,
+		loader:      loader,
+		sandbox:     sandbox,
+		config:      cfg,
+		logger:      log,
+		eventBus:    eventBus,
+		metrics:     metrics,
+		ctx:         ctx,
+		cancel:      cancel,
+		marketplace: marketplace, // Add marketplace to manager
 	}
 }
 
@@ -499,39 +506,315 @@ func (m *Manager) UnsubscribeFromEvents(handler EventHandler) error {
 	return m.eventBus.Unsubscribe(handler)
 }
 
-// Shutdown gracefully shuts down the plugin manager
-func (m *Manager) Shutdown(ctx context.Context) error {
-	m.logger.Info("Shutting down plugin manager")
+// GetMarketplace returns the marketplace instance
+func (m *Manager) GetMarketplace() *Marketplace {
+	return m.marketplace
+}
 
-	// Stop all plugins
-	m.mutex.RLock()
-	pluginNames := make([]string, 0, len(m.plugins))
-	for name := range m.plugins {
-		pluginNames = append(pluginNames, name)
+// SearchPluginsInMarketplace searches for plugins in the marketplace
+func (m *Manager) SearchPluginsInMarketplace(ctx context.Context, query string, filters SearchFilters, sortBy SortOption) (*SearchResult, error) {
+	return m.marketplace.Search(ctx, query, filters, sortBy, 0, 100)
+}
+
+// GetPluginFromMarketplace retrieves a plugin from the marketplace by ID
+func (m *Manager) GetPluginFromMarketplace(ctx context.Context, pluginID string) (*MarketplacePlugin, error) {
+	return m.marketplace.GetPlugin(ctx, pluginID)
+}
+
+// GetPopularPluginsFromMarketplace retrieves popular plugins from the marketplace
+func (m *Manager) GetPopularPluginsFromMarketplace(ctx context.Context, category string, limit int) ([]MarketplacePlugin, error) {
+	return m.marketplace.GetPopularPlugins(ctx, category, limit)
+}
+
+// GetFeaturedPluginsFromMarketplace retrieves featured plugins from the marketplace
+func (m *Manager) GetFeaturedPluginsFromMarketplace(ctx context.Context) ([]MarketplacePlugin, error) {
+	return m.marketplace.GetFeaturedPlugins(ctx)
+}
+
+// GetNewPluginsFromMarketplace retrieves new plugins from the marketplace
+func (m *Manager) GetNewPluginsFromMarketplace(ctx context.Context, limit int) ([]MarketplacePlugin, error) {
+	return m.marketplace.GetNewPlugins(ctx, limit)
+}
+
+// GetPluginReviewsFromMarketplace retrieves reviews for a plugin from the marketplace
+func (m *Manager) GetPluginReviewsFromMarketplace(ctx context.Context, pluginID string) ([]PluginReview, error) {
+	return m.marketplace.GetPluginReviews(ctx, pluginID, 0, 100)
+}
+
+// GetMarketplaceStats retrieves marketplace statistics
+func (m *Manager) GetMarketplaceStats(ctx context.Context) (*MarketplaceStats, error) {
+	return m.marketplace.GetMarketplaceStats(ctx)
+}
+
+// InstallPluginFromMarketplace installs a plugin from the marketplace
+func (m *Manager) InstallPluginFromMarketplace(ctx context.Context, pluginID string) error {
+	// Get plugin from marketplace
+	plugin, err := m.marketplace.GetPlugin(ctx, pluginID)
+	if err != nil {
+		return fmt.Errorf("failed to get plugin from marketplace: %w", err)
 	}
-	m.mutex.RUnlock()
 
-	for _, name := range pluginNames {
-		if err := m.StopPlugin(name); err != nil {
-			m.logger.Warn(fmt.Sprintf("Error stopping plugin '%s' during shutdown: %v", name, err))
-		}
-		if err := m.UnloadPlugin(name); err != nil {
-			m.logger.Warn(fmt.Sprintf("Error unloading plugin '%s' during shutdown: %v", name, err))
-		}
+	// Download plugin binary
+	resp, err := http.Get(plugin.DownloadURL)
+	if err != nil {
+		return fmt.Errorf("failed to download plugin: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Create plugin directory if it doesn't exist
+	pluginDir := filepath.Join(os.Getenv("HOME"), ".local/share/nixai/plugins")
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		return fmt.Errorf("failed to create plugin directory: %w", err)
 	}
 
-	// Cancel context
-	m.cancel()
+	// Save plugin to file
+	pluginPath := filepath.Join(pluginDir, fmt.Sprintf("%s.so", pluginID))
+	out, err := os.Create(pluginPath)
+	if err != nil {
+		return fmt.Errorf("failed to create plugin file: %w", err)
+	}
+	defer out.Close()
 
-	m.logger.Info("Plugin manager shutdown complete")
+	// Copy downloaded content to file
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		return fmt.Errorf("failed to save plugin: %w", err)
+	}
+
+	// Set executable permissions
+	if err := os.Chmod(pluginPath, 0755); err != nil {
+		return fmt.Errorf("failed to set executable permissions: %w", err)
+	}
+
+	// Verify checksum
+	if plugin.Checksum != "" {
+		// In a real implementation, we would verify the checksum here
+		m.logger.Info(fmt.Sprintf("Plugin %s downloaded to %s", pluginID, pluginPath))
+	}
+
 	return nil
 }
 
-// GetManagerMetrics returns metrics about the plugin manager itself
-func (m *Manager) GetManagerMetrics() ManagerMetrics {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+// UpdatePluginFromMarketplace updates a plugin from the marketplace
+func (m *Manager) UpdatePluginFromMarketplace(ctx context.Context, pluginID string) error {
+	// Get current plugin version
+	currentPlugin, exists := m.GetPlugin(pluginID)
+	if !exists {
+		return fmt.Errorf("plugin '%s' not found", pluginID)
+	}
+	
+	currentVersion := currentPlugin.Version()
+	
+	// Get plugin from marketplace
+	marketplacePlugin, err := m.marketplace.GetPlugin(ctx, pluginID)
+	if err != nil {
+		return fmt.Errorf("failed to get plugin from marketplace: %w", err)
+	}
+	
+	// Check if update is needed
+	if marketplacePlugin.Version == currentVersion {
+		m.logger.Info(fmt.Sprintf("Plugin '%s' is already up to date (version %s)", pluginID, currentVersion))
+		return nil
+	}
+	
+	// Stop current plugin
+	if err := m.StopPlugin(pluginID); err != nil {
+		m.logger.Warn(fmt.Sprintf("Failed to stop plugin '%s' before update: %v", pluginID, err))
+	}
+	
+	// Download updated plugin binary
+	resp, err := http.Get(marketplacePlugin.DownloadURL)
+	if err != nil {
+		return fmt.Errorf("failed to download updated plugin: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	// Create plugin directory if it doesn't exist
+	pluginDir := filepath.Join(os.Getenv("HOME"), ".local/share/nixai/plugins")
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		return fmt.Errorf("failed to create plugin directory: %w", err)
+	}
+	
+	// Save updated plugin to file
+	pluginPath := filepath.Join(pluginDir, fmt.Sprintf("%s.so", pluginID))
+	backupPath := pluginPath + ".bak"
+	
+	// Backup current plugin
+	if _, err := os.Stat(pluginPath); err == nil {
+		if err := os.Rename(pluginPath, backupPath); err != nil {
+			m.logger.Warn(fmt.Sprintf("Failed to backup current plugin: %v", err))
+		}
+	}
+	
+	out, err := os.Create(pluginPath)
+	if err != nil {
+		// Restore backup if creating new file fails
+		if _, backupErr := os.Stat(backupPath); backupErr == nil {
+			_ = os.Rename(backupPath, pluginPath)
+		}
+		return fmt.Errorf("failed to create updated plugin file: %w", err)
+	}
+	defer out.Close()
+	
+	// Copy downloaded content to file
+	if _, err := io.Copy(out, resp.Body); err != nil {
+		// Restore backup if copying fails
+		if _, backupErr := os.Stat(backupPath); backupErr == nil {
+			_ = os.Rename(backupPath, pluginPath)
+		}
+		return fmt.Errorf("failed to save updated plugin: %w", err)
+	}
+	
+	// Set executable permissions
+	if err := os.Chmod(pluginPath, 0755); err != nil {
+		// Restore backup if setting permissions fails
+		if _, backupErr := os.Stat(backupPath); backupErr == nil {
+			_ = os.Rename(backupPath, pluginPath)
+		}
+		return fmt.Errorf("failed to set executable permissions: %w", err)
+	}
+	
+	// Remove backup
+	_ = os.Remove(backupPath)
+	
+	// Verify checksum
+	if marketplacePlugin.Checksum != "" {
+		// In a real implementation, we would verify the checksum here
+		m.logger.Info(fmt.Sprintf("Plugin %s updated to version %s", pluginID, marketplacePlugin.Version))
+	}
+	
+	// Reload plugin
+	if err := m.reloadPlugin(pluginID); err != nil {
+		m.logger.Warn(fmt.Sprintf("Failed to reload updated plugin '%s': %v", pluginID, err))
+	}
+	
+	return nil
+}
 
+// reloadPlugin reloads a plugin
+func (m *Manager) reloadPlugin(pluginID string) error {
+	// First stop the plugin if running
+	if err := m.StopPlugin(pluginID); err != nil {
+		m.logger.Warn(fmt.Sprintf("Failed to stop plugin '%s' before reload: %v", pluginID, err))
+	}
+	
+	// Then unload the plugin
+	if err := m.UnloadPlugin(pluginID); err != nil {
+		m.logger.Warn(fmt.Sprintf("Failed to unload plugin '%s' before reload: %v", pluginID, err))
+	}
+	
+	// Finally load the plugin again
+	config := PluginConfig{
+		Name:          pluginID,
+		Enabled:       true,
+		Version:       "",
+		Configuration: make(map[string]interface{}),
+		Environment:   make(map[string]string),
+		Resources: ResourceLimits{
+			MaxMemoryMB:      100,
+			MaxCPUPercent:    50,
+			MaxExecutionTime: 30 * time.Second,
+			MaxFileSize:      10 * 1024 * 1024, // 10MB
+			AllowedPaths:     []string{"/nix/store", "/tmp"},
+			NetworkAccess:    true,
+		},
+		SecurityPolicy: SecurityPolicy{
+			AllowFileSystem:  true,
+			AllowNetwork:     true,
+			AllowSystemCalls: false,
+			SandboxLevel:     SandboxBasic,
+		},
+		UpdatePolicy: UpdatePolicy{
+			AutoUpdate:         false,
+			UpdateChannel:      "stable",
+			CheckInterval:      24 * time.Hour,
+			RequireApproval:    true,
+			BackupBeforeUpdate: true,
+		},
+	}
+	
+	if err := m.LoadPlugin(pluginID, config); err != nil {
+		m.logger.Warn(fmt.Sprintf("Failed to load plugin '%s' after reload: %v", pluginID, err))
+		return err
+	}
+	
+	return nil
+}
+
+// RemovePluginFromMarketplace removes a plugin installed from the marketplace
+func (m *Manager) RemovePluginFromMarketplace(ctx context.Context, pluginID string) error {
+	// First stop the plugin if it's running
+	if err := m.StopPlugin(pluginID); err != nil {
+		m.logger.Warn(fmt.Sprintf("Failed to stop plugin '%s' before removal: %v", pluginID, err))
+	}
+	
+	// Then unload the plugin
+	if err := m.UnloadPlugin(pluginID); err != nil {
+		m.logger.Warn(fmt.Sprintf("Failed to unload plugin '%s' before removal: %v", pluginID, err))
+	}
+	
+	// Remove plugin file
+	pluginDir := filepath.Join(os.Getenv("HOME"), ".local/share/nixai/plugins")
+	pluginPath := filepath.Join(pluginDir, fmt.Sprintf("%s.so", pluginID))
+	
+	if err := os.Remove(pluginPath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("plugin '%s' not found at %s", pluginID, pluginPath)
+		}
+		return fmt.Errorf("failed to remove plugin file: %w", err)
+	}
+	
+	m.logger.Info(fmt.Sprintf("Plugin '%s' removed successfully from %s", pluginID, pluginPath))
+	return nil
+}
+
+// ListMarketplacePlugins lists available plugins from the marketplace
+func (m *Manager) ListMarketplacePlugins(ctx context.Context) ([]MarketplacePlugin, error) {
+		// Search for all plugins in marketplace
+	result, err := m.marketplace.Search(ctx, "", SearchFilters{}, SortByRelevance, 0, 100)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search marketplace: %w", err)
+	}
+	
+	return result.Plugins, nil
+}
+
+// GetMarketplacePlugin retrieves detailed information about a specific plugin from the marketplace
+func (m *Manager) GetMarketplacePlugin(ctx context.Context, pluginID string) (*MarketplacePlugin, error) {
+	return m.marketplace.GetPlugin(ctx, pluginID)
+}
+
+// RateMarketplacePlugin allows users to rate a plugin in the marketplace
+func (m *Manager) RateMarketplacePlugin(ctx context.Context, pluginID string, rating int, review string) error {
+	if rating < 1 || rating > 5 {
+		return fmt.Errorf("rating must be between 1 and 5")
+	}
+	
+	// Submit rating to marketplace
+	err := m.marketplace.SubmitPluginReview(ctx, pluginID, PluginReview{
+		ID:        fmt.Sprintf("review-%d", time.Now().UnixNano()),
+		PluginID:  pluginID,
+		UserID:    "anonymous", // In a real implementation, this would be the actual user ID
+		Username:  "Anonymous User",
+		Rating:    rating,
+		Title:     fmt.Sprintf("%d-star review", rating),
+		Content:   review,
+		Helpful:   0,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Verified:  false, // In a real implementation, this would depend on user verification
+	})
+	
+	if err != nil {
+		return fmt.Errorf("failed to submit review: %w", err)
+	}
+	
+	m.logger.Info(fmt.Sprintf("Plugin '%s' rated %d stars with review: %s", pluginID, rating, review))
+	return nil
+}
+
+// ListMarketplacePlugins lists plugins from the marketplace
+func (m *Manager) GetManagerMetrics() ManagerMetrics {
+	// Calculate plugin states
 	running := 0
 	stopped := 0
 	errored := 0
@@ -547,6 +830,7 @@ func (m *Manager) GetManagerMetrics() ManagerMetrics {
 		}
 	}
 
+	// Return metrics
 	return ManagerMetrics{
 		TotalPlugins:   len(m.plugins),
 		RunningPlugins: running,

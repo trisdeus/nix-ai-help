@@ -217,8 +217,16 @@ type NixOSContext struct {
 	ConfigurationNix  string `yaml:"configuration_nix" json:"configuration_nix"`
 	HardwareConfigNix string `yaml:"hardware_config_nix" json:"hardware_config_nix"`
 
+	// System Information (newly added)
+	HardwareInfo     *HardwareInfo     `yaml:"hardware_info,omitempty" json:"hardware_info,omitempty"`
+	NetworkInfo      *NetworkInfo      `yaml:"network_info,omitempty" json:"network_info,omitempty"`
+	SecurityInfo     *SecurityInfo     `yaml:"security_info,omitempty" json:"security_info,omitempty"`
+	PerformanceInfo  *PerformanceInfo  `yaml:"performance_info,omitempty" json:"performance_info,omitempty"`
+	UserEnvironment  *UserEnvironment  `yaml:"user_environment,omitempty" json:"user_environment,omitempty"`
+
 	// Cache Information
 	LastDetected    time.Time `yaml:"last_detected" json:"last_detected"`
+	CacheExpires    time.Time `yaml:"cache_expires" json:"cache_expires"`
 	CacheValid      bool      `yaml:"cache_valid" json:"cache_valid"`
 	DetectionErrors []string  `yaml:"detection_errors,omitempty" json:"detection_errors,omitempty"`
 }

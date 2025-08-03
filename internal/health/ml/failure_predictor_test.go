@@ -5,8 +5,6 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"nix-ai-help/internal/health"
 )
 
 func TestNewFailurePredictionModel(t *testing.T) {

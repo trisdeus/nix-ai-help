@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"nix-ai-help/internal/config"
-	"nix-ai-help/pkg/logger"
 )
 
 func TestNewSystemHealthPredictor(t *testing.T) {

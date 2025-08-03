@@ -8,9 +8,9 @@
 
 **nixai: Revolutionary AI-powered NixOS management platform with 40+ specialized commands — run instantly with nix run, leverage 7 AI providers, manage multi-machine fleets, and master NixOS with intelligent agents, modern web interface, and comprehensive plugin ecosystem.**
 
-## 🆕 Latest Updates (July 2025)
+## 🆕 Latest Updates (August 2025)
 
-### 🚀 **v2.0.8: Enterprise Fleet Intelligence Platform** - **COMPLETED July 4, 2025**
+### 🚀 **v1.1.0: Enterprise Fleet Intelligence Platform** - **COMPLETED August 3, 2025**
 
 - **🏢 Enterprise Fleet Intelligence**: Advanced analytics, intelligent canary deployments, automated compliance (SOC2, HIPAA, PCI-DSS, ISO 27001), and cost optimization
 - **🛡️ Intelligent Canary Deployments**: AI-powered deployment decisions with statistical analysis, automated rollback triggers, and progressive traffic routing
@@ -1570,5 +1570,31 @@ nixai ask "How can nixai help me with my NixOS goals?"
 # Or try without installing first:
 # nix run github:olafkfreund/nix-ai-help -- ask "How can nixai help me?"
 ```
+
+## 🤖 Advanced AI Integration
+
+nixai now features advanced AI integration with enhanced capabilities:
+
+### 🧠 Chain-of-Thought Reasoning
+The AI shows its step-by-step reasoning process, making its decision-making transparent to users. This helps build trust and understanding of how the AI arrives at its conclusions.
+
+### 🔁 Self-Correction
+The AI reviews its own responses for accuracy, clarity, and completeness, automatically correcting any issues it identifies before presenting the final output to the user.
+
+### 📋 Multi-Step Task Planning
+For complex tasks, the AI breaks them down into smaller, actionable steps with clear prerequisites and dependencies. This makes it easier for users to follow along and implement solutions.
+
+### 📊 Confidence Scoring
+Each AI response includes a confidence score that helps users understand how reliable the information is. The score is based on multiple factors including technical accuracy, completeness, and relevance.
+
+### 🔄 Real Plugin System Integration
+nixai now supports dynamically loadable plugins that extend functionality with custom commands and capabilities. The plugin system includes:
+- Plugin discovery and loading from standard directories
+- Plugin validation and security checks
+- Plugin lifecycle management (install, uninstall, enable, disable)
+- Plugin marketplace integration for community plugins
+- Plugin templates for easy development
+
+The enhanced AI integration makes nixai more intelligent and user-friendly, leading to more accurate and personalized assistance for NixOS users.
 
 *nixai transforms NixOS from a complex system into an intelligent, approachable platform that grows with your expertise and supports your unique requirements.*

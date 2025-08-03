@@ -822,7 +822,7 @@ func outputSummaryReport(report *analytics.FleetAnalyticsReport) error {
 	fmt.Printf("Fleet Analytics Summary\n")
 	fmt.Printf("======================\n\n")
 	fmt.Printf("Generated: %s\n", report.GeneratedAt.Format(time.RFC3339))
-	fmt.Printf("Fleet: %s\n\n", report.FleetOverview.TotalMachines)
+	fmt.Printf("Fleet: %d\n\n", report.FleetOverview.TotalMachines)
 
 	fmt.Printf("Fleet Overview:\n")
 	fmt.Printf("  Total Machines: %d\n", report.FleetOverview.TotalMachines)

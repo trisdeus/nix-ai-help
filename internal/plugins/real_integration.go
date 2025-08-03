@@ -5,47 +5,42 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/logger"
 )
 
-// RealPluginIntegration handles real plugin integration with the system
+// RealPluginIntegration implements the actual plugin integration with the system
 type RealPluginIntegration struct {
-	manager    PluginManager
-	registry   PluginRegistry
-	loader     PluginLoader
-	discovery  *PluginDiscovery
-	config     *config.UserConfig
-	logger     *logger.Logger
-	pluginPath string
+	manager     PluginManager
+	registry    PluginRegistry
+	loader      PluginLoader
+	discovery   *PluginDiscovery
+	config      *config.UserConfig
+	logger      *logger.Logger
+	pluginPath  string
+	initialized bool
+	mutex       sync.RWMutex
 }
 
 // NewRealPluginIntegration creates a new real plugin integration handler
 func NewRealPluginIntegration(cfg *config.UserConfig, log *logger.Logger) *RealPluginIntegration {
-	// Initialize the real plugin components
-	manager := NewManager(cfg, log)
-	registry := NewRegistry(log)
-	loader := NewLoader(log)
-	discovery := NewPluginDiscovery(log)
-	
 	// Determine plugin path
 	pluginPath := filepath.Join(os.Getenv("HOME"), ".nixai", "plugins")
 	if cfg.Plugin.Directory != "" {
 		pluginPath = cfg.Plugin.Directory
 	}
-	
+
 	// Ensure plugin directory exists
 	if err := os.MkdirAll(pluginPath, 0755); err != nil {
 		log.Warn(fmt.Sprintf("Failed to create plugin directory: %v", err))
 	}
-	
+
 	return &RealPluginIntegration{
-		manager:    manager,
-		registry:   registry,
-		loader:     loader,
-		discovery:  discovery,
 		config:     cfg,
 		logger:     log,
 		pluginPath: pluginPath,
@@ -54,29 +49,47 @@ func NewRealPluginIntegration(cfg *config.UserConfig, log *logger.Logger) *RealP
 
 // Initialize sets up the real plugin system
 func (rpi *RealPluginIntegration) Initialize(ctx context.Context) error {
+	rpi.mutex.Lock()
+	defer rpi.mutex.Unlock()
+
+	if rpi.initialized {
+		return nil
+	}
+
 	rpi.logger.Info("Initializing real plugin system")
-	
+
+	// Initialize plugin components
+	manager := NewManager(rpi.config, rpi.logger)
+	registry := NewRegistry(rpi.logger)
+	loader := NewLoader(rpi.logger)
+	discovery := NewPluginDiscovery(rpi.logger)
+
+	rpi.manager = manager
+	rpi.registry = registry
+	rpi.loader = loader
+	rpi.discovery = discovery
+
 	// Discover plugins in standard directories
 	pluginDirs := rpi.discovery.GetPluginDirectories()
-	
 	rpi.logger.Info(fmt.Sprintf("Searching for plugins in directories: %v", pluginDirs))
-	
+
 	// Discover and load plugins
 	plugins, err := rpi.discovery.DiscoverPlugins(pluginDirs)
 	if err != nil {
 		rpi.logger.Warn(fmt.Sprintf("Plugin discovery failed: %v", err))
 		return err
 	}
-	
+
 	rpi.logger.Info(fmt.Sprintf("Discovered %d plugins", len(plugins)))
-	
+
 	// Load discovered plugins
 	for _, pluginPath := range plugins {
 		if err := rpi.loadPlugin(pluginPath); err != nil {
 			rpi.logger.Warn(fmt.Sprintf("Failed to load plugin %s: %v", pluginPath, err))
 		}
 	}
-	
+
+	rpi.initialized = true
 	rpi.logger.Info("Real plugin system initialized")
 	return nil
 }
@@ -84,15 +97,15 @@ func (rpi *RealPluginIntegration) Initialize(ctx context.Context) error {
 // loadPlugin loads a plugin from a path
 func (rpi *RealPluginIntegration) loadPlugin(pluginPath string) error {
 	rpi.logger.Info(fmt.Sprintf("Loading plugin from: %s", pluginPath))
-	
+
 	// Validate plugin first
 	if err := rpi.loader.ValidatePlugin(pluginPath); err != nil {
 		return fmt.Errorf("plugin validation failed: %w", err)
 	}
-	
+
 	// Extract plugin name from path
 	pluginName := strings.TrimSuffix(filepath.Base(pluginPath), filepath.Ext(pluginPath))
-	
+
 	// Create plugin config
 	config := PluginConfig{
 		Name:          pluginName,
@@ -103,7 +116,9 @@ func (rpi *RealPluginIntegration) loadPlugin(pluginPath string) error {
 		Resources: ResourceLimits{
 			MaxMemoryMB:      100,
 			MaxCPUPercent:    50,
-			MaxExecutionTime: 30 * 1000000000, // 30 seconds in nanoseconds
+			MaxExecutionTime: 30 * time.Second,
+			MaxFileSize:      10 * 1024 * 1024, // 10MB
+			AllowedPaths:     []string{"/nix/store", "/tmp"},
 			NetworkAccess:    true,
 		},
 		SecurityPolicy: SecurityPolicy{
@@ -112,70 +127,99 @@ func (rpi *RealPluginIntegration) loadPlugin(pluginPath string) error {
 			AllowSystemCalls: false,
 			SandboxLevel:     SandboxBasic,
 		},
+		UpdatePolicy: UpdatePolicy{
+			AutoUpdate:         false,
+			UpdateChannel:      "stable",
+			CheckInterval:      24 * time.Hour,
+			RequireApproval:    true,
+			BackupBeforeUpdate: true,
+		},
 	}
-	
+
 	// Load the plugin
-	plugin, err := rpi.loader.Load(pluginPath)
+	pluginInst, err := rpi.loader.Load(pluginPath)
 	if err != nil {
 		return fmt.Errorf("failed to load plugin: %w", err)
 	}
+
+	// Initialize plugin context
+	ctx := context.Background()
 	
 	// Initialize plugin
-	ctx := context.Background()
-	if err := plugin.Initialize(ctx, config); err != nil {
+	if err := pluginInst.Initialize(ctx, config); err != nil {
 		return fmt.Errorf("plugin initialization failed: %w", err)
 	}
-	
+
 	// Register plugin
-	if err := rpi.registry.Register(plugin); err != nil {
+	if err := rpi.registry.Register(pluginInst); err != nil {
 		return fmt.Errorf("plugin registration failed: %w", err)
 	}
+
+	// Start plugin context
+	ctx = context.Background()
 	
+	// Start plugin
+	if err := pluginInst.Start(ctx); err != nil {
+		rpi.logger.Warn(fmt.Sprintf("Failed to start plugin %s: %v", pluginName, err))
+	} else {
+		rpi.logger.Info(fmt.Sprintf("Plugin '%s' started successfully", pluginName))
+	}
+
 	rpi.logger.Info(fmt.Sprintf("Plugin '%s' loaded successfully", pluginName))
 	return nil
 }
 
 // ListPlugins returns a list of all loaded plugins
 func (rpi *RealPluginIntegration) ListPlugins() []PluginInterface {
-	if rpi.manager == nil {
+	rpi.mutex.RLock()
+	defer rpi.mutex.RUnlock()
+
+	if !rpi.initialized || rpi.manager == nil {
 		return []PluginInterface{}
 	}
-	
+
 	return rpi.manager.ListPlugins()
 }
 
 // GetPlugin returns a specific plugin by name
 func (rpi *RealPluginIntegration) GetPlugin(name string) (PluginInterface, bool) {
-	if rpi.manager == nil {
+	rpi.mutex.RLock()
+	defer rpi.mutex.RUnlock()
+
+	if !rpi.initialized || rpi.manager == nil {
 		return nil, false
 	}
-	
+
 	return rpi.manager.GetPlugin(name)
 }
 
 // InstallPlugin installs a plugin from a path
 func (rpi *RealPluginIntegration) InstallPlugin(pluginPath string) error {
-	if rpi.manager == nil {
+	rpi.mutex.Lock()
+	defer rpi.mutex.Unlock()
+
+	if !rpi.initialized || rpi.manager == nil {
 		return fmt.Errorf("plugin manager not initialized")
 	}
-	
+
 	// Copy plugin to plugin directory
 	destPath := filepath.Join(rpi.pluginPath, filepath.Base(pluginPath))
-	
+
 	// Read source file
 	srcData, err := os.ReadFile(pluginPath)
 	if err != nil {
 		return fmt.Errorf("failed to read source plugin: %w", err)
 	}
-	
+
 	// Write to destination
 	if err := os.WriteFile(destPath, srcData, 0755); err != nil {
 		return fmt.Errorf("failed to copy plugin: %w", err)
 	}
-	
-	// Load the installed plugin
+
+	// Create plugin config
+	pluginName := strings.TrimSuffix(filepath.Base(destPath), filepath.Ext(destPath))
 	config := PluginConfig{
-		Name:          strings.TrimSuffix(filepath.Base(destPath), filepath.Ext(destPath)),
+		Name:          pluginName,
 		Enabled:       true,
 		Version:       "unknown",
 		Configuration: make(map[string]interface{}),
@@ -183,7 +227,9 @@ func (rpi *RealPluginIntegration) InstallPlugin(pluginPath string) error {
 		Resources: ResourceLimits{
 			MaxMemoryMB:      100,
 			MaxCPUPercent:    50,
-			MaxExecutionTime: 30 * 1000000000,
+			MaxExecutionTime: 30 * time.Second,
+			MaxFileSize:      10 * 1024 * 1024, // 10MB
+			AllowedPaths:     []string{"/nix/store", "/tmp"},
 			NetworkAccess:    true,
 		},
 		SecurityPolicy: SecurityPolicy{
@@ -192,46 +238,74 @@ func (rpi *RealPluginIntegration) InstallPlugin(pluginPath string) error {
 			AllowSystemCalls: false,
 			SandboxLevel:     SandboxBasic,
 		},
+		UpdatePolicy: UpdatePolicy{
+			AutoUpdate:         false,
+			UpdateChannel:      "stable",
+			CheckInterval:      24 * time.Hour,
+			RequireApproval:    true,
+			BackupBeforeUpdate: true,
+		},
 	}
-	
+
+	// Load and register the installed plugin
 	return rpi.manager.LoadPlugin(destPath, config)
 }
 
 // UninstallPlugin uninstalls a plugin by name
 func (rpi *RealPluginIntegration) UninstallPlugin(name string) error {
-	if rpi.manager == nil {
+	rpi.mutex.Lock()
+	defer rpi.mutex.Unlock()
+
+	if !rpi.initialized || rpi.manager == nil {
 		return fmt.Errorf("plugin manager not initialized")
 	}
-	
-	return rpi.manager.UnloadPlugin(name)
+
+	// Unload the plugin first
+	if err := rpi.manager.UnloadPlugin(name); err != nil {
+		rpi.logger.Warn(fmt.Sprintf("Failed to unload plugin %s: %v", name, err))
+	}
+
+	// Remove plugin file
+	pluginPath := filepath.Join(rpi.pluginPath, name+".so")
+	if err := os.Remove(pluginPath); err != nil {
+		rpi.logger.Warn(fmt.Sprintf("Failed to remove plugin file %s: %v", pluginPath, err))
+		return err
+	}
+
+	rpi.logger.Info(fmt.Sprintf("Plugin '%s' uninstalled successfully", name))
+	return nil
 }
 
 // EnablePlugin enables a plugin
 func (rpi *RealPluginIntegration) EnablePlugin(name string) error {
-	if rpi.manager == nil {
+	rpi.mutex.Lock()
+	defer rpi.mutex.Unlock()
+
+	if !rpi.initialized || rpi.manager == nil {
 		return fmt.Errorf("plugin manager not initialized")
 	}
-	
-	// In our implementation, all loaded plugins are enabled by default
-	// Future enhancement could add explicit enable/disable functionality
-	rpi.logger.Info(fmt.Sprintf("Plugin '%s' enabled", name))
-	return nil
+
+	// In our implementation, we'll start the plugin to enable it
+	return rpi.manager.StartPlugin(name)
 }
 
 // DisablePlugin disables a plugin
 func (rpi *RealPluginIntegration) DisablePlugin(name string) error {
-	if rpi.manager == nil {
+	rpi.mutex.Lock()
+	defer rpi.mutex.Unlock()
+
+	if !rpi.initialized || rpi.manager == nil {
 		return fmt.Errorf("plugin manager not initialized")
 	}
-	
-	// In our implementation, we'll unload the plugin to disable it
-	return rpi.manager.UnloadPlugin(name)
+
+	// In our implementation, we'll stop the plugin to disable it
+	return rpi.manager.StopPlugin(name)
 }
 
 // GetPluginCommands returns all commands provided by plugins
 func (rpi *RealPluginIntegration) GetPluginCommands() []PluginCommand {
 	var commands []PluginCommand
-	
+
 	// Get integrated plugin commands (existing built-in commands)
 	integratedCommands := rpi.GetIntegratedCommands()
 	for _, cmd := range integratedCommands {
@@ -244,9 +318,9 @@ func (rpi *RealPluginIntegration) GetPluginCommands() []PluginCommand {
 			Examples:    cmd.Examples,
 		})
 	}
-	
+
 	// Get external plugin commands
-	if rpi.manager != nil {
+	if rpi.initialized && rpi.manager != nil {
 		plugins := rpi.manager.ListPlugins()
 		for _, plugin := range plugins {
 			operations := plugin.GetOperations()
@@ -264,7 +338,12 @@ func (rpi *RealPluginIntegration) GetPluginCommands() []PluginCommand {
 			}
 		}
 	}
-	
+
+	// Sort commands alphabetically
+	sort.Slice(commands, func(i, j int) bool {
+		return commands[i].Name < commands[j].Name
+	})
+
 	return commands
 }
 
@@ -312,4 +391,80 @@ func (rpi *RealPluginIntegration) GetIntegratedCommands() []IntegratedPluginInfo
 			},
 		},
 	}
+}
+
+// IsInitialized returns whether the plugin system is initialized
+func (rpi *RealPluginIntegration) IsInitialized() bool {
+	rpi.mutex.RLock()
+	defer rpi.mutex.RUnlock()
+	return rpi.initialized
+}
+
+// GetPluginStatus returns the status of a specific plugin
+func (rpi *RealPluginIntegration) GetPluginStatus(name string) (PluginStatus, error) {
+	rpi.mutex.RLock()
+	defer rpi.mutex.RUnlock()
+
+	if !rpi.initialized || rpi.manager == nil {
+		return PluginStatus{}, fmt.Errorf("plugin manager not initialized")
+	}
+
+	pluginInst, exists := rpi.manager.GetPlugin(name)
+	if !exists {
+		return PluginStatus{}, fmt.Errorf("plugin '%s' not found", name)
+	}
+
+	return pluginInst.GetStatus(), nil
+}
+
+// GetPluginHealth returns the health information of a specific plugin
+func (rpi *RealPluginIntegration) GetPluginHealth(name string) (PluginHealth, error) {
+	rpi.mutex.RLock()
+	defer rpi.mutex.RUnlock()
+
+	if !rpi.initialized || rpi.manager == nil {
+		return PluginHealth{}, fmt.Errorf("plugin manager not initialized")
+	}
+
+	pluginInst, exists := rpi.manager.GetPlugin(name)
+	if !exists {
+		return PluginHealth{}, fmt.Errorf("plugin '%s' not found", name)
+	}
+
+	return pluginInst.HealthCheck(context.Background()), nil
+}
+
+// GetPluginMetrics returns the metrics of a specific plugin
+func (rpi *RealPluginIntegration) GetPluginMetrics(name string) (PluginMetrics, error) {
+	rpi.mutex.RLock()
+	defer rpi.mutex.RUnlock()
+
+	if !rpi.initialized || rpi.manager == nil {
+		return PluginMetrics{}, fmt.Errorf("plugin manager not initialized")
+	}
+
+	pluginInst, exists := rpi.manager.GetPlugin(name)
+	if !exists {
+		return PluginMetrics{}, fmt.Errorf("plugin '%s' not found", name)
+	}
+
+	return pluginInst.GetMetrics(), nil
+}
+
+// ExecutePluginOperation executes an operation on a plugin
+func (rpi *RealPluginIntegration) ExecutePluginOperation(name, operation string, params map[string]interface{}) (interface{}, error) {
+	rpi.mutex.RLock()
+	defer rpi.mutex.RUnlock()
+
+	if !rpi.initialized || rpi.manager == nil {
+		return nil, fmt.Errorf("plugin manager not initialized")
+	}
+
+	pluginInst, exists := rpi.manager.GetPlugin(name)
+	if !exists {
+		return nil, fmt.Errorf("plugin '%s' not found", name)
+	}
+
+	ctx := context.Background()
+	return pluginInst.Execute(ctx, operation, params)
 }

@@ -277,28 +277,28 @@ func (m *Marketplace) GetNewPlugins(ctx context.Context, limit int) ([]Marketpla
 func (m *Marketplace) GetPluginReviews(ctx context.Context, pluginID string, page, pageSize int) ([]PluginReview, error) {
 	m.logger.Info(fmt.Sprintf("Fetching reviews for plugin: %s", pluginID))
 
-	// Mock reviews
+	// Generate mock reviews
 	reviews := []PluginReview{
 		{
 			ID:        "review-1",
 			PluginID:  pluginID,
-			UserID:    "user-1",
-			Username:  "nixos_user",
+			UserID:    "user-123",
+			Username:  "Alice",
 			Rating:    5,
-			Title:     "Excellent plugin!",
-			Content:   "This plugin has saved me so much time. Highly recommended!",
-			Helpful:   15,
-			CreatedAt: time.Now().AddDate(0, 0, -10),
-			UpdatedAt: time.Now().AddDate(0, 0, -10),
+			Title:     "Excellent plugin",
+			Content:   "This plugin works perfectly for my use case!",
+			Helpful:   8,
+			CreatedAt: time.Now().AddDate(0, 0, -5),
+			UpdatedAt: time.Now().AddDate(0, 0, -5),
 			Verified:  true,
 		},
 		{
 			ID:        "review-2",
 			PluginID:  pluginID,
-			UserID:    "user-2",
-			Username:  "developer123",
+			UserID:    "user-456",
+			Username:  "Bob",
 			Rating:    4,
-			Title:     "Great functionality",
+			Title:     "Good functionality",
 			Content:   "Works well for most use cases. Could use better documentation.",
 			Helpful:   8,
 			CreatedAt: time.Now().AddDate(0, 0, -20),
@@ -308,6 +308,18 @@ func (m *Marketplace) GetPluginReviews(ctx context.Context, pluginID string, pag
 	}
 
 	return reviews, nil
+}
+
+// SubmitPluginReview submits a review for a plugin
+func (m *Marketplace) SubmitPluginReview(ctx context.Context, pluginID string, review PluginReview) error {
+	m.logger.Info(fmt.Sprintf("Submitting review for plugin: %s", pluginID))
+	
+	// In a real implementation, this would submit the review to the marketplace
+	// For now, just log that the review was submitted
+	m.logger.Info(fmt.Sprintf("Review submitted for plugin %s: %s (Rating: %d)", 
+		pluginID, review.Title, review.Rating))
+	
+	return nil
 }
 
 // GetMarketplaceStats retrieves overall marketplace statistics

@@ -489,7 +489,7 @@ func (ce *ChaosEngineer) executeDiskFillAttack(ctx context.Context, envID string
 
 	// Create a large file to fill disk space
 	_, err := ce.envManager.ExecuteCommand(ctx, envID, []string{
-		"dd", "if=/dev/zero", "of=/tmp/chaos_fill", fmt.Sprintf("bs=1G", "count=%.0f", sizeGB),
+		"dd", "if=/dev/zero", "of=/tmp/chaos_fill", fmt.Sprintf("bs=1G count=%.0f", sizeGB),
 	})
 	return err
 }

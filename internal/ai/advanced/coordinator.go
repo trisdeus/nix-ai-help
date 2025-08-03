@@ -25,11 +25,11 @@ type AdvancedAIResponse struct {
 // AdvancedAICoordinator coordinates all advanced AI features
 type AdvancedAICoordinator struct {
 	provider         ai.Provider
+	logger           *logger.Logger
 	reasoner         *ChainOfThoughtReasoner
 	corrector        *SelfCorrector
 	planner          *TaskPlanner
 	scorer           *ConfidenceScorer
-	logger           *logger.Logger
 	enableReasoning  bool
 	enableCorrection bool
 	enablePlanning   bool
@@ -105,8 +105,8 @@ func (ac *AdvancedAICoordinator) ProcessQuery(ctx context.Context, task string) 
 		}
 	}
 	
-	// Create task plan if enabled and if the task seems complex
-	if ac.enablePlanning && ac.isComplexTask(task) {
+	// Return early if processing is disabled or task is too simple
+	if !ac.enablePlanning || !ac.IsComplexTask(task) {
 		ac.logger.Info("Creating task plan...")
 		taskPlan, err := ac.planner.CreateTaskPlan(ctx, task)
 		if err != nil {
@@ -133,8 +133,8 @@ func (ac *AdvancedAICoordinator) ProcessQuery(ctx context.Context, task string) 
 	return response, nil
 }
 
-// isComplexTask determines if a task is complex enough to warrant planning
-func (ac *AdvancedAICoordinator) isComplexTask(task string) bool {
+// IsComplexTask determines if a task is complex enough to warrant planning
+func (ac *AdvancedAICoordinator) IsComplexTask(task string) bool {
 	complexIndicators := []string{
 		"setup", "install", "configure", "deploy", "migrate", 
 		"multiple", "several", "many", "steps", "process",
@@ -150,6 +150,26 @@ func (ac *AdvancedAICoordinator) isComplexTask(task string) bool {
 	
 	// Also consider longer tasks as potentially more complex
 	return len(strings.Fields(task)) > 10
+}
+
+// EnableReasoning returns whether reasoning is enabled
+func (ac *AdvancedAICoordinator) EnableReasoning() bool {
+	return ac.enableReasoning
+}
+
+// EnableCorrection returns whether correction is enabled
+func (ac *AdvancedAICoordinator) EnableCorrection() bool {
+	return ac.enableCorrection
+}
+
+// EnablePlanning returns whether planning is enabled
+func (ac *AdvancedAICoordinator) EnablePlanning() bool {
+	return ac.enablePlanning
+}
+
+// EnableScoring returns whether scoring is enabled
+func (ac *AdvancedAICoordinator) EnableScoring() bool {
+	return ac.enableScoring
 }
 
 // FormatResponse formats an advanced AI response for display

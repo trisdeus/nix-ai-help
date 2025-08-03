@@ -18,15 +18,7 @@
     else if src != null
     then src
     else
-      fetchFromGitHub {
-        owner = "olafkfreund";
-        repo = "nix-ai-help";
-        rev =
-          if rev != null
-          then rev
-          else "main"; # Use main branch instead of tag for latest code
-        sha256 = lib.fakeSha256; # This will need to be updated with actual hash
-      };
+      ./.; # Use local source for development
 in
   buildGoModule rec {
     pname = "nixai";
@@ -72,6 +64,11 @@ in
       # Force remove vendor directory if it exists to avoid conflicts
       echo "Removing any vendor directories..."
       find . -name "vendor" -type d -exec rm -rf {} + 2>/dev/null || true
+      
+      # Ensure system_info.go is present
+      if [ ! -f ./internal/config/system_info.go ]; then
+        echo "Missing system_info.go file, this shouldn't happen in a complete source tree"
+      fi
 
       echo "=== Build Environment Ready ==="
     '';

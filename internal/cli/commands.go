@@ -3787,6 +3787,12 @@ func Execute() {
 		}
 	})
 	initializeCommands()
+	
+	// Initialize the enhanced plugin system
+	if err := InitializeEnhancedPluginSystem(); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to initialize enhanced plugin system: %v\n", err)
+	}
+	
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

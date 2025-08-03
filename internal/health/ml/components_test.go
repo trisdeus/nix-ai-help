@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"nix-ai-help/internal/health"
 	"nix-ai-help/pkg/logger"
 )
 
