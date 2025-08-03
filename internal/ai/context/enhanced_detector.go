@@ -216,7 +216,7 @@ func (ecd *EnhancedContextDetector) detectVersionInformation() (string, string) 
 
 // detectConfigurationFiles detects configuration files
 func (ecd *EnhancedContextDetector) detectConfigurationFiles(cfg *config.UserConfig) []string {
-	var files []string
+	files := make([]string, 0) // Always return initialized slice
 	
 	// Standard configuration file paths
 	standardPaths := []string{
@@ -247,7 +247,7 @@ func (ecd *EnhancedContextDetector) detectConfigurationFiles(cfg *config.UserCon
 
 // detectEnabledServices detects enabled system services
 func (ecd *EnhancedContextDetector) detectEnabledServices() []string {
-	var services []string
+	services := make([]string, 0) // Always return initialized slice
 	
 	// Get enabled systemd services
 	if output, err := exec.Command("systemctl", "list-units", "--type=service", "--state=running").Output(); err == nil {
@@ -266,7 +266,7 @@ func (ecd *EnhancedContextDetector) detectEnabledServices() []string {
 
 // detectInstalledPackages detects installed packages
 func (ecd *EnhancedContextDetector) detectInstalledPackages() []string {
-	var packages []string
+	packages := make([]string, 0) // Always return initialized slice
 	
 	// Get installed packages from nix-env
 	if output, err := exec.Command("nix-env", "-q").Output(); err == nil {
@@ -324,7 +324,10 @@ func (ecd *EnhancedContextDetector) detectHardwareInfo() *config.HardwareInfo {
 
 // detectNetworkInfo detects network information
 func (ecd *EnhancedContextDetector) detectNetworkInfo() *config.NetworkInfo {
-	info := &config.NetworkInfo{}
+	info := &config.NetworkInfo{
+		Interfaces:  make([]string, 0), // Always initialize slices
+		DNSServers:  make([]string, 0),
+	}
 	
 	// Get network interfaces
 	if output, err := exec.Command("ip", "link", "show").Output(); err == nil {
