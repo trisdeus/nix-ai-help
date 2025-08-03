@@ -3754,6 +3754,7 @@ func initializeCommands() {
 	rootCmd.AddCommand(mcpServerCmd)
 	rootCmd.AddCommand(neovimSetupCmd)
 	rootCmd.AddCommand(packageRepoCmd)
+	rootCmd.AddCommand(createProviderCommands(cfg, logger.NewLogger()))
 	rootCmd.AddCommand(CreateSystemInfoCommand())
 	rootCmd.AddCommand(CreatePackageMonitorCommand())
 

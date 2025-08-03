@@ -93,7 +93,21 @@ func (o *OllamaProvider) queryWithContext(ctx context.Context, prompt string) (s
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("ollama returned status %d", resp.StatusCode)
+		// Provide more helpful error messages for common status codes
+		switch resp.StatusCode {
+		case http.StatusNotFound:
+			// Try to get available models for a helpful error message
+			if availableModels, err := o.GetAvailableModels(); err == nil && len(availableModels) > 0 {
+				return "", fmt.Errorf("model '%s' not found (status 404). Available models: %s. Please use 'ollama list' to see all models or configure a different model", o.Model, strings.Join(availableModels, ", "))
+			}
+			return "", fmt.Errorf("model '%s' not found (status 404). Please ensure the model is pulled with 'ollama pull %s' or use a different model", o.Model, o.Model)
+		case http.StatusBadRequest:
+			return "", fmt.Errorf("bad request to ollama (status 400). Check if model '%s' exists and endpoint is correct", o.Model)
+		case http.StatusInternalServerError:
+			return "", fmt.Errorf("ollama server error (status 500). The server may be overloaded or the model may be corrupted")
+		default:
+			return "", fmt.Errorf("ollama returned status %d", resp.StatusCode)
+		}
 	}
 
 	var result ollamaResponse
@@ -221,6 +235,78 @@ func (o *OllamaProvider) HealthCheck() error {
 	}
 
 	return nil
+}
+
+// ModelInfo represents information about an Ollama model
+type ModelInfo struct {
+	Name     string `json:"name"`
+	Size     int64  `json:"size"`
+	ModifiedAt string `json:"modified_at"`
+}
+
+// TagsResponse represents the response from Ollama's /api/tags endpoint
+type TagsResponse struct {
+	Models []ModelInfo `json:"models"`
+}
+
+// GetAvailableModels retrieves the list of available models from Ollama
+func (o *OllamaProvider) GetAvailableModels() ([]string, error) {
+	tagsURL := strings.Replace(o.Endpoint, "/api/generate", "/api/tags", 1)
+	
+	req, err := http.NewRequest("GET", tagsURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tags request: %w", err)
+	}
+
+	resp, err := o.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get available models: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ollama server returned status %d when getting models", resp.StatusCode)
+	}
+
+	var tagsResp TagsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tagsResp); err != nil {
+		return nil, fmt.Errorf("failed to decode models response: %w", err)
+	}
+
+	var modelNames []string
+	for _, model := range tagsResp.Models {
+		modelNames = append(modelNames, model.Name)
+	}
+
+	return modelNames, nil
+}
+
+// ValidateModel checks if the specified model is available on Ollama
+func (o *OllamaProvider) ValidateModel() error {
+	availableModels, err := o.GetAvailableModels()
+	if err != nil {
+		return fmt.Errorf("unable to validate model: %w", err)
+	}
+
+	// Check for exact match first
+	for _, model := range availableModels {
+		if model == o.Model {
+			return nil
+		}
+	}
+
+	// Check for base name match (e.g., "llama3" matches "llama3:latest")
+	for _, model := range availableModels {
+		// Split on ":" to get base name
+		parts := strings.Split(model, ":")
+		if len(parts) > 0 && parts[0] == o.Model {
+			// Update the model to the full name with tag
+			o.Model = model
+			return nil
+		}
+	}
+
+	return fmt.Errorf("model '%s' not found. Available models: %s", o.Model, strings.Join(availableModels, ", "))
 }
 
 // SetModel allows changing the model after creation

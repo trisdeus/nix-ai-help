@@ -272,7 +272,29 @@ func (pm *ProviderManager) initializeOllamaProvider(config *config.AIProviderCon
 	timeout := pm.config.GetAITimeout("ollama")
 	ollamaProvider.SetTimeout(timeout)
 
-	pm.logger.Debug(fmt.Sprintf("Ollama provider initialized with %v timeout", timeout))
+	pm.logger.Debug(fmt.Sprintf("Ollama provider initialized with model '%s' and %v timeout", defaultModel, timeout))
+
+	// Check if Ollama is accessible and validate the model
+	if err := ollamaProvider.HealthCheck(); err != nil {
+		pm.logger.Debug(fmt.Sprintf("Ollama health check failed: %v", err))
+		// Don't fail initialization, just log the issue
+	} else {
+		// If health check passes, try to validate the model
+		if err := ollamaProvider.ValidateModel(); err != nil {
+			pm.logger.Warn(fmt.Sprintf("Ollama model validation failed: %v", err))
+			
+			// Try to auto-detect and use the first available model
+			if availableModels, getErr := ollamaProvider.GetAvailableModels(); getErr == nil && len(availableModels) > 0 {
+				firstAvailable := availableModels[0]
+				pm.logger.Info(fmt.Sprintf("Auto-switching to available model: %s", firstAvailable))
+				ollamaProvider.SetModel(firstAvailable)
+			} else {
+				pm.logger.Warn("Could not auto-detect available models. Provider may fail at runtime.")
+			}
+		} else {
+			pm.logger.Debug(fmt.Sprintf("Ollama model '%s' validated successfully", defaultModel))
+		}
+	}
 
 	// Create legacy wrapper and then wrap that as Provider
 	legacyProvider := &OllamaLegacyProvider{OllamaProvider: ollamaProvider}

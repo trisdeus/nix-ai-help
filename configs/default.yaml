@@ -66,6 +66,24 @@ default:
                         max_tokens: 4096
                         recommended_for: ["general", "fast"]
                         requires_download: true
+                    deepseek-r1:
+                        name: "DeepSeek R1"
+                        description: "DeepSeek's reasoning model with enhanced problem-solving capabilities"
+                        size: "7B"
+                        type: "reasoning"
+                        context_window: 8192
+                        max_tokens: 4096
+                        recommended_for: ["reasoning", "problem-solving", "analysis", "coding"]
+                        requires_download: true
+                    deepseek-r1:8b:
+                        name: "DeepSeek R1 8B"
+                        description: "DeepSeek's 8B reasoning model for complex tasks"
+                        size: "8B"
+                        type: "reasoning"
+                        context_window: 8192
+                        max_tokens: 4096
+                        recommended_for: ["reasoning", "complex", "analysis", "detailed"]
+                        requires_download: true
             gemini:
                 name: "Google Gemini"
                 description: "Google's advanced AI models via API"
