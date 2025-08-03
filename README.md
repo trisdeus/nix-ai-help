@@ -10,7 +10,7 @@
 
 ## 🆕 Latest Updates (August 2025)
 
-### 🚀 **v1.1.0: Enterprise Fleet Intelligence Platform** - **COMPLETED August 3, 2025**
+### 🚀 **v2.1.0: Enterprise Fleet Intelligence Platform** - **COMPLETED August 3, 2025**
 
 - **🏢 Enterprise Fleet Intelligence**: Advanced analytics, intelligent canary deployments, automated compliance (SOC2, HIPAA, PCI-DSS, ISO 27001), and cost optimization
 - **🛡️ Intelligent Canary Deployments**: AI-powered deployment decisions with statistical analysis, automated rollback triggers, and progressive traffic routing
