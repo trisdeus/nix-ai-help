@@ -2,27 +2,17 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
+	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
+	"nix-ai-help/pkg/version"
 )
-
-// TUI represents the main terminal user interface
-type TUI struct {
-	commands       []Command
-	selected       int
-	searchQuery    string
-	showHelp       bool
-	showSuggestions bool
-	suggestions    []CommandSuggestion
-	width          int
-	height         int
-	pluginIntegration *PluginIntegration
-}
 
 // Command represents a nixai command with metadata
 type Command struct {
@@ -42,1253 +32,1195 @@ type CommandSuggestion struct {
 	UsageHint   string
 }
 
-// NewTUI creates a new TUI instance
+// TUI represents the main TUI
+type TUI struct {
+	textInput       textinput.Model
+	output          []string
+	commandHistory  []string
+	historyIndex    int
+	width           int
+	height          int
+	suggestions     []string
+	showSuggestions bool
+	selectedSuggestion int
+	currentTheme    string
+	styles          ThemeStyles
+	
+	// Plugin integration
+	pluginIntegration *PluginIntegration
+	pluginCommands    []string
+	pluginSuggestions []string
+}
+
+// NewTUI creates a new TUI
 func NewTUI() *TUI {
+	ti := textinput.New()
+	ti.Placeholder = "Enter nixai command..."
+	ti.Focus()
+	ti.CharLimit = 256
+	ti.Width = 50
+
+	// Initialize with Gruvbox theme as default
+	defaultTheme := "gruvbox"
+	theme := themes[defaultTheme]
+	styles := createThemeStyles(theme)
+
 	// Create plugin integration
 	logger := logger.NewLogger()
 	pluginIntegration := NewPluginIntegration(logger)
 	pluginIntegration.Initialize()
-	
+
+	// Initialize plugin integration
 	tui := &TUI{
-		commands: getAvailableCommands(),
-		selected: 0,
-		width:    80,
-		height:   24,
+		textInput:         ti,
+		output:            []string{},
+		commandHistory:    []string{},
+		historyIndex:      -1,
+		suggestions:       getAllCommandSuggestions(),
+		currentTheme:      defaultTheme,
+		styles:            styles,
 		pluginIntegration: pluginIntegration,
+		pluginCommands:    []string{},
+		pluginSuggestions: []string{},
 	}
 	
-	// Add plugin commands to available commands
-	tui.addPluginCommands()
+	// Initialize plugin manager for dynamic commands
+	tui.initializePluginIntegration()
 	
 	return tui
 }
 
-// addPluginCommands adds plugin commands to the available commands list
-func (t *TUI) addPluginCommands() {
-	if t.pluginIntegration != nil {
-		pluginCommands := t.pluginIntegration.GetAvailablePluginCommands()
-		t.commands = append(t.commands, pluginCommands...)
+// initializePluginIntegration sets up plugin command discovery for TUI
+func (m *TUI) initializePluginIntegration() {
+	// Initialize the integrated plugin commands
+	m.updatePluginCommands()
+	
+	// Add plugin status to output on startup
+	if m.pluginIntegration != nil {
+		pluginStatus := m.pluginIntegration.RenderPluginStatus()
+		if pluginStatus != "" {
+			m.addOutput(pluginStatus)
+			m.addOutput("")
+		}
 	}
 }
 
-// getAvailableCommands returns all available nixai commands
+// updatePluginCommands refreshes the list of available plugin commands
+func (m *TUI) updatePluginCommands() {
+	// Get plugin commands from plugin integration
+	if m.pluginIntegration != nil {
+		pluginCommands := m.pluginIntegration.GetAvailablePluginCommands()
+		
+		// Convert to string format for suggestions
+		for _, cmd := range pluginCommands {
+			m.pluginCommands = append(m.pluginCommands, cmd.Name)
+			
+			// Add examples if available
+			for _, example := range cmd.Examples {
+				m.pluginSuggestions = append(m.pluginSuggestions, example)
+			}
+		}
+	} else {
+		// Fallback to built-in plugin commands
+		m.pluginCommands = []string{
+			"system-info", "system-info health", "system-info status", "system-info cpu",
+			"system-info memory", "system-info disk", "system-info processes", "system-info monitor",
+			"package-monitor", "package-monitor list", "package-monitor updates", "package-monitor security",
+			"package-monitor analyze", "package-monitor orphans", "package-monitor stats",
+		}
+		
+		// Add plugin suggestions to the main suggestions list
+		m.pluginSuggestions = append(m.pluginCommands,
+			// Add example usage
+			"system-info health --json",
+			"system-info monitor --interval 3",
+			"package-monitor list --detailed",
+			"package-monitor updates --security",
+		)
+	}
+	
+	// Merge with main suggestions
+	allSuggestions := append(m.suggestions, m.pluginSuggestions...)
+	m.suggestions = removeDuplicates(allSuggestions)
+}
+
+// getAvailableCommands returns Command structs for all available nixai commands
 func getAvailableCommands() []Command {
 	return []Command{
-		// AI & Configuration
-		{
-			Name:        "ai-config",
-			Description: "AI-powered configuration generation and management",
-			Category:    "AI",
-			Usage:       "nixai ai-config [action]",
-			Examples:    []string{"nixai ai-config generate", "nixai ai-config validate", "nixai ai-config optimize"},
-		},
-		{
-			Name:        "ask",
-			Description: "Ask AI questions about NixOS",
-			Category:    "AI",
-			Usage:       "nixai ask \"your question\"",
-			Examples:    []string{"nixai ask \"how to configure nginx?\"", "nixai ask \"fix boot issues\""},
-		},
-		{
-			Name:        "configure",
-			Description: "Interactive NixOS configuration assistant",
-			Category:    "Configuration",
-			Usage:       "nixai configure [service]",
-			Examples:    []string{"nixai configure", "nixai configure nginx", "nixai configure desktop"},
-		},
-		{
-			Name:        "config",
-			Description: "Manage nixai configuration settings",
-			Category:    "Configuration",
-			Usage:       "nixai config [action]",
-			Examples:    []string{"nixai config show", "nixai config set cache.enabled true", "nixai config reset"},
-		},
+		// Core AI commands
+		{Name: "ai-config", Description: "AI-powered configuration generation and management", Category: "AI", Usage: "nixai ai-config [action]", Examples: []string{"nixai ai-config generate"}},
+		{Name: "ask", Description: "Ask AI questions about NixOS", Category: "AI", Usage: "nixai ask \"your question\"", Examples: []string{"nixai ask \"how to configure nginx?\""}},
+		{Name: "configure", Description: "Interactive NixOS configuration assistant", Category: "Configuration", Usage: "nixai configure [service]", Examples: []string{"nixai configure nginx"}},
+		{Name: "explain-option", Description: "Explain a NixOS option using AI", Category: "Documentation", Usage: "nixai explain-option [option]", Examples: []string{"nixai explain-option services.nginx.enable"}},
+		{Name: "explain-home-option", Description: "Explain a Home Manager option", Category: "Documentation", Usage: "nixai explain-home-option [option]", Examples: []string{"nixai explain-home-option programs.git.enable"}},
 		
-		// Build & Development
-		{
-			Name:        "build",
-			Description: "Build and analyze NixOS configurations",
-			Category:    "Build",
-			Usage:       "nixai build [options]",
-			Examples:    []string{"nixai build", "nixai build --dry-run", "nixai build analyze"},
-		},
-		{
-			Name:        "devenv",
-			Description: "Create and manage development environments with devenv",
-			Category:    "Development",
-			Usage:       "nixai devenv [action]",
-			Examples:    []string{"nixai devenv create", "nixai devenv shell", "nixai devenv status"},
-		},
-		{
-			Name:        "dev",
-			Description: "Developer Experience Revolution - intelligent development environment management",
-			Category:    "Development",
-			Usage:       "nixai dev [action]",
-			Examples:    []string{"nixai dev setup my-app --language go --editor vscode", "nixai dev template list", "nixai dev env create web-app --template react-typescript"},
-		},
-		{
-			Name:        "flake",
-			Description: "Manage NixOS flakes and configurations",
-			Category:    "Flakes",
-			Usage:       "nixai flake [action]",
-			Examples:    []string{"nixai flake create", "nixai flake validate", "nixai flake migrate"},
-		},
+		// Build and development
+		{Name: "build", Description: "Build and analyze NixOS configurations", Category: "Build", Usage: "nixai build [options]", Examples: []string{"nixai build --dry-run"}},
+		{Name: "devenv", Description: "Create and manage development environments", Category: "Development", Usage: "nixai devenv [action]", Examples: []string{"nixai devenv create"}},
+		{Name: "dev", Description: "Developer Experience Revolution", Category: "Development", Usage: "nixai dev [action]", Examples: []string{"nixai dev setup"}},
+		{Name: "import", Description: "Import configurations and templates", Category: "Templates", Usage: "nixai import [source]", Examples: []string{"nixai import config.nix"}},
+		{Name: "templates", Description: "List and manage project templates", Category: "Templates", Usage: "nixai templates [action]", Examples: []string{"nixai templates list"}},
 		
-		// Diagnostics & Health
-		{
-			Name:        "diagnose",
-			Description: "Diagnose system issues and problems",
-			Category:    "Diagnostics",
-			Usage:       "nixai diagnose [component]",
-			Examples:    []string{"nixai diagnose", "nixai diagnose boot", "nixai diagnose services"},
-		},
-		{
-			Name:        "doctor",
-			Description: "Run comprehensive NixOS health checks and diagnostics",
-			Category:    "Diagnostics",
-			Usage:       "nixai doctor [options]",
-			Examples:    []string{"nixai doctor", "nixai doctor --verbose", "nixai doctor --fix"},
-		},
-		{
-			Name:        "health",
-			Description: "System health monitoring and prediction",
-			Category:    "Monitoring",
-			Usage:       "nixai health [action]",
-			Examples:    []string{"nixai health status", "nixai health predict", "nixai health monitor"},
-		},
-		{
-			Name:        "logs",
-			Description: "Analyze and diagnose NixOS system logs",
-			Category:    "Diagnostics",
-			Usage:       "nixai logs [options]",
-			Examples:    []string{"nixai logs analyze", "nixai logs tail", "nixai logs search"},
-		},
+		// Diagnostics and troubleshooting
+		{Name: "diagnose", Description: "Diagnose system issues and problems", Category: "Diagnostics", Usage: "nixai diagnose [component]", Examples: []string{"nixai diagnose boot"}},
+		{Name: "doctor", Description: "Run comprehensive NixOS health checks", Category: "Diagnostics", Usage: "nixai doctor [options]", Examples: []string{"nixai doctor --verbose"}},
+		{Name: "error", Description: "Error handling and analytics management", Category: "Support", Usage: "nixai error [action]", Examples: []string{"nixai error analyze"}},
+		{Name: "logs", Description: "Analyze and diagnose NixOS system logs", Category: "Diagnostics", Usage: "nixai logs [options]", Examples: []string{"nixai logs analyze"}},
+		{Name: "performance", Description: "Performance monitoring and optimization", Category: "Performance", Usage: "nixai performance [action]", Examples: []string{"nixai performance stats"}},
+		{Name: "health", Description: "System health monitoring and prediction", Category: "Monitoring", Usage: "nixai health [action]", Examples: []string{"nixai health status"}},
 		
-		// System Management
-		{
-			Name:        "execute",
-			Description: "Execute commands with AI-powered safety validation",
-			Category:    "Execution",
-			Usage:       "nixai execute [command] [args...]",
-			Examples:    []string{"nixai execute nix-env -iA nixpkgs.firefox", "nixai execute --dry-run nixos-rebuild switch"},
-		},
-		{
-			Name:        "gc",
-			Description: "AI-powered garbage collection analysis and cleanup",
-			Category:    "Maintenance",
-			Usage:       "nixai gc [action]",
-			Examples:    []string{"nixai gc analyze", "nixai gc collect", "nixai gc optimize"},
-		},
-		{
-			Name:        "hardware",
-			Description: "Hardware detection and optimization",
-			Category:    "Hardware",
-			Usage:       "nixai hardware [action]",
-			Examples:    []string{"nixai hardware detect", "nixai hardware optimize", "nixai hardware drivers"},
-		},
-		{
-			Name:        "system-info",
-			Description: "System information and health monitoring",
-			Category:    "Monitoring",
-			Usage:       "nixai system-info [options]",
-			Examples:    []string{"nixai system-info", "nixai system-info --detailed", "nixai system-info --json"},
-		},
+		// Package and dependency management
+		{Name: "deps", Description: "Analyze NixOS configuration dependencies", Category: "Analysis", Usage: "nixai deps [options]", Examples: []string{"nixai deps analyze"}},
+		{Name: "package-repo", Description: "Analyze Git repositories and generate Nix derivations", Category: "Packages", Usage: "nixai package-repo [repo-url]", Examples: []string{"nixai package-repo https://github.com/user/repo"}},
+		{Name: "search", Description: "Search for NixOS packages/services", Category: "Packages", Usage: "nixai search [query]", Examples: []string{"nixai search firefox"}},
+		{Name: "store", Description: "Manage, backup, and analyze the Nix store", Category: "Store", Usage: "nixai store [action]", Examples: []string{"nixai store analyze"}},
+		{Name: "gc", Description: "AI-powered garbage collection analysis", Category: "Maintenance", Usage: "nixai gc [action]", Examples: []string{"nixai gc analyze"}},
 		
-		// Intelligence & Analysis
-		{
-			Name:        "intelligence",
-			Description: "AI-powered system intelligence and recommendations",
-			Category:    "Intelligence",
-			Usage:       "nixai intelligence [action]",
-			Examples:    []string{"nixai intelligence analyze", "nixai intelligence predict", "nixai intelligence conflicts"},
-		},
-		{
-			Name:        "context",
-			Description: "Manage NixOS system context detection and caching",
-			Category:    "Intelligence",
-			Usage:       "nixai context [action]",
-			Examples:    []string{"nixai context detect", "nixai context cache", "nixai context clear"},
-		},
-		{
-			Name:        "deps",
-			Description: "Analyze NixOS configuration dependencies and imports",
-			Category:    "Analysis",
-			Usage:       "nixai deps [options]",
-			Examples:    []string{"nixai deps analyze", "nixai deps graph", "nixai deps validate"},
-		},
+		// Flake management
+		{Name: "flake", Description: "Manage NixOS flakes and configurations", Category: "Flakes", Usage: "nixai flake [action]", Examples: []string{"nixai flake create"}},
+		{Name: "migrate", Description: "AI-powered migration assistant", Category: "Migration", Usage: "nixai migrate [action]", Examples: []string{"nixai migrate to-flakes"}},
 		
-		// Package Management
-		{
-			Name:        "search",
-			Description: "Search for NixOS packages/services and get config/AI tips",
-			Category:    "Packages",
-			Usage:       "nixai search [query]",
-			Examples:    []string{"nixai search firefox", "nixai search --config nginx", "nixai search --ai python"},
-		},
-		{
-			Name:        "package-monitor",
-			Description: "Package monitoring and update management",
-			Category:    "Packages",
-			Usage:       "nixai package-monitor [action]",
-			Examples:    []string{"nixai package-monitor status", "nixai package-monitor updates", "nixai package-monitor security"},
-		},
-		{
-			Name:        "package-repo",
-			Description: "Analyze Git repositories and generate Nix derivations",
-			Category:    "Packages",
-			Usage:       "nixai package-repo [repo-url]",
-			Examples:    []string{"nixai package-repo https://github.com/user/repo", "nixai package-repo analyze"},
-		},
-		{
-			Name:        "store",
-			Description: "Manage, backup, and analyze the Nix store",
-			Category:    "Store",
-			Usage:       "nixai store [action]",
-			Examples:    []string{"nixai store analyze", "nixai store backup", "nixai store optimize"},
-		},
+		// System and hardware
+		{Name: "hardware", Description: "Hardware detection and optimization", Category: "Hardware", Usage: "nixai hardware [action]", Examples: []string{"nixai hardware detect"}},
+		{Name: "context", Description: "Manage NixOS system context detection", Category: "Intelligence", Usage: "nixai context [action]", Examples: []string{"nixai context detect"}},
+		{Name: "intelligence", Description: "AI-powered system intelligence", Category: "Intelligence", Usage: "nixai intelligence [action]", Examples: []string{"nixai intelligence analyze"}},
 		
-		// Documentation & Help
-		{
-			Name:        "explain-option",
-			Description: "Explain a NixOS option using AI and documentation",
-			Category:    "Documentation",
-			Usage:       "nixai explain-option [option]",
-			Examples:    []string{"nixai explain-option services.nginx.enable", "nixai explain-option boot.loader.grub"},
-		},
-		{
-			Name:        "explain-home-option",
-			Description: "Explain a Home Manager option using AI and documentation",
-			Category:    "Documentation",
-			Usage:       "nixai explain-home-option [option]",
-			Examples:    []string{"nixai explain-home-option programs.git.enable", "nixai explain-home-option home.stateVersion"},
-		},
-		{
-			Name:        "manual",
-			Description: "Built-in comprehensive manual system",
-			Category:    "Documentation",
-			Usage:       "nixai manual [topic]",
-			Examples:    []string{"nixai manual", "nixai manual search flakes", "nixai manual configuration"},
-		},
-		{
-			Name:        "learn",
-			Description: "Interactive NixOS learning modules",
-			Category:    "Education",
-			Usage:       "nixai learn [module]",
-			Examples:    []string{"nixai learn list", "nixai learn basics", "nixai learn progress"},
-		},
-		
-		// Templates & Snippets
-		{
-			Name:        "templates",
-			Description: "List and manage project templates for NixOS, Home Manager, and related setups",
-			Category:    "Templates",
-			Usage:       "nixai templates [action]",
-			Examples:    []string{"nixai templates list", "nixai templates create", "nixai templates apply"},
-		},
-		{
-			Name:        "snippets",
-			Description: "Show, add, or manage code snippets for NixOS, Home Manager, and related workflows",
-			Category:    "Templates",
-			Usage:       "nixai snippets [action]",
-			Examples:    []string{"nixai snippets list", "nixai snippets add", "nixai snippets search"},
-		},
-		{
-			Name:        "import",
-			Description: "Import configurations and templates",
-			Category:    "Templates",
-			Usage:       "nixai import [source]",
-			Examples:    []string{"nixai import config.nix", "nixai import --from-url", "nixai import --migrate"},
-		},
-		
-		// Fleet & Machine Management
-		{
-			Name:        "fleet",
-			Description: "Manage machine fleet deployments",
-			Category:    "Fleet Management",
-			Usage:       "nixai fleet [action]",
-			Examples:    []string{"nixai fleet list", "nixai fleet deploy", "nixai fleet status"},
-		},
-		{
-			Name:        "fleet-enterprise",
-			Description: "Enterprise Fleet Intelligence - advanced analytics, canary deployments, compliance automation, and cost optimization",
-			Category:    "Enterprise",
-			Usage:       "nixai fleet-enterprise [action]",
-			Examples:    []string{"nixai fleet-enterprise analytics --fleet prod", "nixai fleet-enterprise canary deploy --traffic 10%", "nixai fleet-enterprise compliance assess --framework soc2", "nixai fleet-enterprise optimize --type cost"},
-		},
-		{
-			Name:        "machines",
-			Description: "Manage and deploy NixOS configurations across multiple machines",
-			Category:    "Fleet Management",
-			Usage:       "nixai machines [action]",
-			Examples:    []string{"nixai machines list", "nixai machines deploy", "nixai machines add"},
-		},
-		
-		// Automation & Workflows
-		{
-			Name:        "workflow",
-			Description: "Manage automated workflows",
-			Category:    "Automation",
-			Usage:       "nixai workflow [action]",
-			Examples:    []string{"nixai workflow list", "nixai workflow create", "nixai workflow execute"},
-		},
-		{
-			Name:        "migrate",
-			Description: "AI-powered migration assistant for channels and flakes",
-			Category:    "Migration",
-			Usage:       "nixai migrate [action]",
-			Examples:    []string{"nixai migrate to-flakes", "nixai migrate channels", "nixai migrate analyze"},
-		},
-		
-		// Collaboration & Team
-		{
-			Name:        "team",
-			Description: "Team collaboration management",
-			Category:    "Collaboration",
-			Usage:       "nixai team [action]",
-			Examples:    []string{"nixai team create", "nixai team members", "nixai team permissions"},
-		},
-		
-		// Version Control
-		{
-			Name:        "version-control",
-			Description: "Git-like configuration version control",
-			Category:    "Version Control",
-			Usage:       "nixai version-control [action]",
-			Examples:    []string{"nixai version-control init", "nixai version-control commit", "nixai version-control branch"},
-		},
-		
-		// Extensions & Integration
-		{
-			Name:        "plugin",
-			Description: "Manage nixai plugins",
-			Category:    "Extensibility",
-			Usage:       "nixai plugin [action]",
-			Examples:    []string{"nixai plugin list", "nixai plugin install", "nixai plugin create"},
-		},
-		{
-			Name:        "mcp-server",
-			Description: "Manage the Model Context Protocol (MCP) server",
-			Category:    "Integration",
-			Usage:       "nixai mcp-server [action]",
-			Examples:    []string{"nixai mcp-server start", "nixai mcp-server stop", "nixai mcp-server status"},
-		},
-		{
-			Name:        "neovim-setup",
-			Description: "Set up Neovim integration with nixai MCP server",
-			Category:    "Integration",
-			Usage:       "nixai neovim-setup [options]",
-			Examples:    []string{"nixai neovim-setup", "nixai neovim-setup --config-path", "nixai neovim-setup --verify"},
-		},
-		
-		// Web & Interfaces
-		{
-			Name:        "web",
-			Description: "Start the web interface",
-			Category:    "Web Interface",
-			Usage:       "nixai web start [options]",
-			Examples:    []string{"nixai web start", "nixai web start --port 8080", "nixai web start --repo /path/to/repo"},
-		},
-		
-		// Performance & Monitoring
-		{
-			Name:        "performance",
-			Description: "Performance monitoring and optimization",
-			Category:    "Performance",
-			Usage:       "nixai performance [action]",
-			Examples:    []string{"nixai performance stats", "nixai performance cache", "nixai performance report"},
-		},
-		
-		// Error Handling & Support
-		{
-			Name:        "error",
-			Description: "Error handling and analytics management",
-			Category:    "Support",
-			Usage:       "nixai error [action]",
-			Examples:    []string{"nixai error analyze", "nixai error report", "nixai error clear"},
-		},
-		{
-			Name:        "community",
-			Description: "Show NixOS community resources and support links",
-			Category:    "Support",
-			Usage:       "nixai community [topic]",
-			Examples:    []string{"nixai community", "nixai community discourse", "nixai community github"},
-		},
-		
-		// Utility
-		{
-			Name:        "completion",
-			Description: "Generate autocompletion scripts for your shell",
-			Category:    "Utility",
-			Usage:       "nixai completion [shell]",
-			Examples:    []string{"nixai completion bash", "nixai completion zsh", "nixai completion fish"},
-		},
+		// Integration and tools
+		{Name: "web", Description: "Start the web interface", Category: "Web Interface", Usage: "nixai web start [options]", Examples: []string{"nixai web start"}},
+		{Name: "plugin", Description: "Manage nixai plugins", Category: "Extensibility", Usage: "nixai plugin [action]", Examples: []string{"nixai plugin list"}},
+		{Name: "mcp-server", Description: "Manage the Model Context Protocol server", Category: "Integration", Usage: "nixai mcp-server [action]", Examples: []string{"nixai mcp-server start"}},
+		{Name: "manual", Description: "Built-in comprehensive manual system", Category: "Documentation", Usage: "nixai manual [topic]", Examples: []string{"nixai manual"}},
+		{Name: "learn", Description: "Interactive NixOS learning modules", Category: "Education", Usage: "nixai learn [module]", Examples: []string{"nixai learn basics"}},
+		{Name: "community", Description: "Show NixOS community resources", Category: "Support", Usage: "nixai community [topic]", Examples: []string{"nixai community"}},
+		{Name: "fleet", Description: "Manage machine fleet deployments", Category: "Fleet Management", Usage: "nixai fleet [action]", Examples: []string{"nixai fleet list"}},
 	}
 }
 
-// Styles for the TUI
-var (
-	titleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#7C3AED")).
+// getAllCommandSuggestions returns all available nixai commands for completion
+func getAllCommandSuggestions() []string {
+	return []string{
+		// Core AI commands
+		"ai-config", "ask", "configure", "explain-option", "explain-home-option",
+		
+		// Build and development
+		"build", "devenv", "import", "templates",
+		
+		// Diagnostics and troubleshooting
+		"diagnose", "doctor", "error", "logs", "performance", "health",
+		
+		// Package and dependency management
+		"deps", "package-repo", "search", "store", "gc",
+		
+		// Flake management
+		"flake", "migrate",
+		
+		// System and hardware
+		"hardware", "context", "intelligence",
+		
+		// Integrated plugin commands
+		"system-info", "package-monitor",
+		
+		// Learning and help
+		"learn", "help", "community", "snippets",
+		
+		// Team and collaboration
+		"team", "fleet", "machines",
+		
+		// Workflow and automation
+		"workflow", "plugin", "version-control", "execute",
+		
+		// Web and integrations
+		"web", "mcp-server", "neovim-setup",
+		
+		// Configuration management
+		"config", "completion", "tui",
+		
+		// Plugin management
+		"plugin list", "plugin search", "plugin install", "plugin uninstall",
+		"plugin enable", "plugin disable", "plugin status", "plugin info",
+		"plugin execute", "plugin discover", "plugin validate", "plugin metrics",
+		"plugin events", "plugin create",
+		
+		// Common command examples with options
+		"ask \"how to configure nginx?\"",
+		"ask \"fix boot issues\"",
+		"ask \"setup development environment\"",
+		"build --dry-run",
+		"build analyze",
+		"configure nginx",
+		"configure desktop",
+		"configure development",
+		"diagnose boot",
+		"diagnose services",
+		"diagnose network",
+		"doctor --full",
+		"doctor --quick",
+		"flake create",
+		"flake validate",
+		"flake migrate",
+		"learn list",
+		"learn basics",
+		"learn advanced",
+		"web start",
+		"web start --port 8080",
+		"web start --repo /path/to/repo",
+		"fleet list",
+		"fleet deploy",
+		"fleet status",
+		"team create",
+		"team members",
+		"team permissions",
+		"search nginx",
+		"search postgresql",
+		"hardware detect",
+		"hardware optimize",
+		"performance stats",
+		"performance cache",
+		"health status",
+		"health predict --timeline 7d",
+		"health anomalies",
+		"health forecast --resource cpu --timeline 3d",
+		"health remediate",
+		"health monitor --interval 5m",
+		"mcp-server start",
+		"mcp-server status",
+		"neovim-setup install",
+		"package-repo analyze",
+		"store analyze",
+		"gc run",
+		"templates list",
+		"snippets list",
+		
+		// Integrated plugin examples
+		"system-info health",
+		"system-info status",
+		"system-info cpu",
+		"system-info memory",
+		"system-info disk",
+		"system-info processes",
+		"system-info monitor",
+		"system-info all",
+		"package-monitor list",
+		"package-monitor updates",
+		"package-monitor security",
+		"package-monitor analyze",
+		"package-monitor stats",
+		
+		// Execution examples
+		"execute status",
+		"execute config",
+		"execute history",
+		"execute nix-env -iA nixpkgs.firefox",
+		"execute --dry-run nixos-rebuild switch",
+		"execute --category package nix-collect-garbage -d",
+		"execute --description \"Update system\" nixos-rebuild switch",
+		
+		"help ask",
+		"help build",
+		"help configure",
+		"help diagnose",
+		"help flake",
+		"help web",
+		"help system-info",
+		"help package-monitor",
+		
+		// Plugin command examples
+		"plugin list",
+		"plugin search monitoring",
+		"plugin status system-info",
+		"plugin info package-monitor",
+	}
+}
+
+// Theme represents a color theme for the TUI
+type Theme struct {
+	Name       string
+	Background string
+	Foreground string
+	Primary    string
+	Secondary  string
+	Success    string
+	Warning    string
+	Error      string
+	Muted      string
+	Accent     string
+	Border     string
+}
+
+// Available themes
+var themes = map[string]Theme{
+	"gruvbox": {
+		Name:       "Gruvbox Dark",
+		Background: "#282828",
+		Foreground: "#ebdbb2",
+		Primary:    "#fabd2f",
+		Secondary:  "#83a598",
+		Success:    "#b8bb26",
+		Warning:    "#fe8019",
+		Error:      "#fb4934",
+		Muted:      "#928374",
+		Accent:     "#d3869b",
+		Border:     "#504945",
+	},
+	"dracula": {
+		Name:       "Dracula",
+		Background: "#282a36",
+		Foreground: "#f8f8f2",
+		Primary:    "#bd93f9",
+		Secondary:  "#8be9fd",
+		Success:    "#50fa7b",
+		Warning:    "#ffb86c",
+		Error:      "#ff5555",
+		Muted:      "#6272a4",
+		Accent:     "#ff79c6",
+		Border:     "#44475a",
+	},
+	"nord": {
+		Name:       "Nord",
+		Background: "#2e3440",
+		Foreground: "#eceff4",
+		Primary:    "#88c0d0",
+		Secondary:  "#81a1c1",
+		Success:    "#a3be8c",
+		Warning:    "#ebcb8b",
+		Error:      "#bf616a",
+		Muted:      "#4c566a",
+		Accent:     "#b48ead",
+		Border:     "#3b4252",
+	},
+	"tokyo-night": {
+		Name:       "Tokyo Night",
+		Background: "#1a1b26",
+		Foreground: "#c0caf5",
+		Primary:    "#7aa2f7",
+		Secondary:  "#bb9af7",
+		Success:    "#9ece6a",
+		Warning:    "#e0af68",
+		Error:      "#f7768e",
+		Muted:      "#565f89",
+		Accent:     "#ff9e64",
+		Border:     "#292e42",
+	},
+	"catppuccin": {
+		Name:       "Catppuccin Mocha",
+		Background: "#1e1e2e",
+		Foreground: "#cdd6f4",
+		Primary:    "#89b4fa",
+		Secondary:  "#cba6f7",
+		Success:    "#a6e3a1",
+		Warning:    "#f9e2af",
+		Error:      "#f38ba8",
+		Muted:      "#6c7086",
+		Accent:     "#f5c2e7",
+		Border:     "#313244",
+	},
+}
+
+// ThemeStyles contains all the styled components for the current theme
+type ThemeStyles struct {
+	header      lipgloss.Style
+	commandBox  lipgloss.Style
+	output      lipgloss.Style
+	suggestion  lipgloss.Style
+	selectedSug lipgloss.Style
+	prompt      lipgloss.Style
+	timestamp   lipgloss.Style
+	error       lipgloss.Style
+	success     lipgloss.Style
+	warning     lipgloss.Style
+	muted       lipgloss.Style
+	accent      lipgloss.Style
+	logo        lipgloss.Style
+	versionInfo lipgloss.Style
+	info        lipgloss.Style
+}
+
+// createThemeStyles creates styled components from a theme
+func createThemeStyles(theme Theme) ThemeStyles {
+	return ThemeStyles{
+		header: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Primary)).
 			Bold(true).
-			Padding(0, 1)
+			Padding(0, 1).
+			Border(lipgloss.NormalBorder(), false, false, true, false).
+			BorderForeground(lipgloss.Color(theme.Border)),
 
-	selectedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(lipgloss.Color("#7C3AED")).
-			Padding(0, 1)
-
-	normalStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#A1A1AA")).
-			Padding(0, 1)
-
-	descriptionStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#71717A")).
-				Italic(true)
-
-	categoryStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#10B981")).
-			Bold(true)
-
-	usageStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#F59E0B")).
-			Italic(true)
-
-	borderStyle = lipgloss.NewStyle().
+		commandBox: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#7C3AED")).
-			Padding(1, 2)
+			BorderForeground(lipgloss.Color(theme.Primary)).
+			Padding(0, 1).
+			Margin(0, 1).
+			Background(lipgloss.Color(theme.Background)),
 
-	helpStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#6B7280")).
-			Italic(true)
+		output: lipgloss.NewStyle().
+			Padding(0, 2).
+			MarginBottom(1).
+			Foreground(lipgloss.Color(theme.Foreground)),
+
+		suggestion: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Muted)).
+			Background(lipgloss.Color(theme.Background)).
+			Padding(0, 1),
+
+		selectedSug: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Background)).
+			Background(lipgloss.Color(theme.Primary)).
+			Padding(0, 1).
+			Bold(true),
+
+		prompt: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Primary)).
+			Bold(true),
+
+		timestamp: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Muted)).
+			Italic(true),
+
+		error: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Error)).
+			Bold(true),
+
+		success: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Success)).
+			Bold(true),
+
+		warning: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Warning)).
+			Bold(true),
+
+		muted: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Muted)),
+
+		accent: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Accent)).
+			Bold(true),
+
+		logo: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Primary)).
+			Bold(true),
+
+		versionInfo: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Muted)).
+			Italic(true).
+			Align(lipgloss.Right).
+			Padding(0, 1),
 			
-	infoStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#81A1C1")).
-			Italic(true)
-)
+		info: lipgloss.NewStyle().
+			Foreground(lipgloss.Color(theme.Secondary)).
+			Italic(true),
+	}
+}
 
-// Start runs the TUI interface
-func (t *TUI) Start() error {
-	// Simple terminal-based interface for now
-	fmt.Print("\033[2J\033[H") // Clear screen
-	
-	for {
-		t.render()
-		
-		// Get user input
-		var input string
-		fmt.Print("\n> ")
-		fmt.Scanln(&input)
-		
-		if input == "q" || input == "quit" || input == "exit" {
-			break
-		}
-		
-		if input == "h" || input == "help" {
-			t.showHelp = !t.showHelp
-			continue
-		}
-		
-		// Handle suggestions mode toggle
-		if input == "s" || input == "suggest" {
-			t.showSuggestions = !t.showSuggestions
-			continue
-		}
-		
-		// Handle plugin status command
-		if input == "plugins" || strings.HasPrefix(input, "plugin ") {
-			t.showPluginStatus()
-			continue
-		}
-		
-		// Handle number selection
-		if num := parseNumber(input); num >= 0 && num < len(t.commands) {
-			t.executeCommand(t.commands[num])
-			continue
-		}
-		
-		// Check for exact command name match first
-		exactMatch := false
-		for i, cmd := range t.commands {
-			if strings.EqualFold(cmd.Name, input) {
-				t.executeCommand(t.commands[i])
-				exactMatch = true
-				break
+// Init initializes the TUI
+func (m *TUI) Init() tea.Cmd {
+	m.showLogo()
+	return textinput.Blink
+}
+
+// Update handles messages and updates the model
+func (m *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyCtrlC, tea.KeyEsc:
+			return m, tea.Quit
+
+		case tea.KeyUp:
+			if m.showSuggestions && len(m.suggestions) > 0 {
+				m.selectedSuggestion--
+				if m.selectedSuggestion < 0 {
+					m.selectedSuggestion = len(m.getFilteredSuggestions()) - 1
+				}
+				return m, nil
 			}
-		}
-		
-		// If no exact match, check if it looks like a natural language query
-		if !exactMatch && t.isNaturalLanguageQuery(input) {
-			suggestions := t.intelligentCommandSearch(input)
-			if len(suggestions) > 0 {
-				t.suggestions = suggestions
-				t.showIntelligentSuggestions(input)
-				continue
+			// Navigate command history
+			if len(m.commandHistory) > 0 {
+				if m.historyIndex == -1 {
+					m.historyIndex = len(m.commandHistory) - 1
+				} else if m.historyIndex > 0 {
+					m.historyIndex--
+				}
+				if m.historyIndex >= 0 && m.historyIndex < len(m.commandHistory) {
+					m.textInput.SetValue(m.commandHistory[m.historyIndex])
+				}
 			}
-		}
-	}
-	
-	return nil
-}
+			return m, nil
 
-// render displays the TUI interface
-func (t *TUI) render() {
-	fmt.Print("\033[2J\033[H") // Clear screen
-	
-	// Title
-	title := titleStyle.Render("🚀 NixAI Terminal Interface")
-	fmt.Println(title)
-	fmt.Println()
-	
-	// Instructions
-	instructions := helpStyle.Render("Enter command number/name, ask questions in natural language, 'h' for help, 'q' to quit")
-	fmt.Println(instructions)
-	fmt.Println()
-	
-	// Commands list
-	fmt.Println(categoryStyle.Render("Available Commands:"))
-	fmt.Println()
-	
-	currentCategory := ""
-	for i, cmd := range t.commands {
-		if cmd.Category != currentCategory {
-			if currentCategory != "" {
-				fmt.Println()
+		case tea.KeyDown:
+			if m.showSuggestions && len(m.suggestions) > 0 {
+				m.selectedSuggestion++
+				if m.selectedSuggestion >= len(m.getFilteredSuggestions()) {
+					m.selectedSuggestion = 0
+				}
+				return m, nil
 			}
-			fmt.Println(categoryStyle.Render(fmt.Sprintf("▶ %s", cmd.Category)))
-			currentCategory = cmd.Category
-		}
-		
-		// Command entry
-		numberStr := fmt.Sprintf("[%2d]", i)
-		nameStr := cmd.Name
-		descStr := cmd.Description
-		
-		if i == t.selected {
-			fmt.Printf("  %s %s - %s\n", 
-				selectedStyle.Render(numberStr),
-				selectedStyle.Render(nameStr),
-				selectedStyle.Render(descStr))
-		} else {
-			fmt.Printf("  %s %s - %s\n",
-				normalStyle.Render(numberStr),
-				normalStyle.Render(nameStr),
-				descriptionStyle.Render(descStr))
-		}
-	}
-	
-	// Help section
-	if t.showHelp {
-		fmt.Println()
-		fmt.Println(borderStyle.Render(t.renderHelp()))
-	}
-}
-
-// renderHelp returns the help content
-func (t *TUI) renderHelp() string {
-	help := titleStyle.Render("📖 Help & Quick Start") + "\n\n"
-	
-	help += categoryStyle.Render("Navigation:") + "\n"
-	help += "• Enter number (0-43) to select command\n"
-	help += "• Enter command name directly\n"
-	help += "• Ask questions in natural language (e.g., 'help me with health status')\n"
-	help += "• 'h' or 'help' to toggle this help\n"
-	help += "• 'q', 'quit', or 'exit' to leave\n\n"
-	
-	help += categoryStyle.Render("Quick Examples:") + "\n"
-	help += "• Type '1' or 'ask' to ask AI questions\n"
-	help += "• Type 'help me with health status' for intelligent suggestions\n"
-	help += "• Type 'how do I monitor system performance' for AI guidance\n"
-	help += "• Type 'web' to start web interface\n"
-	help += "• Type 'plugin list' to see available plugins\n\n"
-	
-	help += categoryStyle.Render("Categories:") + "\n"
-	categories := make(map[string][]string)
-	for _, cmd := range t.commands {
-		categories[cmd.Category] = append(categories[cmd.Category], cmd.Name)
-	}
-	
-	for category, commands := range categories {
-		help += fmt.Sprintf("• %s: %s\n", category, strings.Join(commands, ", "))
-	}
-	
-	// Add plugin information
-	help += "\n" + categoryStyle.Render("Plugin System:") + "\n"
-	help += "• Plugins extend nixai functionality with custom commands\n"
-	help += "• Built-in plugins: system-info, package-monitor\n"
-	help += "• Use 'plugin list' to see all available plugins\n"
-	help += "• Use 'plugin search [query]' to find plugins\n"
-	
-	return help
-}
-
-// executeCommand runs the selected command
-func (t *TUI) executeCommand(cmd Command) {
-	fmt.Print("\033[2J\033[H") // Clear screen
-	
-	fmt.Println(titleStyle.Render(fmt.Sprintf("🚀 Executing: %s", cmd.Name)))
-	fmt.Println()
-	
-	fmt.Println(categoryStyle.Render("Description:"))
-	fmt.Printf("  %s\n\n", cmd.Description)
-	
-	fmt.Println(categoryStyle.Render("Usage:"))
-	fmt.Printf("  %s\n\n", usageStyle.Render(cmd.Usage))
-	
-	if len(cmd.Examples) > 0 {
-		fmt.Println(categoryStyle.Render("Examples:"))
-		for _, example := range cmd.Examples {
-			fmt.Printf("  %s\n", usageStyle.Render(example))
-		}
-		fmt.Println()
-	}
-	
-	// Special handling for plugin commands
-	if cmd.Category == "Plugin Commands" || cmd.Category == "External Plugins" {
-		fmt.Println(infoStyle.Render("This is a plugin command."))
-		fmt.Println(infoStyle.Render("Plugin commands are dynamically loaded extensions to nixai functionality."))
-		fmt.Println()
-	}
-	
-	fmt.Println(helpStyle.Render("Choose an action:"))
-	fmt.Println("  [1] Run basic command")
-	fmt.Println("  [2] Run with options")
-	fmt.Println("  [3] Show detailed help")
-	if strings.HasPrefix(cmd.Name, "plugin ") {
-		fmt.Println("  [4] Show plugin status")
-	}
-	fmt.Println("  [0] Back to main menu")
-	fmt.Println()
-	
-	var choice string
-	fmt.Print("> ")
-	fmt.Scanln(&choice)
-	
-	switch choice {
-	case "1":
-		t.runCommand(cmd.Name)
-	case "2":
-		t.runCommandWithOptions(cmd)
-	case "3":
-		t.showDetailedHelp(cmd)
-	case "4":
-		if strings.HasPrefix(cmd.Name, "plugin ") {
-			t.showPluginStatus()
-		} else {
-			return
-		}
-	default:
-		return
-	}
-}
-
-// runCommand executes a basic nixai command
-func (t *TUI) runCommand(cmdName string) {
-	fmt.Println(categoryStyle.Render(fmt.Sprintf("Running: nixai %s", cmdName)))
-	fmt.Println()
-	
-	// Execute the actual nixai command
-	nixaiPath, err := utils.GetExecutablePath()
-	if err != nil {
-		fmt.Printf("Error getting executable path: %v\n", err)
-		return
-	}
-	cmd := exec.Command(nixaiPath, cmdName)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	
-	err = cmd.Run()
-	if err != nil {
-		fmt.Printf("Error running command: %v\n", err)
-	}
-	
-	fmt.Println()
-	fmt.Print("Press Enter to continue...")
-	fmt.Scanln()
-}
-
-// runCommandWithOptions executes a command with user-specified options
-func (t *TUI) runCommandWithOptions(cmd Command) {
-	fmt.Printf("Enter options for '%s' (or press Enter for none): ", cmd.Name)
-	var options string
-	fmt.Scanln(&options)
-	
-	args := []string{cmd.Name}
-	if options != "" {
-		args = append(args, strings.Fields(options)...)
-	}
-	
-	fmt.Println(categoryStyle.Render(fmt.Sprintf("Running: nixai %s", strings.Join(args, " "))))
-	fmt.Println()
-	
-	// Execute the actual nixai command
-	nixaiPath, err := utils.GetExecutablePath()
-	if err != nil {
-		fmt.Printf("Error getting executable path: %v\n", err)
-		return
-	}
-	execCmd := exec.Command(nixaiPath, args...)
-	execCmd.Stdout = os.Stdout
-	execCmd.Stderr = os.Stderr
-	execCmd.Stdin = os.Stdin
-	
-	err = execCmd.Run()
-	if err != nil {
-		fmt.Printf("Error running command: %v\n", err)
-	}
-	
-	fmt.Println()
-	fmt.Print("Press Enter to continue...")
-	fmt.Scanln()
-}
-
-// showPluginStatus displays plugin status information
-func (t *TUI) showPluginStatus() {
-	fmt.Print("\033[2J\033[H") // Clear screen
-	
-	fmt.Println(titleStyle.Render("🔌 Plugin Status"))
-	fmt.Println()
-	
-	// In a real implementation, this would show actual plugin status
-	fmt.Println(infoStyle.Render("Plugin system status:"))
-	fmt.Println("• Plugin system: Available")
-	fmt.Println("• Integrated plugins: system-info, package-monitor")
-	fmt.Println("• External plugins: None currently loaded")
-	fmt.Println()
-	
-	fmt.Println(categoryStyle.Render("Integrated Plugins:"))
-	fmt.Println("• system-info: System information and monitoring")
-	fmt.Println("• package-monitor: Package monitoring and management")
-	fmt.Println()
-	
-	fmt.Println(helpStyle.Render("Plugin Management Commands:"))
-	fmt.Println("• plugin list        - List all plugins")
-	fmt.Println("• plugin search      - Search for available plugins")
-	fmt.Println("• plugin install     - Install a new plugin")
-	fmt.Println("• plugin enable      - Enable a plugin")
-	fmt.Println("• plugin disable     - Disable a plugin")
-	fmt.Println("• plugin status      - Show plugin status")
-	fmt.Println()
-	
-	fmt.Print("Press Enter to continue...")
-	fmt.Scanln()
-}
-
-// showDetailedHelp shows detailed help for a command
-func (t *TUI) showDetailedHelp(cmd Command) {
-	fmt.Print("\033[2J\033[H") // Clear screen
-	
-	fmt.Println(titleStyle.Render(fmt.Sprintf("📖 Help: %s", cmd.Name)))
-	fmt.Println()
-	
-	help := borderStyle.Render(fmt.Sprintf(
-		"%s\n\n%s\n  %s\n\n%s\n%s",
-		categoryStyle.Render("Description:"),
-		cmd.Description,
-		usageStyle.Render(cmd.Usage),
-		categoryStyle.Render("Examples:"),
-		strings.Join(cmd.Examples, "\n"),
-	))
-	
-	fmt.Println(help)
-	fmt.Println()
-	
-	// Try to get actual help from nixai command
-	nixaiPath, err := utils.GetExecutablePath()
-	if err != nil {
-		// If we can't get the path, skip the help command
-		fmt.Print("Press Enter to continue...")
-		fmt.Scanln()
-		return
-	}
-	execCmd := exec.Command(nixaiPath, cmd.Name, "--help")
-	output, err := execCmd.CombinedOutput()
-	if err == nil {
-		fmt.Println(categoryStyle.Render("Detailed Command Help:"))
-		fmt.Println(string(output))
-	}
-	
-	fmt.Print("Press Enter to continue...")
-	fmt.Scanln()
-}
-
-
-// IntelligentCommandSearch analyzes user query and suggests relevant commands (exported for testing)
-func (t *TUI) IntelligentCommandSearch(query string) []CommandSuggestion {
-	return t.intelligentCommandSearch(query)
-}
-
-// intelligentCommandSearch analyzes user query and suggests relevant commands
-func (t *TUI) intelligentCommandSearch(query string) []CommandSuggestion {
-	query = strings.ToLower(strings.TrimSpace(query))
-	var suggestions []CommandSuggestion
-	
-	// Define keyword mappings for intelligent suggestions
-	keywordMappings := map[string][]string{
-		// Health & Monitoring
-		"health":     {"health", "doctor", "diagnose", "system-info", "performance"},
-		"status":     {"health", "system-info", "performance", "fleet"},
-		"monitor":    {"health", "system-info", "performance", "package-monitor"},
-		"diagnose":   {"diagnose", "doctor", "health", "logs"},
-		"doctor":     {"doctor", "health", "diagnose"},
-		"check":      {"doctor", "health", "diagnose", "system-info"},
-		
-		// Configuration
-		"config":     {"configure", "config", "ai-config", "explain-option"},
-		"configure":  {"configure", "ai-config", "config"},
-		"setup":      {"dev", "configure", "neovim-setup", "ai-config"},
-		"generate":   {"dev", "configure", "ai-config", "templates"},
-		
-		// Package Management
-		"package":    {"search", "package-monitor", "package-repo", "gc"},
-		"packages":   {"search", "package-monitor", "package-repo", "gc"},
-		"install":    {"search", "package-repo", "execute"},
-		"search":     {"search", "package-repo"},
-		"update":     {"package-monitor", "migrate"},
-		"upgrade":    {"package-monitor", "migrate"},
-		
-		// Build & Development
-		"build":      {"build", "devenv", "flake"},
-		"compile":    {"build", "devenv"},
-		"develop":    {"dev", "devenv", "build", "flake"},
-		"development": {"dev", "devenv", "build"},
-		"environment": {"dev", "devenv", "configure"},
-		"project":    {"dev", "devenv"},
-		"scaffold":   {"dev", "templates"},
-		"deps":       {"dev"},
-		"ide":        {"dev"},
-		"editor":     {"dev"},
-		"vscode":     {"dev"},
-		"neovim":     {"dev"},
-		"vim":        {"dev"},
-		"emacs":      {"dev"},
-		
-		// Flakes
-		"flake":      {"flake", "migrate", "build"},
-		"flakes":     {"flake", "migrate", "build"},
-		
-		// Documentation & Learning
-		"help":       {"manual", "learn", "explain-option", "explain-home-option"},
-		"learn":      {"learn", "manual", "explain-option"},
-		"explain":    {"explain-option", "explain-home-option", "manual"},
-		"document":   {"manual", "explain-option", "explain-home-option"},
-		"tutorial":   {"learn", "manual"},
-		
-		// System Management
-		"system":     {"system-info", "health", "doctor", "hardware"},
-		"hardware":   {"hardware", "system-info", "health"},
-		"network":    {"health", "system-info", "diagnose"},
-		"performance": {"performance", "health", "system-info"},
-		
-		// Logs & Errors
-		"log":        {"logs", "diagnose", "error"},
-		"logs":       {"logs", "diagnose", "error"},
-		"error":      {"error", "diagnose", "logs", "doctor"},
-		"errors":     {"error", "diagnose", "logs", "doctor"},
-		
-		// Fleet & Machines
-		"fleet":      {"fleet", "fleet-enterprise", "machines"},
-		"deploy":     {"fleet", "fleet-enterprise", "machines", "workflow"},
-		"machine":    {"machines", "fleet", "fleet-enterprise", "hardware"},
-		"machines":   {"machines", "fleet", "fleet-enterprise"},
-		
-		// Enterprise Fleet Intelligence
-		"enterprise": {"fleet-enterprise"},
-		"analytics":  {"fleet-enterprise", "intelligence", "performance"},
-		"canary":     {"fleet-enterprise"},
-		"compliance": {"fleet-enterprise"},
-		"soc2":       {"fleet-enterprise"},
-		"hipaa":      {"fleet-enterprise"},
-		"pci":        {"fleet-enterprise"},
-		"iso27001":   {"fleet-enterprise"},
-		"cost":       {"fleet-enterprise", "performance"},
-		"optimize":   {"fleet-enterprise", "performance", "intelligence"},
-		"optimization": {"fleet-enterprise", "performance", "intelligence"},
-		"security":   {"fleet-enterprise", "doctor", "health"},
-		"rollback":   {"fleet-enterprise", "version-control"},
-		"promote":    {"fleet-enterprise"},
-		"assessment": {"fleet-enterprise", "doctor"},
-		"audit":      {"fleet-enterprise", "compliance"},
-		"remediate":  {"fleet-enterprise", "doctor"},
-		
-		// Storage & Cleanup
-		"storage":    {"store", "gc", "performance"},
-		"cleanup":    {"gc", "store", "performance"},
-		"garbage":    {"gc", "store"},
-		"disk":       {"gc", "store", "health", "system-info"},
-		
-		// Version Control
-		"git":        {"version-control", "import"},
-		"version":    {"version-control", "migrate"},
-		"history":    {"version-control"},
-		
-		// Templates & Snippets
-		"template":   {"dev", "templates", "snippets", "import"},
-		"templates":  {"dev", "templates", "snippets", "import"},
-		"snippet":    {"snippets", "templates"},
-		"snippets":   {"snippets", "templates"},
-		
-		// Intelligence & Analysis
-		"analyze":    {"intelligence", "deps", "diagnose", "performance"},
-		"analysis":   {"intelligence", "deps", "diagnose", "performance"},
-		"predict":    {"intelligence", "health"},
-		"recommend":  {"intelligence", "doctor"},
-		"conflict":   {"intelligence", "deps", "diagnose"},
-		"conflicts":  {"intelligence", "deps", "diagnose"},
-		"dependency": {"deps", "intelligence"},
-		"dependencies": {"dev", "deps", "intelligence"},
-		
-		// Migration & Import
-		"migrate":    {"migrate", "import", "flake"},
-		"migration":  {"migrate", "import", "flake"},
-		"import":     {"import", "migrate", "templates"},
-		
-		// Workflow & Automation
-		"workflow":   {"workflow", "fleet", "execute"},
-		"automate":   {"workflow", "execute"},
-		"automation": {"workflow", "execute"},
-		"execute":    {"execute", "workflow"},
-		"run":        {"execute", "build", "workflow"},
-		
-		// Web Interface
-		"web":        {"web"},
-		"interface":  {"web", "tui"},
-		"ui":         {"web", "tui"},
-		
-		// Community & Support
-		"community":  {"community", "learn", "manual"},
-		"support":    {"community", "error", "manual"},
-		"forum":      {"community"},
-		
-		// Plugin Commands
-		"plugin":     {"plugin", "system-info", "package-monitor"},
-		"plugins":    {"plugin", "system-info", "package-monitor"},
-		"info":       {"system-info", "package-monitor"},
-	}
-	
-	// Score commands based on relevance
-	for _, cmd := range t.commands {
-		relevance := t.calculateRelevance(query, cmd, keywordMappings)
-		if relevance > 0.1 { // Only include if somewhat relevant
-			suggestion := CommandSuggestion{
-				Command:   cmd,
-				Relevance: relevance,
-				Reason:    t.generateReason(query, cmd),
-				Keywords:  t.extractMatchingKeywords(query, cmd),
-				UsageHint: t.generateUsageHint(query, cmd),
+			// Navigate command history
+			if len(m.commandHistory) > 0 {
+				if m.historyIndex < len(m.commandHistory)-1 {
+					m.historyIndex++
+					m.textInput.SetValue(m.commandHistory[m.historyIndex])
+				} else {
+					m.historyIndex = -1
+					m.textInput.SetValue("")
+				}
 			}
-			suggestions = append(suggestions, suggestion)
+			return m, nil
+
+		case tea.KeyTab:
+			if m.showSuggestions && len(m.getFilteredSuggestions()) > 0 {
+				filtered := m.getFilteredSuggestions()
+				if m.selectedSuggestion >= 0 && m.selectedSuggestion < len(filtered) {
+					m.textInput.SetValue(filtered[m.selectedSuggestion])
+					m.showSuggestions = false
+				}
+			}
+			return m, nil
+
+		case tea.KeyEnter:
+			input := strings.TrimSpace(m.textInput.Value())
+			if input != "" {
+				m.executeCommand(input)
+				m.commandHistory = append(m.commandHistory, input)
+				m.historyIndex = -1
+				m.textInput.SetValue("")
+				m.showSuggestions = false
+			}
+			return m, nil
+
+		default:
+			// Update suggestions based on input
+			m.textInput, cmd = m.textInput.Update(msg)
+			m.updateSuggestions()
+			return m, cmd
+		}
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		m.textInput.Width = msg.Width - 8 // Account for borders and padding
+		return m, nil
+	}
+
+	m.textInput, cmd = m.textInput.Update(msg)
+	return m, cmd
+}
+
+// updateSuggestions updates the suggestion list based on current input
+func (m *TUI) updateSuggestions() {
+	input := m.textInput.Value()
+	if len(input) > 0 {
+		m.showSuggestions = true
+		m.selectedSuggestion = 0
+	} else {
+		m.showSuggestions = false
+	}
+}
+
+// getFilteredSuggestions returns suggestions that match the current input
+func (m *TUI) getFilteredSuggestions() []string {
+	input := strings.ToLower(m.textInput.Value())
+	if input == "" {
+		return m.suggestions[:10] // Show first 10 suggestions when no input
+	}
+
+	// Parse the current input to provide intelligent completion
+	return m.getIntelligentSuggestions(input)
+}
+
+// getIntelligentSuggestions provides context-aware command completion
+func (m *TUI) getIntelligentSuggestions(input string) []string {
+	parts := strings.Fields(input)
+	if len(parts) == 0 {
+		return m.suggestions[:10]
+	}
+
+	// Get the current command being typed
+	currentCommand := parts[0]
+	
+	// If we're still typing the first word (command name)
+	if !strings.HasSuffix(input, " ") && len(parts) == 1 {
+		return m.getCommandSuggestions(currentCommand)
+	}
+	
+	// If we have a complete command and are looking for flags/options
+	if len(parts) >= 1 {
+		return m.getCommandOptionSuggestions(currentCommand, parts[1:], input)
+	}
+
+	return []string{}
+}
+
+// getCommandSuggestions returns command name suggestions
+func (m *TUI) getCommandSuggestions(partial string) []string {
+	var filtered []string
+	for _, suggestion := range m.suggestions {
+		cmd := strings.Fields(suggestion)[0]
+		if strings.HasPrefix(strings.ToLower(cmd), strings.ToLower(partial)) {
+			filtered = append(filtered, suggestion)
 		}
 	}
 	
-	// Add plugin suggestions if plugin integration is available
-	if t.pluginIntegration != nil {
-		pluginSuggestions := t.pluginIntegration.GetPluginSuggestions(query)
-		suggestions = append(suggestions, pluginSuggestions...)
+	// Limit to 8 suggestions
+	if len(filtered) > 8 {
+		filtered = filtered[:8]
 	}
 	
-	// Sort by relevance (highest first)
-	for i := 0; i < len(suggestions); i++ {
-		for j := i + 1; j < len(suggestions); j++ {
-			if suggestions[j].Relevance > suggestions[i].Relevance {
-				suggestions[i], suggestions[j] = suggestions[j], suggestions[i]
+	return filtered
+}
+
+// getCommandOptionSuggestions returns flag and option suggestions for commands
+func (m *TUI) getCommandOptionSuggestions(command string, args []string, fullInput string) []string {
+	suggestions := []string{}
+	
+	// Get available flags for the command
+	flags := m.getCommandFlags(command)
+	
+	// Get the last word being typed
+	lastWord := ""
+	if len(args) > 0 {
+		lastWord = args[len(args)-1]
+	}
+	
+	// If the last character is a space, show all available options
+	if strings.HasSuffix(fullInput, " ") {
+		suggestions = append(suggestions, flags...)
+	} else {
+		// Filter flags based on partial input
+		for _, flag := range flags {
+			if strings.HasPrefix(strings.ToLower(flag), strings.ToLower(lastWord)) {
+				suggestions = append(suggestions, strings.TrimSpace(fullInput[:len(fullInput)-len(lastWord)]) + flag)
 			}
 		}
 	}
 	
-	// Return top 5 suggestions
-	if len(suggestions) > 5 {
-		suggestions = suggestions[:5]
+	// Add contextual value suggestions for certain flags
+	suggestions = append(suggestions, m.getValueSuggestions(command, args, fullInput)...)
+	
+	// Limit to 8 suggestions
+	if len(suggestions) > 8 {
+		suggestions = suggestions[:8]
 	}
 	
 	return suggestions
 }
 
-// calculateRelevance scores how relevant a command is to the user query
-func (t *TUI) calculateRelevance(query string, cmd Command, keywordMappings map[string][]string) float64 {
-	query = strings.ToLower(query)
-	cmdName := strings.ToLower(cmd.Name)
-	cmdDesc := strings.ToLower(cmd.Description)
-	
-	score := 0.0
-	
-	// Direct name match gets highest score
-	if strings.Contains(query, cmdName) || strings.Contains(cmdName, query) {
-		score += 1.0
+// getCommandFlags returns available flags for a specific command
+func (m *TUI) getCommandFlags(command string) []string {
+	flagMap := map[string][]string{
+		"ask": {
+			"--provider openai", "--provider claude", "--provider gemini", "--provider ollama",
+			"--model gpt-4", "--model claude-3", "--model gemini-pro",
+			"--context-file", "--role", "--agent",
+			"--nixos-path", "--help",
+		},
+		"build": {
+			"--dry-run", "--show-trace", "--verbose", "--quiet",
+			"--nixos-path", "--target", "--help",
+			"analyze", "monitor", "recovery",
+		},
+		"configure": {
+			"nginx", "desktop", "development", "server", "security",
+			"--interactive", "--template", "--help",
+		},
+		"diagnose": {
+			"boot", "services", "network", "hardware", "performance",
+			"--full", "--quick", "--output-file", "--help",
+		},
+		"doctor": {
+			"--full", "--quick", "--fix", "--verbose", "--help",
+		},
+		"flake": {
+			"create", "validate", "migrate", "update", "check",
+			"--help", "--verbose",
+		},
+		"web": {
+			"start", "stop", "status",
+			"--port 8080", "--port 3000", "--port 8000",
+			"--repo", "--host", "--help",
+		},
+		"plugin": {
+			"list", "load", "unload", "status", "execute",
+			"--help", "--verbose",
+		},
+		"service": {
+			"start", "stop", "restart", "status", "enable", "disable",
+			"--help", "--all",
+		},
+		"search": {
+			"--limit 10", "--limit 20", "--limit 50",
+			"--category", "--help",
+		},
+		"learn": {
+			"list", "start", "progress", "complete",
+			"basics", "advanced", "expert",
+			"--help", "--interactive",
+		},
+		"help": {
+			"ask", "build", "configure", "diagnose", "doctor",
+			"flake", "web", "plugin", "search", "learn",
+		},
 	}
 	
-	// Description match gets good score
-	queryWords := strings.Fields(query)
-	for _, word := range queryWords {
-		if strings.Contains(cmdDesc, word) {
-			score += 0.3
-		}
-		if strings.Contains(cmdName, word) {
-			score += 0.5
-		}
+	if flags, exists := flagMap[command]; exists {
+		return flags
 	}
 	
-	// Keyword mapping match
-	for keyword, commands := range keywordMappings {
-		if strings.Contains(query, keyword) {
-			for _, mappedCmd := range commands {
-				if mappedCmd == cmdName {
-					score += 0.7
-				}
+	// Default flags for unknown commands
+	return []string{"--help", "--verbose", "--quiet"}
+}
+
+// getValueSuggestions returns contextual value suggestions
+func (m *TUI) getValueSuggestions(command string, args []string, fullInput string) []string {
+	suggestions := []string{}
+	
+	// Check if we're completing a flag value
+	if len(args) >= 2 {
+		lastFlag := args[len(args)-2]
+		
+		switch lastFlag {
+		case "--provider":
+			suggestions = []string{
+				fullInput + "openai", fullInput + "claude", 
+				fullInput + "gemini", fullInput + "ollama",
+			}
+		case "--model":
+			suggestions = []string{
+				fullInput + "gpt-4", fullInput + "claude-3",
+				fullInput + "gemini-pro", fullInput + "llama3",
+			}
+		case "--port":
+			suggestions = []string{
+				fullInput + "8080", fullInput + "3000", 
+				fullInput + "8000", fullInput + "9000",
+			}
+		case "--role":
+			suggestions = []string{
+				fullInput + "diagnoser", fullInput + "explainer",
+				fullInput + "builder", fullInput + "assistant",
+			}
+		case "--agent":
+			suggestions = []string{
+				fullInput + "ask", fullInput + "build",
+				fullInput + "diagnose", fullInput + "configure",
 			}
 		}
 	}
 	
-	// Category relevance
-	categoryName := strings.ToLower(cmd.Category)
-	for _, word := range queryWords {
-		if strings.Contains(categoryName, word) {
-			score += 0.2
+	// Command-specific contextual suggestions
+	switch command {
+	case "configure":
+		if !strings.Contains(fullInput, "nginx") && !strings.Contains(fullInput, "desktop") {
+			suggestions = append(suggestions, 
+				fullInput + "nginx",
+				fullInput + "desktop", 
+				fullInput + "development",
+				fullInput + "server",
+			)
+		}
+	case "diagnose":
+		if !strings.Contains(fullInput, "boot") && !strings.Contains(fullInput, "services") {
+			suggestions = append(suggestions,
+				fullInput + "boot",
+				fullInput + "services",
+				fullInput + "network",
+				fullInput + "hardware",
+			)
+		}
+	case "learn":
+		if !strings.Contains(fullInput, "basics") && !strings.Contains(fullInput, "advanced") {
+			suggestions = append(suggestions,
+				fullInput + "basics",
+				fullInput + "advanced", 
+				fullInput + "expert",
+			)
 		}
 	}
 	
-	return score
+	return suggestions
 }
 
-// generateReason explains why a command was suggested
-func (t *TUI) generateReason(query string, cmd Command) string {
-	cmdName := cmd.Name
-	query = strings.ToLower(query)
+// handlePluginCommand handles plugin-related commands
+func (m *TUI) handlePluginCommand(input string) {
+	timestamp := time.Now().Format("15:04:05")
+	m.addOutput(fmt.Sprintf("[%s] %s", 
+		m.styles.timestamp.Render(timestamp),
+		m.styles.prompt.Render("$ nixai "+input)))
 	
-	// Specific reason patterns
-	if strings.Contains(query, "health") && cmdName == "health" {
-		return "Perfect match for health monitoring and system status"
-	}
-	if strings.Contains(query, "status") && cmdName == "health" {
-		return "Health command provides comprehensive system status information"
-	}
-	if strings.Contains(query, "monitor") && cmdName == "health" {
-		return "Health command includes real-time monitoring capabilities"
-	}
-	if strings.Contains(query, "diagnose") && cmdName == "doctor" {
-		return "Doctor command provides comprehensive system diagnostics"
-	}
-	if strings.Contains(query, "config") && cmdName == "configure" {
-		return "Configure command helps with NixOS configuration setup"
-	}
-	if strings.Contains(query, "package") && cmdName == "search" {
-		return "Search command helps find and install packages"
-	}
-	if strings.Contains(query, "build") && cmdName == "build" {
-		return "Build command handles NixOS configuration building"
-	}
-	if strings.Contains(query, "flake") && cmdName == "flake" {
-		return "Flake command manages Nix flakes and modern configurations"
+	// For now, we'll just show a message that plugin commands are handled
+	// In a real implementation, this would interact with the plugin system
+	if m.pluginIntegration != nil {
+		pluginStatus := m.pluginIntegration.RenderPluginStatus()
+		if pluginStatus != "" {
+			lines := strings.Split(pluginStatus, "\n")
+			for _, line := range lines {
+				if strings.TrimSpace(line) != "" {
+					m.addOutput(line)
+				}
+			}
+		} else {
+			m.addOutput(m.styles.info.Render("Plugin system is available but no plugins are currently loaded."))
+		}
+	} else {
+		m.addOutput(m.styles.info.Render("Plugin system is not available in this build."))
 	}
 	
-	// Generic patterns
-	if strings.Contains(strings.ToLower(cmd.Description), strings.ToLower(query)) {
-		return fmt.Sprintf("Command description matches your query about '%s'", query)
-	}
-	
-	return fmt.Sprintf("Suggested based on relevance to '%s'", query)
+	m.addOutput("") // Add empty line for separation
 }
 
-// extractMatchingKeywords finds which keywords from the query match the command
-func (t *TUI) extractMatchingKeywords(query string, cmd Command) []string {
-	var keywords []string
-	queryWords := strings.Fields(strings.ToLower(query))
-	cmdText := strings.ToLower(fmt.Sprintf("%s %s %s", cmd.Name, cmd.Description, cmd.Category))
+// executeCommand executes the given nixai command
+func (m *TUI) executeCommand(input string) {
+	timestamp := time.Now().Format("15:04:05")
+	m.addOutput(fmt.Sprintf("[%s] %s", 
+		m.styles.timestamp.Render(timestamp),
+		m.styles.prompt.Render("$ nixai "+input)))
+
+	// Handle built-in commands
+	switch {
+	case input == "help":
+		m.showHelp()
+		return
+	case input == "clear":
+		m.output = []string{}
+		m.addOutput("Terminal cleared")
+		return
+	case input == "history":
+		m.showHistory()
+		return
+	case strings.HasPrefix(input, "theme"):
+		m.handleThemeCommand(input)
+		return
+	case input == "plugins" || strings.HasPrefix(input, "plugin "):
+		m.handlePluginCommand(input)
+		return
+	case input == "exit" || input == "quit":
+		m.addOutput("Goodbye!")
+		return
+	}
+
+	// Execute nixai command
+	args := strings.Fields(input)
+	if len(args) == 0 {
+		return
+	}
+
+	// Try to execute the actual nixai command
+	nixaiPath, pathErr := utils.GetExecutablePath()
+	if pathErr != nil {
+		m.addOutput(m.styles.error.Render(fmt.Sprintf("Error getting executable path: %v", pathErr)))
+		m.addOutput("") // Add empty line for separation
+		return
+	}
+	cmd := exec.Command(nixaiPath, args...)
 	
-	for _, word := range queryWords {
-		if strings.Contains(cmdText, word) && len(word) > 2 { // Skip short words
-			keywords = append(keywords, word)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		m.addOutput(m.styles.error.Render(fmt.Sprintf("Error: %v", err)))
+		if len(output) > 0 {
+			m.addOutput(m.styles.error.Render(string(output)))
+		}
+	} else {
+		if len(output) > 0 {
+			// Split output into lines and add each one
+			lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+			for _, line := range lines {
+				if strings.TrimSpace(line) != "" {
+					m.addOutput(line)
+				}
+			}
+		} else {
+			m.addOutput(m.styles.success.Render("Command executed successfully"))
 		}
 	}
-	
-	return keywords
+	m.addOutput("") // Add empty line for separation
 }
 
-// generateUsageHint provides a specific usage suggestion based on the query
-func (t *TUI) generateUsageHint(query string, cmd Command) string {
-	query = strings.ToLower(query)
-	cmdName := cmd.Name
+// addOutput adds a line to the output
+func (m *TUI) addOutput(line string) {
+	m.output = append(m.output, line)
 	
-	// Specific usage hints
-	if strings.Contains(query, "health status") && cmdName == "health" {
-		return "Try: nixai health status"
+	// Keep only the last 100 lines to prevent memory issues
+	if len(m.output) > 100 {
+		m.output = m.output[len(m.output)-100:]
 	}
-	if strings.Contains(query, "health") && cmdName == "health" {
-		return "Try: nixai health status  or  nixai health monitor"
-	}
-	if strings.Contains(query, "diagnose") && cmdName == "doctor" {
-		return "Try: nixai doctor  or  nixai doctor --verbose"
-	}
-	if strings.Contains(query, "system info") && cmdName == "system-info" {
-		return "Try: nixai system-info  or  nixai system-info --detailed"
-	}
-	if strings.Contains(query, "performance") && cmdName == "performance" {
-		return "Try: nixai performance stats  or  nixai performance cache"
-	}
-	if strings.Contains(query, "package search") && cmdName == "search" {
-		return "Try: nixai search firefox  or  nixai search --config nginx"
-	}
-	
-	// Generic hint using first example
-	if len(cmd.Examples) > 0 {
-		return fmt.Sprintf("Try: %s", cmd.Examples[0])
-	}
-	
-	return fmt.Sprintf("Try: %s", cmd.Usage)
 }
 
-// isNaturalLanguageQuery detects if the input looks like a natural language question/request
-func (t *TUI) isNaturalLanguageQuery(input string) bool {
-	input = strings.ToLower(strings.TrimSpace(input))
+// showHelp displays help information
+func (m *TUI) showHelp() {
+	m.addOutput(m.styles.success.Render("NixAI Commands:"))
+	m.addOutput("")
 	
-	// Check for question words
-	questionWords := []string{"how", "what", "why", "when", "where", "which", "can", "should", "help"}
-	for _, word := range questionWords {
-		if strings.HasPrefix(input, word+" ") {
-			return true
+	commands := getAvailableCommands()
+	currentCategory := ""
+	
+	for _, cmd := range commands {
+		if cmd.Category != currentCategory {
+			m.addOutput(m.styles.prompt.Render("▶ " + cmd.Category))
+			currentCategory = cmd.Category
+		}
+		m.addOutput(fmt.Sprintf("  %s - %s", cmd.Name, cmd.Description))
+	}
+	
+	m.addOutput("")
+	m.addOutput(m.styles.prompt.Render("Built-in Commands:"))
+	m.addOutput("  help - Show this help")
+	m.addOutput("  clear - Clear terminal")
+	m.addOutput("  history - Show command history")
+	m.addOutput("  exit/quit - Exit nixai")
+	m.addOutput("  theme [name] - Change theme")
+	m.addOutput("  plugins - Show plugin status")
+	m.addOutput("")
+	m.addOutput(m.styles.prompt.Render("Navigation & Completion:"))
+	m.addOutput("  ↑/↓ - Navigate history and suggestions")
+	m.addOutput("  Tab - Complete suggestion")
+	m.addOutput("  Space - Show available flags/options")
+	m.addOutput("  Ctrl+C/Esc - Exit")
+	m.addOutput("")
+	m.addOutput(m.styles.prompt.Render("Smart Completion Features:"))
+	m.addOutput("  • Command names: Type partial command names")
+	m.addOutput("  • Flags & options: Automatic flag suggestions")
+	m.addOutput("  • Values: Context-aware value completion")
+	m.addOutput("  • Examples: 'ask --provider ' shows provider options")
+	m.addOutput("  • Examples: 'web --port ' shows common port numbers")
+	m.addOutput("  • Examples: 'configure ' shows configuration targets")
+	m.addOutput("")
+	m.addOutput(m.styles.accent.Render("Available Themes:"))
+	for name, theme := range themes {
+		if name == m.currentTheme {
+			m.addOutput(fmt.Sprintf("  %s %s (current)", m.styles.success.Render("●"), theme.Name))
+		} else {
+			m.addOutput(fmt.Sprintf("  %s %s", m.styles.muted.Render("○"), theme.Name))
 		}
 	}
+	m.addOutput("")
 	
-	// Check for help phrases
-	helpPhrases := []string{"help me", "i need", "i want", "show me", "find", "search for"}
-	for _, phrase := range helpPhrases {
-		if strings.Contains(input, phrase) {
-			return true
-		}
+	// Add plugin information if available
+	if m.pluginIntegration != nil {
+		m.addOutput(m.styles.accent.Render("Plugin Information:"))
+		m.addOutput("  The nixai plugin system allows extending functionality with custom commands.")
+		m.addOutput("  Use 'plugins' command to see currently loaded plugins.")
+		m.addOutput("  Built-in plugins include system-info and package-monitor for enhanced functionality.")
+		m.addOutput("")
 	}
-	
-	// Check for multiple words (likely a sentence)
-	words := strings.Fields(input)
-	if len(words) >= 3 {
-		return true
-	}
-	
-	// Check for action verbs
-	actionVerbs := []string{"monitor", "check", "analyze", "fix", "configure", "install", "build", "deploy", 
-		"plugin", "list", "search", "enable", "disable"}
-	for _, verb := range actionVerbs {
-		if strings.Contains(input, verb) {
-			return true
-		}
-	}
-	
-	return false
 }
 
-// showIntelligentSuggestions displays AI-powered command suggestions
-func (t *TUI) showIntelligentSuggestions(query string) {
-	fmt.Print("\033[2J\033[H") // Clear screen
-	
-	fmt.Println(titleStyle.Render("🤖 AI-Powered Command Suggestions"))
-	fmt.Println()
-	fmt.Printf("Query: %s\n", usageStyle.Render(fmt.Sprintf("\"%s\"", query)))
-	fmt.Println()
-	
-	if len(t.suggestions) == 0 {
-		fmt.Println(helpStyle.Render("No relevant commands found for your query."))
-		fmt.Println()
-		fmt.Print("Press Enter to continue...")
-		fmt.Scanln()
+// showHistory displays command history
+func (m *TUI) showHistory() {
+	if len(m.commandHistory) == 0 {
+		m.addOutput("No command history")
 		return
 	}
 	
-	fmt.Println(categoryStyle.Render("Suggested Commands:"))
-	fmt.Println()
+	m.addOutput(m.styles.success.Render("Command History:"))
+	for i, cmd := range m.commandHistory {
+		m.addOutput(fmt.Sprintf("  %d: %s", i+1, cmd))
+	}
+	m.addOutput("")
+}
+
+// handleThemeCommand handles theme switching commands
+func (m *TUI) handleThemeCommand(input string) {
+	parts := strings.Fields(input)
 	
-	for i, suggestion := range t.suggestions {
-		// Command header
-		relevanceStr := fmt.Sprintf("%.0f%% match", suggestion.Relevance*100)
-		fmt.Printf("  %s %s %s\n",
-			selectedStyle.Render(fmt.Sprintf("[%d]", i+1)),
-			selectedStyle.Render(suggestion.Command.Name),
-			normalStyle.Render(fmt.Sprintf("(%s)", relevanceStr)))
-		
-		// Description
-		fmt.Printf("     %s\n", descriptionStyle.Render(suggestion.Command.Description))
-		
-		// Reason
-		fmt.Printf("     💡 %s\n", helpStyle.Render(suggestion.Reason))
-		
-		// Usage hint
-		if suggestion.UsageHint != "" {
-			fmt.Printf("     🔧 %s\n", usageStyle.Render(suggestion.UsageHint))
+	if len(parts) == 1 {
+		// Show current theme and available themes
+		m.addOutput(m.styles.accent.Render("Current Theme:"))
+		m.addOutput(fmt.Sprintf("  %s", themes[m.currentTheme].Name))
+		m.addOutput("")
+		m.addOutput(m.styles.accent.Render("Available Themes:"))
+		for name, theme := range themes {
+			if name == m.currentTheme {
+				m.addOutput(fmt.Sprintf("  %s %s (current)", m.styles.success.Render("●"), theme.Name))
+			} else {
+				m.addOutput(fmt.Sprintf("  %s %s", m.styles.muted.Render("○"), theme.Name))
+			}
 		}
-		
-		// Keywords if any
-		if len(suggestion.Keywords) > 0 {
-			fmt.Printf("     🏷️  Keywords: %s\n", 
-				normalStyle.Render(strings.Join(suggestion.Keywords, ", ")))
-		}
-		
-		// Special note for plugin commands
-		if suggestion.Command.Category == "Plugin Commands" || suggestion.Command.Category == "External Plugins" {
-			fmt.Printf("     🔌 %s\n", infoStyle.Render("This is a plugin command"))
-		}
-		
-		fmt.Println()
+		m.addOutput("")
+		m.addOutput(m.styles.muted.Render("Usage: theme [name]"))
+		return
 	}
 	
-	fmt.Println(helpStyle.Render("Enter suggestion number to execute, or press Enter to go back"))
-	fmt.Print("> ")
+	if len(parts) >= 2 {
+		themeName := parts[1]
+		
+		// Check if theme exists
+		if theme, exists := themes[themeName]; exists {
+			// Switch to new theme
+			m.currentTheme = themeName
+			m.styles = createThemeStyles(theme)
+			
+			m.addOutput(m.styles.success.Render(fmt.Sprintf("Switched to %s theme", theme.Name)))
+			m.addOutput("")
+			
+			// Show a preview of the new theme colors
+			m.addOutput(m.styles.accent.Render("Theme Preview:"))
+			m.addOutput(fmt.Sprintf("  %s Primary color", m.styles.prompt.Render("●")))
+			m.addOutput(fmt.Sprintf("  %s Success color", m.styles.success.Render("●")))
+			m.addOutput(fmt.Sprintf("  %s Warning color", m.styles.warning.Render("●")))
+			m.addOutput(fmt.Sprintf("  %s Error color", m.styles.error.Render("●")))
+			m.addOutput(fmt.Sprintf("  %s Accent color", m.styles.accent.Render("●")))
+			m.addOutput(fmt.Sprintf("  %s Muted color", m.styles.muted.Render("●")))
+		} else {
+			m.addOutput(m.styles.error.Render(fmt.Sprintf("Theme '%s' not found", themeName)))
+			m.addOutput("")
+			m.addOutput(m.styles.muted.Render("Available themes:"))
+			for _, theme := range themes {
+				m.addOutput(fmt.Sprintf("  %s", theme.Name))
+			}
+		}
+	}
+	m.addOutput("")
+}
+
+// showLogo displays the NixAI ASCII logo on startup
+func (m *TUI) showLogo() {
+	// Logo ASCII art
+	logoLines := []string{
+		"",
+		m.styles.logo.Render("      ███╗   ██╗██╗██╗  ██╗ █████╗ ██╗"),
+		m.styles.logo.Render("      ████╗  ██║██║╚██╗██╔╝██╔══██╗██║"),
+		m.styles.logo.Render("      ██╔██╗ ██║██║ ╚███╔╝ ███████║██║"),
+		m.styles.logo.Render("      ██║╚██╗██║██║ ██╔██╗ ██╔══██║██║"),
+		m.styles.logo.Render("      ██║ ╚████║██║██╔╝ ██╗██║  ██║██║"),
+		m.styles.logo.Render("      ╚═╝  ╚═══╝╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝"),
+		"",
+	}
 	
-	var choice string
-	fmt.Scanln(&choice)
+	// Create feature box using lipgloss
+	featureBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(themes[m.currentTheme].Success)).
+		Padding(0, 1).
+		Margin(0, 0, 0, 6). // Left margin to center with logo
+		Render(
+			"AI-Powered NixOS Assistant\n" +
+			"Intelligent Configuration\n" +
+			"Smart Troubleshooting\n" +
+			"Declarative System Management")
 	
-	// Handle suggestion selection
-	if num := parseNumber(choice); num > 0 && num <= len(t.suggestions) {
-		selectedSuggestion := t.suggestions[num-1]
-		t.executeCommand(selectedSuggestion.Command)
+	// Help text
+	helpLines := []string{
+		"",
+		m.styles.muted.Render("      → Type 'help' to see all available commands"),
+		m.styles.muted.Render("      → Start typing for intelligent suggestions"),
+		m.styles.muted.Render("      → Use 'theme [name]' to change themes"),
+		m.styles.accent.Render(fmt.Sprintf("      → Current theme: %s", themes[m.currentTheme].Name)),
+		"",
+	}
+	
+	// Add all logo lines
+	for _, line := range logoLines {
+		m.addOutput(line)
+	}
+	
+	// Add feature box
+	m.addOutput(featureBox)
+	
+	// Add help lines
+	for _, line := range helpLines {
+		m.addOutput(line)
 	}
 }
 
-// updateParseNumber to handle more numbers for suggestions
-func parseNumber(input string) int {
-	switch input {
-	case "0": return 0
-	case "1": return 1
-	case "2": return 2
-	case "3": return 3
-	case "4": return 4
-	case "5": return 5
-	case "6": return 6
-	case "7": return 7
-	case "8": return 8
-	case "9": return 9
-	case "10": return 10
-	case "11": return 11
-	case "12": return 12
-	case "13": return 13
-	case "14": return 14
-	case "15": return 15
-	case "16": return 16
-	case "17": return 17
-	case "18": return 18
-	case "19": return 19
-	case "20": return 20
-	case "21": return 21
-	case "22": return 22
-	case "23": return 23
-	case "24": return 24
-	case "25": return 25
-	case "26": return 26
-	case "27": return 27
-	case "28": return 28
-	case "29": return 29
-	case "30": return 30
-	case "31": return 31
-	case "32": return 32
-	case "33": return 33
-	case "34": return 34
-	case "35": return 35
-	case "36": return 36
-	case "37": return 37
-	case "38": return 38
-	case "39": return 39
-	case "40": return 40
-	case "41": return 41
-	case "42": return 42
-	case "43": return 43
-	default: return -1
+// View renders the TUI
+func (m *TUI) View() string {
+	var sections []string
+
+	// Header
+	header := m.styles.header.Render(fmt.Sprintf("🚀 NixAI Terminal Interface - %s Theme", themes[m.currentTheme].Name))
+	sections = append(sections, header)
+
+	// Calculate available height for output
+	headerHeight := 3 // Header + borders
+	commandBoxHeight := 4 // Command box + borders
+	suggestionsHeight := 0
+	if m.showSuggestions {
+		filtered := m.getFilteredSuggestions()
+		suggestionsHeight = len(filtered) + 2 // Suggestions + borders
 	}
+	
+	availableHeight := m.height - headerHeight - commandBoxHeight - suggestionsHeight - 2
+
+	// Output section (command execution results)
+	outputLines := m.output
+	if len(outputLines) > availableHeight && availableHeight > 0 {
+		outputLines = outputLines[len(outputLines)-availableHeight:]
+	}
+
+	outputContent := strings.Join(outputLines, "\n")
+	if outputContent == "" {
+		outputContent = " " // Ensure some content for proper rendering
+	}
+	
+	outputSection := m.styles.output.Render(outputContent)
+	sections = append(sections, outputSection)
+
+	// Suggestions section (if visible)
+	if m.showSuggestions {
+		suggestions := m.renderSuggestions()
+		sections = append(sections, suggestions)
+	}
+
+	// Command input box at the bottom
+	commandContent := m.styles.prompt.Render("nixai > ") + m.textInput.View()
+	commandBox := m.styles.commandBox.Width(m.width - 4).Render(commandContent)
+	sections = append(sections, commandBox)
+
+	// Version information under command box
+	versionText := m.styles.versionInfo.Width(m.width - 2).Render(
+		fmt.Sprintf("nixai v%s | Theme: %s | Press Ctrl+C to exit", 
+			version.Get().Short(), 
+			themes[m.currentTheme].Name))
+	sections = append(sections, versionText)
+
+	return strings.Join(sections, "\n")
+}
+
+// renderSuggestions renders the suggestions dropdown
+func (m *TUI) renderSuggestions() string {
+	filtered := m.getFilteredSuggestions()
+	if len(filtered) == 0 {
+		return ""
+	}
+
+	var suggestionLines []string
+	suggestionLines = append(suggestionLines, m.styles.accent.Render("Suggestions:"))
+	
+	for i, suggestion := range filtered {
+		if i == m.selectedSuggestion {
+			suggestionLines = append(suggestionLines, m.styles.selectedSug.Render("  "+suggestion))
+		} else {
+			suggestionLines = append(suggestionLines, m.styles.suggestion.Render("  "+suggestion))
+		}
+	}
+
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(themes[m.currentTheme].Border)).
+		Padding(0, 1).
+		Margin(0, 1).
+		Render(strings.Join(suggestionLines, "\n"))
+}
+
+// removeDuplicates removes duplicate strings from a slice while preserving order
+func removeDuplicates(slice []string) []string {
+	seen := make(map[string]bool)
+	result := []string{}
+	
+	for _, item := range slice {
+		if !seen[item] {
+			seen[item] = true
+			result = append(result, item)
+		}
+	}
+	
+	return result
+}
+
+// Start starts the TUI
+func Start() error {
+	p := tea.NewProgram(NewTUI(), tea.WithAltScreen())
+	_, err := p.Run()
+	return err
 }
