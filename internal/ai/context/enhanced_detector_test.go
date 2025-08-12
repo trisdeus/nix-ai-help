@@ -91,16 +91,24 @@ func TestEnhancedContextDetector(t *testing.T) {
 
 	// Test configuration files detection
 	configFiles := ecd.detectConfigurationFiles(cfg)
-	// This should be a slice (can be empty)
+	// This should be a slice (can be empty but never nil)
 	if configFiles == nil {
 		t.Error("Expected configuration files slice, got nil")
+	}
+	// In test environment, this will typically be empty
+	if len(configFiles) == 0 {
+		t.Log("Configuration files slice is empty (expected in test environment)")
 	}
 
 	// Test enabled services detection
 	services := ecd.detectEnabledServices()
-	// This should be a slice (can be empty)
+	// This should be a slice (can be empty but never nil)
 	if services == nil {
 		t.Error("Expected services slice, got nil")
+	}
+	// In test environment, this will typically be empty
+	if len(services) == 0 {
+		t.Log("Services slice is empty (expected in test environment)")
 	}
 
 	// Test installed packages detection
@@ -232,16 +240,24 @@ func TestEnhancedContextDetectorEdgeCases(t *testing.T) {
 
 	// Test detecting configuration files
 	configFiles := ecd.detectConfigurationFiles(cfg)
-	// This should be a slice (can be empty)
+	// This should be a slice (can be empty but never nil)
 	if configFiles == nil {
 		t.Error("Expected configuration files slice, got nil")
+	}
+	// In test environment, this will typically be empty
+	if len(configFiles) == 0 {
+		t.Log("Configuration files slice is empty (expected in test environment)")
 	}
 
 	// Test detecting enabled services
 	services := ecd.detectEnabledServices()
-	// This should be a slice (can be empty)
+	// This should be a slice (can be empty but never nil)
 	if services == nil {
 		t.Error("Expected services slice, got nil")
+	}
+	// In test environment, this will typically be empty
+	if len(services) == 0 {
+		t.Log("Services slice is empty (expected in test environment)")
 	}
 
 	// Test detecting installed packages
