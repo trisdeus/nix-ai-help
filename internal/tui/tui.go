@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -50,6 +51,12 @@ type TUI struct {
 	pluginIntegration *PluginIntegration
 	pluginCommands    []string
 	pluginSuggestions []string
+	
+	// Enhanced intelligent discovery
+	intelligentDiscovery *IntelligentDiscovery
+	currentSuggestions   []SuggestionScore
+	showDetailedHelp     bool
+	lastCommandStart     time.Time
 }
 
 // NewTUI creates a new TUI
@@ -72,16 +79,19 @@ func NewTUI() *TUI {
 
 	// Initialize plugin integration
 	tui := &TUI{
-		textInput:         ti,
-		output:            []string{},
-		commandHistory:    []string{},
-		historyIndex:      -1,
-		suggestions:       getAllCommandSuggestions(),
-		currentTheme:      defaultTheme,
-		styles:            styles,
-		pluginIntegration: pluginIntegration,
-		pluginCommands:    []string{},
-		pluginSuggestions: []string{},
+		textInput:           ti,
+		output:              []string{},
+		commandHistory:      []string{},
+		historyIndex:        -1,
+		suggestions:         getAllCommandSuggestions(),
+		currentTheme:        defaultTheme,
+		styles:              styles,
+		pluginIntegration:   pluginIntegration,
+		pluginCommands:      []string{},
+		pluginSuggestions:   []string{},
+		intelligentDiscovery: NewIntelligentDiscovery(logger),
+		currentSuggestions:  make([]SuggestionScore, 0),
+		showDetailedHelp:    false,
 	}
 	
 	// Initialize plugin manager for dynamic commands
@@ -144,57 +154,6 @@ func (m *TUI) updatePluginCommands() {
 	m.suggestions = removeDuplicates(allSuggestions)
 }
 
-// getAvailableCommands returns Command structs for all available nixai commands
-func getAvailableCommands() []Command {
-	return []Command{
-		// Core AI commands
-		{Name: "ai-config", Description: "AI-powered configuration generation and management", Category: "AI", Usage: "nixai ai-config [action]", Examples: []string{"nixai ai-config generate"}},
-		{Name: "ask", Description: "Ask AI questions about NixOS", Category: "AI", Usage: "nixai ask \"your question\"", Examples: []string{"nixai ask \"how to configure nginx?\""}},
-		{Name: "configure", Description: "Interactive NixOS configuration assistant", Category: "Configuration", Usage: "nixai configure [service]", Examples: []string{"nixai configure nginx"}},
-		{Name: "explain-option", Description: "Explain a NixOS option using AI", Category: "Documentation", Usage: "nixai explain-option [option]", Examples: []string{"nixai explain-option services.nginx.enable"}},
-		{Name: "explain-home-option", Description: "Explain a Home Manager option", Category: "Documentation", Usage: "nixai explain-home-option [option]", Examples: []string{"nixai explain-home-option programs.git.enable"}},
-		
-		// Build and development
-		{Name: "build", Description: "Build and analyze NixOS configurations", Category: "Build", Usage: "nixai build [options]", Examples: []string{"nixai build --dry-run"}},
-		{Name: "devenv", Description: "Create and manage development environments", Category: "Development", Usage: "nixai devenv [action]", Examples: []string{"nixai devenv create"}},
-		{Name: "dev", Description: "Developer Experience Revolution", Category: "Development", Usage: "nixai dev [action]", Examples: []string{"nixai dev setup"}},
-		{Name: "import", Description: "Import configurations and templates", Category: "Templates", Usage: "nixai import [source]", Examples: []string{"nixai import config.nix"}},
-		{Name: "templates", Description: "List and manage project templates", Category: "Templates", Usage: "nixai templates [action]", Examples: []string{"nixai templates list"}},
-		
-		// Diagnostics and troubleshooting
-		{Name: "diagnose", Description: "Diagnose system issues and problems", Category: "Diagnostics", Usage: "nixai diagnose [component]", Examples: []string{"nixai diagnose boot"}},
-		{Name: "doctor", Description: "Run comprehensive NixOS health checks", Category: "Diagnostics", Usage: "nixai doctor [options]", Examples: []string{"nixai doctor --verbose"}},
-		{Name: "error", Description: "Error handling and analytics management", Category: "Support", Usage: "nixai error [action]", Examples: []string{"nixai error analyze"}},
-		{Name: "logs", Description: "Analyze and diagnose NixOS system logs", Category: "Diagnostics", Usage: "nixai logs [options]", Examples: []string{"nixai logs analyze"}},
-		{Name: "performance", Description: "Performance monitoring and optimization", Category: "Performance", Usage: "nixai performance [action]", Examples: []string{"nixai performance stats"}},
-		{Name: "health", Description: "System health monitoring and prediction", Category: "Monitoring", Usage: "nixai health [action]", Examples: []string{"nixai health status"}},
-		
-		// Package and dependency management
-		{Name: "deps", Description: "Analyze NixOS configuration dependencies", Category: "Analysis", Usage: "nixai deps [options]", Examples: []string{"nixai deps analyze"}},
-		{Name: "package-repo", Description: "Analyze Git repositories and generate Nix derivations", Category: "Packages", Usage: "nixai package-repo [repo-url]", Examples: []string{"nixai package-repo https://github.com/user/repo"}},
-		{Name: "search", Description: "Search for NixOS packages/services", Category: "Packages", Usage: "nixai search [query]", Examples: []string{"nixai search firefox"}},
-		{Name: "store", Description: "Manage, backup, and analyze the Nix store", Category: "Store", Usage: "nixai store [action]", Examples: []string{"nixai store analyze"}},
-		{Name: "gc", Description: "AI-powered garbage collection analysis", Category: "Maintenance", Usage: "nixai gc [action]", Examples: []string{"nixai gc analyze"}},
-		
-		// Flake management
-		{Name: "flake", Description: "Manage NixOS flakes and configurations", Category: "Flakes", Usage: "nixai flake [action]", Examples: []string{"nixai flake create"}},
-		{Name: "migrate", Description: "AI-powered migration assistant", Category: "Migration", Usage: "nixai migrate [action]", Examples: []string{"nixai migrate to-flakes"}},
-		
-		// System and hardware
-		{Name: "hardware", Description: "Hardware detection and optimization", Category: "Hardware", Usage: "nixai hardware [action]", Examples: []string{"nixai hardware detect"}},
-		{Name: "context", Description: "Manage NixOS system context detection", Category: "Intelligence", Usage: "nixai context [action]", Examples: []string{"nixai context detect"}},
-		{Name: "intelligence", Description: "AI-powered system intelligence", Category: "Intelligence", Usage: "nixai intelligence [action]", Examples: []string{"nixai intelligence analyze"}},
-		
-		// Integration and tools
-		{Name: "web", Description: "Start the web interface", Category: "Web Interface", Usage: "nixai web start [options]", Examples: []string{"nixai web start"}},
-		{Name: "plugin", Description: "Manage nixai plugins", Category: "Extensibility", Usage: "nixai plugin [action]", Examples: []string{"nixai plugin list"}},
-		{Name: "mcp-server", Description: "Manage the Model Context Protocol server", Category: "Integration", Usage: "nixai mcp-server [action]", Examples: []string{"nixai mcp-server start"}},
-		{Name: "manual", Description: "Built-in comprehensive manual system", Category: "Documentation", Usage: "nixai manual [topic]", Examples: []string{"nixai manual"}},
-		{Name: "learn", Description: "Interactive NixOS learning modules", Category: "Education", Usage: "nixai learn [module]", Examples: []string{"nixai learn basics"}},
-		{Name: "community", Description: "Show NixOS community resources", Category: "Support", Usage: "nixai community [topic]", Examples: []string{"nixai community"}},
-		{Name: "fleet", Description: "Manage machine fleet deployments", Category: "Fleet Management", Usage: "nixai fleet [action]", Examples: []string{"nixai fleet list"}},
-	}
-}
 
 // getAllCommandSuggestions returns all available nixai commands for completion
 func getAllCommandSuggestions() []string {
@@ -618,22 +577,39 @@ func (m *TUI) updateSuggestions() {
 	}
 }
 
-// getFilteredSuggestions returns suggestions that match the current input
+// getFilteredSuggestions returns suggestions that match the current input using intelligent discovery
 func (m *TUI) getFilteredSuggestions() []string {
-	input := strings.ToLower(m.textInput.Value())
-	if input == "" {
-		return m.suggestions[:10] // Show first 10 suggestions when no input
+	input := strings.TrimSpace(m.textInput.Value())
+	
+	// Use intelligent discovery system
+	ctx := context.Background()
+	suggestions, err := m.intelligentDiscovery.GetIntelligentSuggestions(ctx, input, 8)
+	if err != nil {
+		// Fallback to old system
+		return m.getBasicSuggestions(input)
 	}
-
-	// Parse the current input to provide intelligent completion
-	return m.getIntelligentSuggestions(input)
+	
+	// Store current suggestions for detailed display
+	m.currentSuggestions = suggestions
+	
+	// Convert to string format for basic display
+	result := make([]string, len(suggestions))
+	for i, suggestion := range suggestions {
+		result[i] = m.formatSuggestionForDisplay(suggestion)
+	}
+	
+	return result
 }
 
-// getIntelligentSuggestions provides context-aware command completion
-func (m *TUI) getIntelligentSuggestions(input string) []string {
+// getBasicSuggestions provides fallback basic command completion
+func (m *TUI) getBasicSuggestions(input string) []string {
+	if input == "" {
+		return m.suggestions[:8] // Show first 8 suggestions when no input
+	}
+	
 	parts := strings.Fields(input)
 	if len(parts) == 0 {
-		return m.suggestions[:10]
+		return m.suggestions[:8]
 	}
 
 	// Get the current command being typed
@@ -650,6 +626,33 @@ func (m *TUI) getIntelligentSuggestions(input string) []string {
 	}
 
 	return []string{}
+}
+
+// formatSuggestionForDisplay formats an intelligent suggestion for display
+func (m *TUI) formatSuggestionForDisplay(suggestion SuggestionScore) string {
+	// Format: "command - reason (score%)"
+	confidence := int(suggestion.Confidence * 100)
+	
+	// Add urgency indicators
+	indicator := ""
+	switch suggestion.Urgency {
+	case "critical":
+		indicator = "🚨 "
+	case "high":
+		indicator = "⚠️ "
+	case "medium":
+		indicator = "💡 "
+	default:
+		if confidence > 80 {
+			indicator = "⭐ "
+		}
+	}
+	
+	return fmt.Sprintf("%s%s - %s (%d%%)", 
+		indicator, 
+		suggestion.Command.Name, 
+		suggestion.Reason, 
+		confidence)
 }
 
 // getCommandSuggestions returns command name suggestions
@@ -869,12 +872,16 @@ func (m *TUI) handlePluginCommand(input string) {
 	m.addOutput("") // Add empty line for separation
 }
 
-// executeCommand executes the given nixai command
+// executeCommand executes the given nixai command with intelligent tracking
 func (m *TUI) executeCommand(input string) {
 	timestamp := time.Now().Format("15:04:05")
 	m.addOutput(fmt.Sprintf("[%s] %s", 
 		m.styles.timestamp.Render(timestamp),
 		m.styles.prompt.Render("$ nixai "+input)))
+	
+	// Record command start time for analytics
+	commandStart := time.Now()
+	m.lastCommandStart = commandStart
 
 	// Handle built-in commands
 	switch {
@@ -915,6 +922,9 @@ func (m *TUI) executeCommand(input string) {
 	cmd := exec.Command(nixaiPath, args...)
 	
 	output, err := cmd.CombinedOutput()
+	success := err == nil
+	duration := time.Since(commandStart)
+	
 	if err != nil {
 		m.addOutput(m.styles.error.Render(fmt.Sprintf("Error: %v", err)))
 		if len(output) > 0 {
@@ -933,6 +943,12 @@ func (m *TUI) executeCommand(input string) {
 			m.addOutput(m.styles.success.Render("Command executed successfully"))
 		}
 	}
+	
+	// Record command execution for analytics
+	if len(args) > 0 {
+		m.intelligentDiscovery.RecordCommand(args[0], success, duration)
+	}
+	
 	m.addOutput("") // Add empty line for separation
 }
 

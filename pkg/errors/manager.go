@@ -11,16 +11,18 @@ import (
 
 // ErrorManager is the central error handling system for nixai
 type ErrorManager struct {
-	mu                  sync.RWMutex
-	analytics           *ErrorAnalytics
-	messageGenerator    *UserFriendlyMessageGenerator
-	panicHandler        *PanicRecoveryHandler
-	retryManager        *RetryManager
-	debugMode           bool
-	gracefulDegradation bool
-	fallbackHandlers    map[ErrorCategory]FallbackHandler
-	lastErrors          []LastError
-	maxLastErrors       int
+	mu                     sync.RWMutex
+	analytics              *ErrorAnalytics
+	messageGenerator       *UserFriendlyMessageGenerator
+	enhancedCommunicator   *EnhancedErrorCommunicator
+	panicHandler           *PanicRecoveryHandler
+	retryManager           *RetryManager
+	debugMode              bool
+	gracefulDegradation    bool
+	fallbackHandlers       map[ErrorCategory]FallbackHandler
+	lastErrors             []LastError
+	maxLastErrors          int
+	contextualErrorsEnabled bool
 }
 
 // FallbackHandler defines a handler for graceful degradation
@@ -36,13 +38,14 @@ type LastError struct {
 
 // ErrorManagerConfig configures the error manager
 type ErrorManagerConfig struct {
-	DebugMode           bool                              `json:"debug_mode"`
-	GracefulDegradation bool                              `json:"graceful_degradation"`
-	AnalyticsEnabled    bool                              `json:"analytics_enabled"`
-	AnalyticsDataDir    string                            `json:"analytics_data_dir"`
-	RetryConfig         *RetryConfig                      `json:"retry_config"`
-	MaxLastErrors       int                               `json:"max_last_errors"`
-	FallbackHandlers    map[ErrorCategory]FallbackHandler `json:"-"`
+	DebugMode              bool                              `json:"debug_mode"`
+	GracefulDegradation    bool                              `json:"graceful_degradation"`
+	AnalyticsEnabled       bool                              `json:"analytics_enabled"`
+	AnalyticsDataDir       string                            `json:"analytics_data_dir"`
+	RetryConfig            *RetryConfig                      `json:"retry_config"`
+	MaxLastErrors          int                               `json:"max_last_errors"`
+	FallbackHandlers       map[ErrorCategory]FallbackHandler `json:"-"`
+	ContextualErrorsEnabled bool                             `json:"contextual_errors_enabled"`
 }
 
 // DefaultErrorManagerConfig returns a default configuration
@@ -51,13 +54,14 @@ func DefaultErrorManagerConfig() *ErrorManagerConfig {
 	dataDir := filepath.Join(homeDir, ".config", "nixai", "error_analytics")
 
 	return &ErrorManagerConfig{
-		DebugMode:           false,
-		GracefulDegradation: true,
-		AnalyticsEnabled:    true,
-		AnalyticsDataDir:    dataDir,
-		RetryConfig:         DefaultRetryConfig(),
-		MaxLastErrors:       50,
-		FallbackHandlers:    make(map[ErrorCategory]FallbackHandler),
+		DebugMode:              false,
+		GracefulDegradation:    true,
+		AnalyticsEnabled:       true,
+		AnalyticsDataDir:       dataDir,
+		RetryConfig:            DefaultRetryConfig(),
+		MaxLastErrors:          50,
+		FallbackHandlers:       make(map[ErrorCategory]FallbackHandler),
+		ContextualErrorsEnabled: true,
 	}
 }
 
@@ -73,15 +77,17 @@ func NewErrorManager(config *ErrorManagerConfig) *ErrorManager {
 	}
 
 	manager := &ErrorManager{
-		analytics:           analytics,
-		messageGenerator:    NewUserFriendlyMessageGenerator(),
-		panicHandler:        NewPanicRecoveryHandler(nil),
-		retryManager:        NewRetryManager(config.RetryConfig),
-		debugMode:           config.DebugMode,
-		gracefulDegradation: config.GracefulDegradation,
-		fallbackHandlers:    make(map[ErrorCategory]FallbackHandler),
-		lastErrors:          make([]LastError, 0, config.MaxLastErrors),
-		maxLastErrors:       config.MaxLastErrors,
+		analytics:              analytics,
+		messageGenerator:       NewUserFriendlyMessageGenerator(),
+		enhancedCommunicator:   NewEnhancedErrorCommunicator(),
+		panicHandler:           NewPanicRecoveryHandler(nil),
+		retryManager:           NewRetryManager(config.RetryConfig),
+		debugMode:              config.DebugMode,
+		gracefulDegradation:    config.GracefulDegradation,
+		fallbackHandlers:       make(map[ErrorCategory]FallbackHandler),
+		lastErrors:             make([]LastError, 0, config.MaxLastErrors),
+		maxLastErrors:          config.MaxLastErrors,
+		contextualErrorsEnabled: config.ContextualErrorsEnabled,
 	}
 
 	// Copy provided fallback handlers if any
@@ -191,9 +197,47 @@ func (em *ErrorManager) GetUserFriendlyMessage(err error) string {
 	return em.messageGenerator.GenerateUserFriendlyMessage(err)
 }
 
+// GetEnhancedErrorMessage returns an AI-powered enhanced error message with context
+func (em *ErrorManager) GetEnhancedErrorMessage(ctx context.Context, err error, context string) string {
+	if !em.contextualErrorsEnabled || em.enhancedCommunicator == nil {
+		return em.GetUserFriendlyMessage(err)
+	}
+	
+	return em.enhancedCommunicator.GenerateEnhancedMessage(ctx, err, context)
+}
+
 // GetFormattedError returns a formatted error for display
 func (em *ErrorManager) GetFormattedError(err error) string {
 	return FormatErrorForDisplay(err, em.debugMode)
+}
+
+// GetFormattedErrorWithContext returns a formatted error with enhanced context
+func (em *ErrorManager) GetFormattedErrorWithContext(ctx context.Context, err error, context string) string {
+	if !em.contextualErrorsEnabled {
+		return em.GetFormattedError(err)
+	}
+	
+	enhanced := em.GetEnhancedErrorMessage(ctx, err, context)
+	
+	if em.debugMode {
+		enhanced += "\n\n" + FormatErrorForDisplay(err, true)
+	}
+	
+	return enhanced
+}
+
+// EnableContextualErrors enables or disables contextual error messages
+func (em *ErrorManager) EnableContextualErrors(enabled bool) {
+	em.mu.Lock()
+	defer em.mu.Unlock()
+	em.contextualErrorsEnabled = enabled
+}
+
+// IsContextualErrorsEnabled returns whether contextual errors are enabled
+func (em *ErrorManager) IsContextualErrorsEnabled() bool {
+	em.mu.RLock()
+	defer em.mu.RUnlock()
+	return em.contextualErrorsEnabled
 }
 
 // RecordResolution records how an error was resolved

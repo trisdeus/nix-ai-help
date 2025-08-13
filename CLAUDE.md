@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**nixai** is a revolutionary NixOS AI assistant written in Go 1.23+ that provides intelligent system administration through natural language commands. It uses clean architecture with modular AI provider management and specializes in NixOS configuration, troubleshooting, and hardware optimization. **Current version: 2.1.0**
+**nixai** is a revolutionary NixOS AI assistant written in Go 1.23+ that provides intelligent system administration through natural language commands. It uses clean architecture with modular AI provider management and specializes in NixOS configuration, troubleshooting, and hardware optimization. **Current version: 2.2.0**
 
 ## Development Environment
 
@@ -24,13 +24,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Build Commands
 ```bash
-# Recommended: Nix flake build (clean version 2.1.0)
+# Recommended: Nix flake build (clean version 2.2.0)
 nix build
-./result/bin/nixai --version  # Shows: nixai version 2.1.0
+./result/bin/nixai --version  # Shows: nixai version 2.2.0
 
 # Development build (with git info)
 just build
-./nixai --version             # Shows: nixai version v2.1.0-dirty
+./nixai --version             # Shows: nixai version v2.2.0-dirty
 
 # Production build with optimizations  
 just build-prod
@@ -77,13 +77,13 @@ nix run . -- ask "help me with health status"  # Natural language queries
 nix run . -- tui           # Intelligent TUI interface
 ```
 
-## Latest Major Features (v2.1.0)
+## Latest Major Features (v2.2.0)
 
 ### 🤖 Intelligent TUI with AI-Powered Command Search
-- **Location**: `/internal/tui/tui.go`
-- **Feature**: Natural language query understanding with 800+ keyword mappings
-- **Usage**: Type "help me with health status" in TUI for intelligent suggestions
-- **Implementation**: `intelligentCommandSearch()` with relevance scoring and usage hints
+- **Location**: `/internal/tui/tui.go` + `/internal/tui/intelligent_discovery.go`
+- **Feature**: Natural language query understanding with AI-powered command discovery
+- **Usage**: Type "help me with health status" in TUI for intelligent suggestions with fuzzy matching
+- **Implementation**: `intelligentCommandSearch()` with relevance scoring, usage analytics, and context-aware recommendations
 
 ### 🔍 Real System Monitoring (No Mock Data)
 - **Health System**: `/internal/health/predictor.go` - Real `/proc/*` data collection
@@ -91,7 +91,19 @@ nix run . -- tui           # Intelligent TUI interface
 - **Fleet Management**: `/internal/fleet/manager.go` - Real SSH connectivity and health checks
 - **Workflow System**: `/internal/workflow/executor.go` - Actual system command execution
 
-### 📊 CPU-Aware System Thresholds
+### 🔧 Enhanced Hardware Detection and Profiling
+- **Location**: `/internal/hardware/enhanced_detector.go` + detection/profiling methods
+- **Feature**: Comprehensive hardware analysis with detailed CPU, GPU, memory, storage, network profiling
+- **Implementation**: Hardware caching with TTL, vendor-specific capability detection, security feature analysis
+- **Integration**: Enhanced hardware function with fallback to basic detection for reliability
+
+### 📊 Configuration Dependency Analysis  
+- **Location**: `/internal/nixos/dependency/` - Complete dependency analysis system
+- **Feature**: Rule-based dependency detection, conflict resolution, hardware-aware recommendations
+- **Implementation**: 25+ predefined rules, dependency graph generation, circular dependency detection
+- **Function**: AI-powered `dependency-analysis` function with actionable insights and config suggestions
+
+### 📈 CPU-Aware System Thresholds
 - **Load Average**: Critical threshold = CPU cores × 1.5 (e.g., 192.0 for 128-core system)
 - **Network Usage**: Heuristic calculation, not cumulative bytes since boot
 - **Process Count**: Actual running processes from `/proc/` PID directories
@@ -100,7 +112,7 @@ nix run . -- tui           # Intelligent TUI interface
 
 ### Clean Architecture Layers
 - **CLI Layer** (`/internal/cli/`) - Command-line interface and command implementations
-- **AI Layer** (`/internal/ai/`) - 26+ specialized agents, 29+ functions, multi-provider management
+- **AI Layer** (`/internal/ai/`) - 26+ specialized agents, 30+ functions, multi-provider management
 - **Core Layer** (`/internal/nixos/`, `/internal/packaging/`) - NixOS-specific logic and package analysis
 - **Infrastructure** (`/pkg/`) - Logging, utilities, error handling
 
@@ -108,7 +120,9 @@ nix run . -- tui           # Intelligent TUI interface
 - **Agent System** (`/internal/ai/agent/`) - Role-based AI agents for different commands with specialized prompts
 - **Function Calling** (`/internal/ai/function/`) - Structured AI functions with comprehensive testing
 - **Multi-Provider Management** - Unified interface for 7 AI providers (Ollama, OpenAI, Gemini, Claude, Groq, LlamaCpp, GitHub Copilot)
-- **Intelligent TUI** (`/internal/tui/`) - Bubble Tea-based terminal interface with AI-powered command search
+- **Intelligent TUI** (`/internal/tui/`) - Bubble Tea-based terminal interface with AI-powered command discovery and fuzzy search
+- **Enhanced Hardware Detection** (`/internal/hardware/`) - Comprehensive hardware profiling with caching and vendor-specific analysis  
+- **Dependency Analysis System** (`/internal/nixos/dependency/`) - Rule-based configuration analysis with conflict detection
 - **MCP Server** (`/internal/mcp/`) - Model Context Protocol integration for VS Code/Neovim
 - **Real Monitoring** (`/internal/health/`, `/internal/fleet/`) - Authentic system metrics collection
 
@@ -120,7 +134,7 @@ nix run . -- tui           # Intelligent TUI interface
 
 ## Development Guidelines
 
-### Latest Code Changes (v2.1.0)
+### Latest Code Changes (v2.2.0)
 1. **All mock data eliminated** - Health, performance, fleet, and workflow systems now use real data
 2. **Intelligent TUI implemented** - Natural language command search with AI suggestions
 3. **CPU-aware thresholds** - System monitoring adapts to hardware capabilities
@@ -185,8 +199,8 @@ nix run . -- tui           # Intelligent TUI interface
 - **Dependencies**: All managed through Nix flakes
 
 ### Build System Strategy
-- **Development**: `just build` uses git tags with dirty status (v2.1.0-dirty)
-- **Distribution**: `nix build` uses clean version numbers (2.1.0)
+- **Development**: `just build` uses git tags with dirty status (v2.2.0-dirty)
+- **Distribution**: `nix build` uses clean version numbers (2.2.0)
 - **CI/Package**: Nix flakes provide reproducible builds
 
 ### AI Function Development
@@ -215,13 +229,15 @@ nix run . -- tui           # Intelligent TUI interface
 
 ## Latest Changes Tracking
 
-### Completed in v2.1.0
+### Completed in v2.2.0
 - ✅ Intelligent TUI with AI-powered command search
 - ✅ Real system monitoring (eliminated all mock data)
 - ✅ CPU-aware threshold calculations
 - ✅ Accurate network utilization measurement
 - ✅ Real workflow action execution
-- ✅ Version update to 2.1.0 across all build systems
+- ✅ Enhanced hardware detection with comprehensive profiling system
+- ✅ Configuration dependency analysis with conflict detection  
+- ✅ Version update to 2.2.0 across all build systems
 - ✅ Comprehensive documentation updates
 
 ### Current Priorities
@@ -244,7 +260,7 @@ nix build              # Clean production build
 ### Version Management
 - **Git Tags**: Used by justfile for development builds (shows dirty status)
 - **Nix Flakes**: Provide clean version numbers for distribution
-- **Current Version**: 2.1.0 (updated across all systems)
+- **Current Version**: 2.2.0 (updated across all systems)
 
 ## Best Practices for Contributors
 

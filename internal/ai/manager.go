@@ -16,16 +16,49 @@ import (
 	"nix-ai-help/pkg/logger"
 )
 
+// ProviderPool manages connection pooling for AI providers
+type ProviderPool struct {
+	provider        Provider
+	lastUsed        time.Time
+	health          ProviderHealth
+	lastHealthCheck time.Time
+	initializing    bool
+	mu              sync.RWMutex
+}
+
+// PoolConfig defines connection pooling settings
+type PoolConfig struct {
+	MaxIdleTime           time.Duration `json:"max_idle_time"`
+	HealthCheckInterval   time.Duration `json:"health_check_interval"`
+	InitializationTimeout time.Duration `json:"initialization_timeout"`
+	LazyInitialization    bool          `json:"lazy_initialization"`
+	MaxConcurrentChecks   int           `json:"max_concurrent_checks"`
+}
+
+// ProviderHealth represents health status of a provider
+type ProviderHealth struct {
+	Available    bool              `json:"available"`
+	Latency      time.Duration     `json:"latency"`
+	LastCheck    time.Time         `json:"last_check"`
+	ErrorCount   int               `json:"error_count"`
+	LastError    string            `json:"last_error,omitempty"`
+	ModelStatus  map[string]bool   `json:"model_status,omitempty"`
+	Initialized  bool              `json:"initialized"`
+}
+
 // ProviderManager manages AI providers using the configuration system.
 type ProviderManager struct {
 	registry        *config.ModelRegistry
 	config          *config.UserConfig
-	providers       map[string]Provider  // Cache of initialized providers
-	cache           *cache.Manager       // Response cache manager
-	monitor         *performance.Monitor // Performance monitoring
-	errorManager    *errors.ErrorManager // Error handling and analytics
+	providers       map[string]Provider     // Cache of initialized providers
+	providerPools   map[string]*ProviderPool // Connection pools for providers
+	cache           *cache.Manager          // Response cache manager
+	monitor         *performance.Monitor    // Performance monitoring
+	errorManager    *errors.ErrorManager    // Error handling and analytics
 	logger          *logger.Logger
 	executionConfig *ExecutionWrapperConfig // Execution wrapper configuration
+	poolConfig      *PoolConfig             // Connection pooling configuration
+	mu              sync.RWMutex            // Protects provider pools
 }
 
 // NewProviderManager creates a new provider manager with the given configuration.
@@ -90,48 +123,337 @@ func NewProviderManager(cfg *config.UserConfig, log *logger.Logger) *ProviderMan
 		Patterns:      getDefaultExecutionPatternsStrings(),
 	}
 
-	return &ProviderManager{
+	// Default pool configuration
+	poolConfig := &PoolConfig{
+		MaxIdleTime:           5 * time.Minute,
+		HealthCheckInterval:   30 * time.Second,
+		InitializationTimeout: 10 * time.Second,
+		LazyInitialization:    true,
+		MaxConcurrentChecks:   3,
+	}
+
+	pm := &ProviderManager{
 		registry:        registry,
 		config:          cfg,
 		providers:       make(map[string]Provider),
+		providerPools:   make(map[string]*ProviderPool),
 		cache:           cacheManager,
 		monitor:         performance.NewMonitor(log),
 		errorManager:    errorManager,
 		logger:          log,
 		executionConfig: executionConfig,
+		poolConfig:      poolConfig,
+	}
+
+	// Initialize provider pools without creating providers (lazy loading)
+	pm.setupProviderPools()
+
+	// Start background health checker and cleanup
+	go pm.backgroundHealthChecker()
+	go pm.backgroundPoolCleanup()
+
+	return pm
+}
+
+// setupProviderPools initializes provider pools without creating providers
+func (pm *ProviderManager) setupProviderPools() {
+	providers := pm.registry.GetAvailableProviders()
+	
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	
+	for _, providerName := range providers {
+		if _, exists := pm.providerPools[providerName]; !exists {
+			pm.providerPools[providerName] = &ProviderPool{
+				health: ProviderHealth{
+					Available:   false,
+					Initialized: false,
+					ModelStatus: make(map[string]bool),
+				},
+				lastHealthCheck: time.Time{}, // Force immediate health check when accessed
+			}
+			pm.logger.Debug(fmt.Sprintf("Set up provider pool for: %s", providerName))
+		}
 	}
 }
 
-// GetProvider retrieves or initializes a provider by name.
-func (pm *ProviderManager) GetProvider(providerName string) (Provider, error) {
-	// Check cache first
-	if provider, exists := pm.providers[providerName]; exists {
-		return provider, nil
+// getOrCreateProviderPool gets or creates a provider pool
+func (pm *ProviderManager) getOrCreateProviderPool(providerName string) (*ProviderPool, error) {
+	pm.mu.RLock()
+	pool, exists := pm.providerPools[providerName]
+	pm.mu.RUnlock()
+	
+	if exists {
+		return pool, nil
 	}
-
+	
 	// Check if provider exists in configuration
 	_, err := pm.registry.GetProvider(providerName)
 	if err != nil {
 		return nil, fmt.Errorf("provider '%s' is not configured: %w", providerName, err)
 	}
+	
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	
+	// Double-check after acquiring write lock
+	if pool, exists := pm.providerPools[providerName]; exists {
+		return pool, nil
+	}
+	
+	// Create new pool
+	pool = &ProviderPool{
+		health: ProviderHealth{
+			Available:   false,
+			Initialized: false,
+			ModelStatus: make(map[string]bool),
+		},
+		lastHealthCheck: time.Time{},
+	}
+	pm.providerPools[providerName] = pool
+	pm.logger.Debug(fmt.Sprintf("Created new provider pool for: %s", providerName))
+	
+	return pool, nil
+}
 
-	// Initialize the provider
-	provider, err := pm.initializeProvider(providerName)
+// initializeProviderWithTimeout initializes a provider with a timeout context
+func (pm *ProviderManager) initializeProviderWithTimeout(ctx context.Context, providerName string) (Provider, error) {
+	// Create a channel to receive the result
+	resultChan := make(chan struct {
+		provider Provider
+		err      error
+	}, 1)
+	
+	// Run initialization in a goroutine
+	go func() {
+		provider, err := pm.initializeProvider(providerName)
+		
+		// Wrap provider with execution awareness if enabled
+		if err == nil && pm.executionConfig.Enabled {
+			provider = NewExecutionAwareProvider(provider, pm.executionConfig, pm.logger)
+			pm.logger.Debug(fmt.Sprintf("Wrapped provider %s with execution awareness", providerName))
+		}
+		
+		resultChan <- struct {
+			provider Provider
+			err      error
+		}{provider, err}
+	}()
+	
+	// Wait for result or timeout
+	select {
+	case result := <-resultChan:
+		return result.provider, result.err
+	case <-ctx.Done():
+		return nil, fmt.Errorf("provider initialization timed out: %w", ctx.Err())
+	}
+}
+
+// performHealthCheck performs a health check on a provider pool
+func (pm *ProviderManager) performHealthCheck(providerName string, pool *ProviderPool) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+	
+	if pool.provider == nil {
+		return // Skip health check for uninitialized providers
+	}
+	
+	startTime := time.Now()
+	pool.lastHealthCheck = startTime
+	
+	// Simple health check - try to get provider info
+	_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	// Check if provider is still responsive
+	healthy := true
+	var checkErr error
+	
+	// For providers that support health checking, we could add that here
+	// For now, we'll just check if the provider is still accessible
+	if pool.provider != nil {
+		// Basic availability check - this could be enhanced per provider type
+		pool.health.Available = true
+		pool.health.Latency = time.Since(startTime)
+		pool.health.LastCheck = time.Now()
+		
+		if checkErr != nil {
+			pool.health.Available = false
+			pool.health.LastError = checkErr.Error()
+			pool.health.ErrorCount++
+			healthy = false
+		} else {
+			pool.health.LastError = ""
+		}
+	}
+	
+	if healthy {
+		pm.logger.Debug(fmt.Sprintf("Health check passed for provider: %s (latency: %v)", 
+			providerName, pool.health.Latency))
+	} else {
+		pm.logger.Warn(fmt.Sprintf("Health check failed for provider: %s - %s", 
+			providerName, pool.health.LastError))
+	}
+}
+
+// backgroundHealthChecker runs periodic health checks
+func (pm *ProviderManager) backgroundHealthChecker() {
+	ticker := time.NewTicker(pm.poolConfig.HealthCheckInterval)
+	defer ticker.Stop()
+	
+	for range ticker.C {
+		pm.mu.RLock()
+		pools := make(map[string]*ProviderPool)
+		for name, pool := range pm.providerPools {
+			pools[name] = pool
+		}
+		pm.mu.RUnlock()
+		
+		// Limit concurrent health checks
+		semaphore := make(chan struct{}, pm.poolConfig.MaxConcurrentChecks)
+		
+		for providerName, pool := range pools {
+			// Only check initialized providers
+			pool.mu.RLock()
+			needsCheck := pool.provider != nil && 
+				time.Since(pool.lastHealthCheck) > pm.poolConfig.HealthCheckInterval
+			pool.mu.RUnlock()
+			
+			if needsCheck {
+				go func(name string, p *ProviderPool) {
+					semaphore <- struct{}{} // Acquire
+					defer func() { <-semaphore }() // Release
+					pm.performHealthCheck(name, p)
+				}(providerName, pool)
+			}
+		}
+	}
+}
+
+// backgroundPoolCleanup removes idle providers from memory
+func (pm *ProviderManager) backgroundPoolCleanup() {
+	ticker := time.NewTicker(2 * pm.poolConfig.MaxIdleTime)
+	defer ticker.Stop()
+	
+	for range ticker.C {
+		pm.cleanupIdlePools()
+	}
+}
+
+// cleanupIdlePools removes providers that have been idle for too long
+func (pm *ProviderManager) cleanupIdlePools() {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	
+	for providerName, pool := range pm.providerPools {
+		pool.mu.Lock()
+		
+		// Clean up idle providers to free memory
+		if pool.provider != nil && 
+			time.Since(pool.lastUsed) > pm.poolConfig.MaxIdleTime {
+			
+			pm.logger.Debug(fmt.Sprintf("Cleaning up idle provider: %s", providerName))
+			
+			// Reset the pool but keep the structure for lazy reinitialization
+			pool.provider = nil
+			pool.health.Initialized = false
+			pool.health.Available = false
+		}
+		
+		pool.mu.Unlock()
+	}
+}
+
+// GetProviderHealth returns the health status of a provider
+func (pm *ProviderManager) GetProviderHealth(providerName string) (*ProviderHealth, error) {
+	pm.mu.RLock()
+	pool, exists := pm.providerPools[providerName]
+	pm.mu.RUnlock()
+	
+	if !exists {
+		return nil, fmt.Errorf("provider %s not found", providerName)
+	}
+	
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
+	
+	// Create a copy to avoid race conditions
+	health := pool.health
+	return &health, nil
+}
+
+// GetAllProviderHealth returns health status for all providers
+func (pm *ProviderManager) GetAllProviderHealth() map[string]*ProviderHealth {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+	
+	result := make(map[string]*ProviderHealth)
+	for name, pool := range pm.providerPools {
+		pool.mu.RLock()
+		health := pool.health
+		pool.mu.RUnlock()
+		result[name] = &health
+	}
+	
+	return result
+}
+
+// GetProvider retrieves or initializes a provider by name with connection pooling.
+func (pm *ProviderManager) GetProvider(providerName string) (Provider, error) {
+	// Get from connection pool with lazy initialization
+	pool, err := pm.getOrCreateProviderPool(providerName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize provider '%s': %w", providerName, err)
+		return nil, err
 	}
 
-	// Wrap provider with execution awareness if enabled
-	if pm.executionConfig.Enabled {
-		provider = NewExecutionAwareProvider(provider, pm.executionConfig, pm.logger)
-		pm.logger.Info(fmt.Sprintf("Wrapped provider %s with execution awareness", providerName))
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+
+	// Initialize provider if not already done (lazy initialization)
+	if pool.provider == nil && !pool.initializing {
+		pool.initializing = true
+		pm.logger.Debug(fmt.Sprintf("Lazy initializing provider: %s", providerName))
+		
+		// Initialize with timeout
+		ctx, cancel := context.WithTimeout(context.Background(), pm.poolConfig.InitializationTimeout)
+		defer cancel()
+		
+		provider, initErr := pm.initializeProviderWithTimeout(ctx, providerName)
+		pool.initializing = false
+		
+		if initErr != nil {
+			pool.health.Available = false
+			pool.health.LastError = initErr.Error()
+			pool.health.ErrorCount++
+			return nil, fmt.Errorf("failed to initialize provider '%s': %w", providerName, initErr)
+		}
+		
+		pool.provider = provider
+		pool.health.Initialized = true
+		pool.health.Available = true
+		pool.lastUsed = time.Now()
+		pm.logger.Info(fmt.Sprintf("Successfully initialized provider: %s", providerName))
 	}
 
-	// Cache the provider
-	pm.providers[providerName] = provider
-	pm.logger.Info(fmt.Sprintf("Initialized AI provider: %s", providerName))
+	// Wait if another goroutine is initializing
+	if pool.initializing {
+		pool.mu.Unlock()
+		time.Sleep(100 * time.Millisecond) // Brief wait
+		pool.mu.Lock()
+		if pool.provider == nil {
+			return nil, fmt.Errorf("provider %s initialization failed or timed out", providerName)
+		}
+	}
 
-	return provider, nil
+	// Update last used time
+	pool.lastUsed = time.Now()
+
+	// Schedule health check if needed
+	if time.Since(pool.lastHealthCheck) > pm.poolConfig.HealthCheckInterval {
+		go pm.performHealthCheck(providerName, pool)
+	}
+
+	return pool.provider, nil
 }
 
 // GetProviderWithModel retrieves a provider configured for a specific model.

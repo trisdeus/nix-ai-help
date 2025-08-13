@@ -231,11 +231,358 @@ func (f *HardwareFunction) executeHardwareOperation(ctx context.Context, req *Ha
 func (f *HardwareFunction) detectHardware(ctx context.Context, req *HardwareRequest, response *HardwareResponse) (*HardwareResponse, error) {
 	f.logger.Info("Detecting hardware components")
 
-	// Use real hardware detection
+	// Use enhanced hardware detection if detailed analysis is requested
+	if req.DetectAll || req.ComponentType == "all" {
+		enhancedDetector := hardware.NewEnhancedHardwareDetector(f.logger)
+		enhancedInfo, err := enhancedDetector.DetectEnhancedHardware(ctx)
+		if err != nil {
+			f.logger.Warn(fmt.Sprintf("Enhanced detection failed, falling back to basic: %v", err))
+			// Fall back to basic detection
+			hardwareInfo, err := hardware.DetectHardwareComponents()
+			if err != nil {
+				return nil, fmt.Errorf("failed to detect hardware: %v", err)
+			}
+			return f.processBasicHardwareInfo(hardwareInfo, req, response)
+		}
+		return f.processEnhancedHardwareInfo(enhancedInfo, req, response)
+	}
+
+	// Use basic hardware detection for simple requests
 	hardwareInfo, err := hardware.DetectHardwareComponents()
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect hardware: %v", err)
 	}
+	return f.processBasicHardwareInfo(hardwareInfo, req, response)
+}
+
+// processEnhancedHardwareInfo processes enhanced hardware information
+func (f *HardwareFunction) processEnhancedHardwareInfo(enhancedInfo *hardware.EnhancedHardwareInfo, req *HardwareRequest, response *HardwareResponse) (*HardwareResponse, error) {
+	var components []HardwareComponent
+
+	// Process CPU information
+	if enhancedInfo.SystemProfile != nil && enhancedInfo.SystemProfile.CPUDetails != nil {
+		cpu := enhancedInfo.SystemProfile.CPUDetails
+		config := map[string]string{}
+
+		// Set microcode based on vendor
+		if strings.Contains(strings.ToLower(cpu.Vendor), "amd") {
+			config["microcode"] = "hardware.cpu.amd.updateMicrocode = true;"
+		} else if strings.Contains(strings.ToLower(cpu.Vendor), "intel") {
+			config["microcode"] = "hardware.cpu.intel.updateMicrocode = true;"
+		}
+
+		// Add CPU governor configuration
+		if len(cpu.PowerManagement) > 0 {
+			config["governor"] = "powerManagement.cpuFreqGovernor = \"ondemand\";"
+		}
+
+		metadata := map[string]string{
+			"architecture": cpu.Architecture,
+			"cores":        fmt.Sprintf("%d", cpu.Cores),
+			"threads":      fmt.Sprintf("%d", cpu.Threads),
+		}
+
+		if cpu.BaseFrequency > 0 {
+			metadata["base_frequency"] = fmt.Sprintf("%.1f MHz", cpu.BaseFrequency)
+		}
+		if cpu.MaxFrequency > 0 {
+			metadata["max_frequency"] = fmt.Sprintf("%.1f MHz", cpu.MaxFrequency)
+		}
+
+		components = append(components, HardwareComponent{
+			Type:          "CPU",
+			Name:          cpu.Model,
+			Vendor:        cpu.Vendor,
+			Model:         cpu.Model,
+			Driver:        "kernel_default",
+			Supported:     true,
+			Status:        "active",
+			Configuration: config,
+			Metadata:      metadata,
+		})
+	}
+
+	// Process GPU information
+	if enhancedInfo.SystemProfile != nil && len(enhancedInfo.SystemProfile.GPUDetails) > 0 {
+		for _, gpu := range enhancedInfo.SystemProfile.GPUDetails {
+			config := map[string]string{}
+			metadata := map[string]string{}
+
+			driver := "kernel_default"
+			if gpu.Driver != "" {
+				driver = gpu.Driver
+			}
+
+			// Configure based on vendor
+			if strings.Contains(strings.ToLower(gpu.Vendor), "nvidia") {
+				config["videoDrivers"] = "services.xserver.videoDrivers = [ \"nvidia\" ];"
+				config["hardware"] = "hardware.opengl.enable = true;"
+				metadata["cuda_support"] = fmt.Sprintf("%t", gpu.CUDASupport)
+			} else if strings.Contains(strings.ToLower(gpu.Vendor), "amd") {
+				config["videoDrivers"] = "services.xserver.videoDrivers = [ \"amdgpu\" ];"
+				config["hardware"] = "hardware.opengl.enable = true;"
+			} else if strings.Contains(strings.ToLower(gpu.Vendor), "intel") {
+				config["videoDrivers"] = "services.xserver.videoDrivers = [ \"intel\" ];"
+				config["hardware"] = "hardware.opengl.enable = true;"
+			}
+
+			// Add capability information
+			if gpu.VulkanSupport {
+				metadata["vulkan_support"] = "true"
+			}
+			if gpu.OpenCLSupport {
+				metadata["opencl_support"] = "true"
+			}
+			if gpu.OpenGLSupport != "" {
+				metadata["opengl_version"] = gpu.OpenGLSupport
+			}
+
+			components = append(components, HardwareComponent{
+				Type:          "GPU",
+				Name:          gpu.Model,
+				Vendor:        gpu.Vendor,
+				Model:         gpu.Model,
+				Driver:        driver,
+				Supported:     true,
+				Status:        "active",
+				Configuration: config,
+				Metadata:      metadata,
+			})
+		}
+	}
+
+	// Process Memory information
+	if enhancedInfo.SystemProfile != nil && enhancedInfo.SystemProfile.MemoryDetails != nil {
+		memory := enhancedInfo.SystemProfile.MemoryDetails
+		config := map[string]string{}
+		metadata := map[string]string{
+			"total_capacity": memory.TotalCapacity,
+			"memory_type":    memory.MemoryType,
+		}
+
+		if memory.Speed > 0 {
+			metadata["speed"] = fmt.Sprintf("%d MHz", memory.Speed)
+		}
+		if memory.Manufacturer != "" {
+			metadata["manufacturer"] = memory.Manufacturer
+		}
+
+		components = append(components, HardwareComponent{
+			Type:          "Memory",
+			Name:          fmt.Sprintf("%s %s", memory.MemoryType, memory.TotalCapacity),
+			Vendor:        memory.Manufacturer,
+			Model:         memory.MemoryType,
+			Driver:        "kernel_default",
+			Supported:     true,
+			Status:        "active",
+			Configuration: config,
+			Metadata:      metadata,
+		})
+	}
+
+	// Process Storage information
+	if enhancedInfo.SystemProfile != nil && len(enhancedInfo.SystemProfile.StorageDetails) > 0 {
+		for _, storage := range enhancedInfo.SystemProfile.StorageDetails {
+			config := map[string]string{}
+			metadata := map[string]string{
+				"capacity":  storage.Capacity,
+				"type":      storage.Type,
+				"interface": storage.Interface,
+			}
+
+			// Configure based on storage type
+			if storage.Type == "NVMe SSD" {
+				config["kernel"] = "boot.initrd.kernelModules = [ \"nvme\" ];"
+			} else if storage.Interface == "SATA" {
+				config["kernel"] = "boot.initrd.kernelModules = [ \"ahci\" ];"
+			}
+
+			components = append(components, HardwareComponent{
+				Type:          "Storage",
+				Name:          fmt.Sprintf("%s (%s)", storage.DeviceName, storage.Type),
+				Vendor:        extractVendor(storage.DeviceName),
+				Model:         storage.Type,
+				Driver:        "kernel_default",
+				Supported:     true,
+				Status:        "active",
+				Configuration: config,
+				Metadata:      metadata,
+			})
+		}
+	}
+
+	// Process Network information
+	if enhancedInfo.SystemProfile != nil && len(enhancedInfo.SystemProfile.NetworkDetails) > 0 {
+		for _, network := range enhancedInfo.SystemProfile.NetworkDetails {
+			// Skip loopback and virtual interfaces
+			if network.Type == "Loopback" || strings.HasPrefix(network.InterfaceName, "vir") {
+				continue
+			}
+
+			config := map[string]string{
+				"networking": "networking.networkmanager.enable = true;",
+			}
+			metadata := map[string]string{
+				"interface_name": network.InterfaceName,
+				"type":          network.Type,
+				"state":         network.State,
+			}
+
+			if network.MACAddress != "" {
+				metadata["mac_address"] = network.MACAddress
+			}
+			if network.MTU > 0 {
+				metadata["mtu"] = fmt.Sprintf("%d", network.MTU)
+			}
+
+			// Add WiFi specific configuration
+			if network.Type == "WiFi" {
+				config["firmware"] = "hardware.enableRedistributableFirmware = true;"
+				if network.WirelessInfo != nil {
+					// Add wireless capabilities if available
+					metadata["wireless_capabilities"] = "available"
+				}
+			}
+
+			components = append(components, HardwareComponent{
+				Type:          "Network",
+				Name:          fmt.Sprintf("%s (%s)", network.InterfaceName, network.Type),
+				Vendor:        extractVendor(network.InterfaceName),
+				Model:         network.Type,
+				Driver:        "kernel_default",
+				Supported:     true,
+				Status:        network.State,
+				Configuration: config,
+				Metadata:      metadata,
+			})
+		}
+	}
+
+	// Process Audio information
+	if enhancedInfo.SystemProfile != nil && enhancedInfo.SystemProfile.AudioDetails != nil {
+		audio := enhancedInfo.SystemProfile.AudioDetails
+		config := map[string]string{
+			"sound":      "sound.enable = true;",
+			"pulseaudio": "hardware.pulseaudio.enable = true;",
+		}
+		metadata := map[string]string{
+			"sound_server": audio.SoundServer,
+		}
+
+		if len(audio.Cards) > 0 {
+			metadata["audio_cards"] = fmt.Sprintf("%d", len(audio.Cards))
+		}
+
+		components = append(components, HardwareComponent{
+			Type:          "Audio",
+			Name:          fmt.Sprintf("Audio System (%s)", audio.SoundServer),
+			Vendor:        "System",
+			Model:         audio.SoundServer,
+			Driver:        "kernel_default",
+			Supported:     true,
+			Status:        "active",
+			Configuration: config,
+			Metadata:      metadata,
+		})
+	}
+
+	// Process Display information
+	if enhancedInfo.SystemProfile != nil && enhancedInfo.SystemProfile.DisplayDetails != nil {
+		display := enhancedInfo.SystemProfile.DisplayDetails
+		config := map[string]string{}
+		metadata := map[string]string{
+			"display_server":      display.Server,
+			"desktop_environment": display.DesktopEnvironment,
+			"window_manager":      display.WindowManager,
+		}
+
+		if len(display.Displays) > 0 {
+			metadata["display_count"] = fmt.Sprintf("%d", len(display.Displays))
+		}
+
+		components = append(components, HardwareComponent{
+			Type:          "Display",
+			Name:          fmt.Sprintf("Display System (%s)", display.Server),
+			Vendor:        "System",
+			Model:         display.Server,
+			Driver:        "kernel_default",
+			Supported:     true,
+			Status:        "active",
+			Configuration: config,
+			Metadata:      metadata,
+		})
+	}
+
+	response.Hardware = components
+
+	// Add enhanced recommendations based on detected capabilities
+	recommendations := []string{}
+	
+	// Performance recommendations
+	if enhancedInfo.PerformanceMetrics != nil {
+		recommendations = append(recommendations, "Performance metrics available - consider using 'nixai health status' for monitoring")
+	}
+
+	// Thermal recommendations
+	if enhancedInfo.ThermalProfile != nil && enhancedInfo.ThermalProfile.ThermalThrottling {
+		recommendations = append(recommendations, "Thermal throttling detected - check cooling system")
+	}
+
+	// Power management recommendations
+	if enhancedInfo.PowerProfile != nil {
+		if enhancedInfo.PowerProfile.CPUGovernor != "" {
+			recommendations = append(recommendations, fmt.Sprintf("CPU governor: %s - consider optimization", enhancedInfo.PowerProfile.CPUGovernor))
+		}
+		if len(enhancedInfo.PowerProfile.BatteryInfo) > 0 {
+			recommendations = append(recommendations, "Battery detected - enable power management features")
+		}
+	}
+
+	// Security recommendations
+	if enhancedInfo.SecurityFeatures != nil {
+		if enhancedInfo.SecurityFeatures.SecureBoot {
+			recommendations = append(recommendations, "Secure Boot enabled - ensure compatible kernel signing")
+		}
+		if enhancedInfo.SecurityFeatures.TPMVersion != "" {
+			recommendations = append(recommendations, fmt.Sprintf("TPM %s detected - consider enabling encryption features", enhancedInfo.SecurityFeatures.TPMVersion))
+		}
+	}
+
+	// Configuration recommendations
+	if enhancedInfo.RecommendedConfig != nil {
+		if len(enhancedInfo.RecommendedConfig.KernelParameters) > 0 {
+			recommendations = append(recommendations, "Enhanced kernel parameters available - use 'nixai hardware --operation=generate-config' for full configuration")
+		}
+		if len(enhancedInfo.RecommendedConfig.FirmwarePackages) > 0 {
+			recommendations = append(recommendations, "Additional firmware packages recommended for optimal hardware support")
+		}
+	}
+
+	if len(recommendations) == 0 {
+		recommendations = append(recommendations, "Enhanced hardware detection completed successfully")
+	}
+	recommendations = append(recommendations, "Use 'nixai hardware --operation=generate-config' to create optimized hardware configuration")
+
+	response.Recommendations = recommendations
+
+	// Filter results if specific component requested
+	if req.ComponentType != "all" && req.ComponentType != "" {
+		var filteredComponents []HardwareComponent
+		for _, comp := range response.Hardware {
+			if strings.ToLower(comp.Type) == strings.ToLower(req.ComponentType) {
+				filteredComponents = append(filteredComponents, comp)
+			}
+		}
+		response.Hardware = filteredComponents
+	}
+
+	f.logger.Info(fmt.Sprintf("Enhanced detection completed: %d components with detailed profiling", len(response.Hardware)))
+
+	return response, nil
+}
+
+// processBasicHardwareInfo processes basic hardware information
+func (f *HardwareFunction) processBasicHardwareInfo(hardwareInfo *hardware.HardwareInfo, req *HardwareRequest, response *HardwareResponse) (*HardwareResponse, error) {
 
 	// Convert HardwareInfo to HardwareComponent list
 	var components []HardwareComponent

@@ -12,16 +12,20 @@ import (
 
 // FunctionManager manages registration and execution of AI functions
 type FunctionManager struct {
-	functions map[string]functionbase.FunctionInterface
-	mutex     sync.RWMutex
-	logger    *logger.Logger
+	functions   map[string]functionbase.FunctionInterface
+	schemaCache map[string]FunctionSchema  // Cache schemas to avoid repeated computation
+	mutex       sync.RWMutex
+	logger      *logger.Logger
+	cacheValid  bool  // Track if schema cache is valid
 }
 
 // NewFunctionManager creates a new function manager
 func NewFunctionManager() *FunctionManager {
 	return &FunctionManager{
-		functions: make(map[string]functionbase.FunctionInterface),
-		logger:    logger.NewLogger(),
+		functions:   make(map[string]functionbase.FunctionInterface),
+		schemaCache: make(map[string]FunctionSchema),
+		logger:      logger.NewLogger(),
+		cacheValid:  false,
 	}
 }
 
@@ -40,6 +44,8 @@ func (fm *FunctionManager) Register(fn functionbase.FunctionInterface) error {
 	}
 
 	fm.functions[name] = fn
+	// Invalidate schema cache when new function is added
+	fm.cacheValid = false
 	fm.logger.Info(fmt.Sprintf("Registered function: %s", name))
 	return nil
 }
@@ -54,6 +60,9 @@ func (fm *FunctionManager) Unregister(name string) error {
 	}
 
 	delete(fm.functions, name)
+	// Invalidate schema cache when function is removed
+	fm.cacheValid = false
+	delete(fm.schemaCache, name)
 	fm.logger.Info(fmt.Sprintf("Unregistered function: %s", name))
 	return nil
 }
@@ -79,29 +88,63 @@ func (fm *FunctionManager) List() []string {
 	return names
 }
 
-// GetSchemas returns schemas for all registered functions
+// GetSchemas returns schemas for all registered functions with caching
 func (fm *FunctionManager) GetSchemas() map[string]FunctionSchema {
-	fm.mutex.RLock()
-	defer fm.mutex.RUnlock()
+	fm.mutex.Lock()
+	defer fm.mutex.Unlock()
 
-	schemas := make(map[string]FunctionSchema)
+	// Return cached schemas if valid
+	if fm.cacheValid && len(fm.schemaCache) > 0 {
+		// Return a copy to prevent external modification
+		schemas := make(map[string]FunctionSchema)
+		for name, schema := range fm.schemaCache {
+			schemas[name] = schema
+		}
+		return schemas
+	}
+
+	// Rebuild cache
+	fm.schemaCache = make(map[string]FunctionSchema)
 	for name, fn := range fm.functions {
-		schemas[name] = fn.Schema()
+		fm.schemaCache[name] = fn.Schema()
+	}
+	fm.cacheValid = true
+
+	// Return a copy
+	schemas := make(map[string]FunctionSchema)
+	for name, schema := range fm.schemaCache {
+		schemas[name] = schema
 	}
 	return schemas
 }
 
-// GetSchema returns the schema for a specific function
+// GetSchema returns the schema for a specific function with caching
 func (fm *FunctionManager) GetSchema(name string) (FunctionSchema, error) {
-	fm.mutex.RLock()
-	defer fm.mutex.RUnlock()
+	fm.mutex.Lock()
+	defer fm.mutex.Unlock()
 
+	// Check if function exists
 	fn, exists := fm.functions[name]
 	if !exists {
 		return FunctionSchema{}, fmt.Errorf("function '%s' not found", name)
 	}
 
-	return fn.Schema(), nil
+	// Check cache first
+	if fm.cacheValid {
+		if schema, cached := fm.schemaCache[name]; cached {
+			return schema, nil
+		}
+	}
+
+	// Compute and cache schema
+	schema := fn.Schema()
+	if !fm.cacheValid {
+		fm.schemaCache = make(map[string]FunctionSchema)
+		fm.cacheValid = true
+	}
+	fm.schemaCache[name] = schema
+
+	return schema, nil
 }
 
 // Execute runs a function with the given parameters
@@ -206,17 +249,24 @@ func (fm *FunctionManager) Clear() {
 
 	count := len(fm.functions)
 	fm.functions = make(map[string]functionbase.FunctionInterface)
+	fm.schemaCache = make(map[string]FunctionSchema)
+	fm.cacheValid = false
 	fm.logger.Info(fmt.Sprintf("Cleared %d functions from registry", count))
 }
 
-// GetFunctionInfo returns detailed information about a function
+// GetFunctionInfo returns detailed information about a function with cached schema
 func (fm *FunctionManager) GetFunctionInfo(name string) (map[string]interface{}, error) {
 	fn, exists := fm.Get(name)
 	if !exists {
 		return nil, fmt.Errorf("function '%s' not found", name)
 	}
 
-	schema := fn.Schema()
+	// Use cached schema if available
+	schema, err := fm.GetSchema(name)
+	if err != nil {
+		return nil, err
+	}
+
 	info := map[string]interface{}{
 		"name":        fn.Name(),
 		"description": fn.Description(),

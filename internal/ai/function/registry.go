@@ -10,6 +10,7 @@ import (
 	"nix-ai-help/internal/ai/function/completion"
 	configfunction "nix-ai-help/internal/ai/function/config"
 	"nix-ai-help/internal/ai/function/configure"
+	"nix-ai-help/internal/ai/function/dependency"
 	"nix-ai-help/internal/ai/function/devenv"
 	"nix-ai-help/internal/ai/function/diagnose"
 	"nix-ai-help/internal/ai/function/doctor"
@@ -36,22 +37,33 @@ import (
 	"nix-ai-help/pkg/logger"
 )
 
-var (
-	globalRegistry *FunctionManager
-	registryOnce   sync.Once
-)
-
 // GetGlobalRegistry returns the global function registry with all functions registered
+// This now uses the optimized singleton from function_manager.go
 func GetGlobalRegistry() *FunctionManager {
-	registryOnce.Do(func() {
-		globalRegistry = NewFunctionManager()
-		registerAllFunctions()
-	})
-	return globalRegistry
+	manager := GetDefaultManager()
+	
+	// Use a separate once to ensure functions are only registered once
+	var functionsRegistered bool
+	var registrationMutex sync.Mutex
+	
+	registrationMutex.Lock()
+	defer registrationMutex.Unlock()
+	
+	// Check if functions are already registered
+	if manager.Count() > 0 {
+		return manager
+	}
+	
+	if !functionsRegistered {
+		registerAllFunctions(manager)
+		functionsRegistered = true
+	}
+	
+	return manager
 }
 
 // registerAllFunctions registers all available AI functions
-func registerAllFunctions() {
+func registerAllFunctions(manager *FunctionManager) {
 	log := logger.NewLogger()
 
 	// Register all implemented functions
@@ -65,6 +77,7 @@ func registerAllFunctions() {
 		{"completion", completion.NewCompletionFunction()},
 		{"config", configfunction.NewConfigFunction()},
 		{"configure", configure.NewConfigureFunction()},
+		{"dependency-analysis", dependency.NewDependencyFunction()},
 		{"devenv", devenv.NewDevenvFunction()},
 		{"diagnose", diagnose.NewDiagnoseFunction()},
 		{"doctor", doctor.NewDoctorFunction()},
@@ -91,7 +104,7 @@ func registerAllFunctions() {
 
 	successCount := 0
 	for _, f := range functions {
-		if err := globalRegistry.Register(f.fn); err != nil {
+		if err := manager.Register(f.fn); err != nil {
 			log.Error(fmt.Sprintf("Failed to register function %s: %v", f.name, err))
 		} else {
 			log.Info(fmt.Sprintf("Registered function successfully: %s", f.name))
