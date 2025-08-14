@@ -613,12 +613,8 @@ func (as *AISuggester) enhanceSingleSuggestion(suggestion SuggestionScore, input
 	suggestion.Context["input_analysis"] = as.analyzeInput(input)
 	suggestion.Context["system_context"] = contextAnalyzer.systemContext
 	
-	// Enhance reason with more context
-	if suggestion.Urgency == "high" || suggestion.Urgency == "critical" {
-		suggestion.Reason = "🚨 " + suggestion.Reason
-	} else if suggestion.Score > 0.8 {
-		suggestion.Reason = "⭐ " + suggestion.Reason
-	}
+	// Note: Reason enhancement removed to keep suggestions clean
+	// The original reason is kept as-is without emoji additions
 	
 	return suggestion
 }
