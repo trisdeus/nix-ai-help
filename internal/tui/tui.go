@@ -649,14 +649,19 @@ func (m *TUI) getBasicSuggestions(input string) []string {
 
 // extractCommandFromSuggestion extracts just the command part from a suggestion
 func (m *TUI) extractCommandFromSuggestion(suggestion SuggestionScore) string {
-	// Use example if available, otherwise format as "nixai command"
+	// Use example if available, otherwise format as command without nixai prefix
 	if len(suggestion.Command.Examples) > 0 {
 		// Remove quotes from examples if present
 		example := suggestion.Command.Examples[0]
 		example = strings.ReplaceAll(example, `"`, "")
+		// Remove "nixai " prefix since we're inside the TUI
+		if strings.HasPrefix(example, "nixai ") {
+			example = strings.TrimPrefix(example, "nixai ")
+		}
 		return example
 	}
-	return fmt.Sprintf("nixai %s", suggestion.Command.Name)
+	// Return just the command name without nixai prefix for TUI
+	return suggestion.Command.Name
 }
 
 // formatSuggestionForDisplay formats an intelligent suggestion for display
