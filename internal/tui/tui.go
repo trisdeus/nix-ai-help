@@ -531,14 +531,31 @@ func (m *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.showSuggestions && len(m.getFilteredSuggestions()) > 0 {
 				filtered := m.getFilteredSuggestions()
 				if m.selectedSuggestion >= 0 && m.selectedSuggestion < len(filtered) {
-					m.textInput.SetValue(filtered[m.selectedSuggestion])
-					m.showSuggestions = false
+					selectedCommand := filtered[m.selectedSuggestion]
+					m.textInput.SetValue(selectedCommand)
+					
+					// Keep suggestions open for progressive completion
+					// This allows multiple TAB presses to refine the command
+					m.updateSuggestions()
 				}
 			}
 			return m, nil
 
 		case tea.KeyEnter:
 			input := strings.TrimSpace(m.textInput.Value())
+			
+			// If suggestions are visible and we have a selection, complete it first
+			if m.showSuggestions && len(m.getFilteredSuggestions()) > 0 {
+				filtered := m.getFilteredSuggestions()
+				if m.selectedSuggestion >= 0 && m.selectedSuggestion < len(filtered) {
+					selectedCommand := filtered[m.selectedSuggestion]
+					m.textInput.SetValue(selectedCommand)
+					m.updateSuggestions()
+					return m, nil
+				}
+			}
+			
+			// Execute command if we have input
 			if input != "" {
 				m.executeCommand(input)
 				m.commandHistory = append(m.commandHistory, input)
@@ -630,32 +647,19 @@ func (m *TUI) getBasicSuggestions(input string) []string {
 
 // formatSuggestionForDisplay formats an intelligent suggestion for display
 func (m *TUI) formatSuggestionForDisplay(suggestion SuggestionScore) string {
-	// Format: "nixai command - reason (score%)"
+	// Format: "nixai command - reason"
 	confidence := int(suggestion.Confidence * 100)
-	
-	// Add urgency indicators
-	indicator := ""
-	switch suggestion.Urgency {
-	case "critical":
-		indicator = "🚨 "
-	case "high":
-		indicator = "⚠️ "
-	case "medium":
-		indicator = "💡 "
-	default:
-		if confidence > 80 {
-			indicator = "⭐ "
-		}
-	}
 	
 	// Use example if available, otherwise format as "nixai command"
 	commandDisplay := fmt.Sprintf("nixai %s", suggestion.Command.Name)
 	if len(suggestion.Command.Examples) > 0 {
-		commandDisplay = suggestion.Command.Examples[0]
+		// Remove quotes from examples if present
+		example := suggestion.Command.Examples[0]
+		example = strings.ReplaceAll(example, `"`, "")
+		commandDisplay = example
 	}
 	
-	return fmt.Sprintf("%s%s - %s (%d%%)", 
-		indicator, 
+	return fmt.Sprintf("%s - %s (%d%%)", 
 		commandDisplay, 
 		suggestion.Reason, 
 		confidence)
@@ -995,7 +999,8 @@ func (m *TUI) showHelp() {
 	m.addOutput("")
 	m.addOutput(m.styles.prompt.Render("Navigation & Completion:"))
 	m.addOutput("  ↑/↓ - Navigate history and suggestions")
-	m.addOutput("  Tab - Complete suggestion")
+	m.addOutput("  Tab/Enter - Complete selected suggestion (progressive)")
+	m.addOutput("  Enter (no suggestions) - Execute command")
 	m.addOutput("  Space - Show available flags/options")
 	m.addOutput("  Ctrl+C/Esc - Exit")
 	m.addOutput("")
