@@ -3769,6 +3769,9 @@ func initializeCommands() {
 	
 	// Add Phase 3.2 - Enterprise Fleet Intelligence
 	rootCmd.AddCommand(CreateFleetEnterpriseCommands())
+	
+	// Add real-time system monitoring
+	rootCmd.AddCommand(CreateRealtimeCommand())
 
 	commandsInitialized = true
 }
