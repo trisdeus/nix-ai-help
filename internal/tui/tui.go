@@ -528,11 +528,12 @@ func (m *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.KeyTab:
-			if m.showSuggestions && len(m.getFilteredSuggestions()) > 0 {
-				filtered := m.getFilteredSuggestions()
-				if m.selectedSuggestion >= 0 && m.selectedSuggestion < len(filtered) {
-					selectedCommand := filtered[m.selectedSuggestion]
-					m.textInput.SetValue(selectedCommand)
+			if m.showSuggestions && len(m.currentSuggestions) > 0 {
+				if m.selectedSuggestion >= 0 && m.selectedSuggestion < len(m.currentSuggestions) {
+					// Extract just the command from the suggestion
+					suggestion := m.currentSuggestions[m.selectedSuggestion]
+					command := m.extractCommandFromSuggestion(suggestion)
+					m.textInput.SetValue(command)
 					
 					// Keep suggestions open for progressive completion
 					// This allows multiple TAB presses to refine the command
@@ -545,11 +546,12 @@ func (m *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			input := strings.TrimSpace(m.textInput.Value())
 			
 			// If suggestions are visible and we have a selection, complete it first
-			if m.showSuggestions && len(m.getFilteredSuggestions()) > 0 {
-				filtered := m.getFilteredSuggestions()
-				if m.selectedSuggestion >= 0 && m.selectedSuggestion < len(filtered) {
-					selectedCommand := filtered[m.selectedSuggestion]
-					m.textInput.SetValue(selectedCommand)
+			if m.showSuggestions && len(m.currentSuggestions) > 0 {
+				if m.selectedSuggestion >= 0 && m.selectedSuggestion < len(m.currentSuggestions) {
+					// Extract just the command from the suggestion
+					suggestion := m.currentSuggestions[m.selectedSuggestion]
+					command := m.extractCommandFromSuggestion(suggestion)
+					m.textInput.SetValue(command)
 					m.updateSuggestions()
 					return m, nil
 				}
@@ -643,6 +645,18 @@ func (m *TUI) getBasicSuggestions(input string) []string {
 	}
 
 	return []string{}
+}
+
+// extractCommandFromSuggestion extracts just the command part from a suggestion
+func (m *TUI) extractCommandFromSuggestion(suggestion SuggestionScore) string {
+	// Use example if available, otherwise format as "nixai command"
+	if len(suggestion.Command.Examples) > 0 {
+		// Remove quotes from examples if present
+		example := suggestion.Command.Examples[0]
+		example = strings.ReplaceAll(example, `"`, "")
+		return example
+	}
+	return fmt.Sprintf("nixai %s", suggestion.Command.Name)
 }
 
 // formatSuggestionForDisplay formats an intelligent suggestion for display
