@@ -923,8 +923,29 @@ func (m *TUI) executeCommand(input string) {
 		return
 	}
 
-	// Execute nixai command
+	// Check for commands that shouldn't be run in TUI
 	args := strings.Fields(input)
+	if len(args) > 0 {
+		command := args[0]
+		switch command {
+		case "ask":
+			m.addOutput(m.styles.error.Render("⚠️  The 'ask' command is interactive and cannot be run from the TUI."))
+			m.addOutput(m.styles.muted.Render("   Try: 'nixai -a \"your question\"' from the command line instead."))
+			m.addOutput("") // Add empty line for separation
+			return
+		case "tui":
+			m.addOutput(m.styles.error.Render("⚠️  Cannot run 'tui' command from within the TUI."))
+			m.addOutput("") // Add empty line for separation
+			return
+		case "mcp-server":
+			m.addOutput(m.styles.error.Render("⚠️  The 'mcp-server' command runs a server and cannot be used in TUI."))
+			m.addOutput(m.styles.muted.Render("   Run this command from the terminal instead."))
+			m.addOutput("") // Add empty line for separation
+			return
+		}
+	}
+
+	// Execute nixai command
 	if len(args) == 0 {
 		return
 	}
@@ -936,11 +957,23 @@ func (m *TUI) executeCommand(input string) {
 		m.addOutput("") // Add empty line for separation
 		return
 	}
-	cmd := exec.Command(nixaiPath, args...)
+	// Create command with timeout to prevent hanging
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	
+	cmd := exec.CommandContext(ctx, nixaiPath, args...)
 	
 	output, err := cmd.CombinedOutput()
 	success := err == nil
 	duration := time.Since(commandStart)
+	
+	// Check if command timed out
+	if ctx.Err() == context.DeadlineExceeded {
+		m.addOutput(m.styles.error.Render("⚠️  Command timed out after 30 seconds."))
+		m.addOutput(m.styles.muted.Render("   This command may be interactive or require user input."))
+		m.addOutput("") // Add empty line for separation
+		return
+	}
 	
 	if err != nil {
 		m.addOutput(m.styles.error.Render(fmt.Sprintf("Error: %v", err)))
@@ -1018,6 +1051,11 @@ func (m *TUI) showHelp() {
 	m.addOutput("  • Examples: 'ask --provider ' shows provider options")
 	m.addOutput("  • Examples: 'web --port ' shows common port numbers")
 	m.addOutput("  • Examples: 'configure ' shows configuration targets")
+	m.addOutput("")
+	m.addOutput(m.styles.error.Render("⚠️  Commands that don't work in TUI:"))
+	m.addOutput(m.styles.muted.Render("  • ask - Interactive questions (use: nixai -a \"question\")"))
+	m.addOutput(m.styles.muted.Render("  • tui - Cannot run TUI within TUI"))
+	m.addOutput(m.styles.muted.Render("  • mcp-server - Server commands need terminal"))
 	m.addOutput("")
 	m.addOutput(m.styles.accent.Render("Available Themes:"))
 	for name, theme := range themes {
