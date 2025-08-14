@@ -906,7 +906,7 @@ func (m *TUI) executeCommand(input string) {
 	timestamp := time.Now().Format("15:04:05")
 	m.addOutput(fmt.Sprintf("[%s] %s", 
 		m.styles.timestamp.Render(timestamp),
-		m.styles.prompt.Render("$ nixai "+input)))
+		m.styles.prompt.Render("$ "+input)))
 	
 	// Record command start time for analytics
 	commandStart := time.Now()
