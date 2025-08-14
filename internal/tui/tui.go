@@ -545,31 +545,7 @@ func (m *TUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter:
 			input := strings.TrimSpace(m.textInput.Value())
 			
-			// If suggestions are visible and we have a selection, check if we need to complete or execute
-			if m.showSuggestions && len(m.currentSuggestions) > 0 {
-				if m.selectedSuggestion >= 0 && m.selectedSuggestion < len(m.currentSuggestions) {
-					// Extract the command from the suggestion
-					suggestion := m.currentSuggestions[m.selectedSuggestion]
-					command := m.extractCommandFromSuggestion(suggestion)
-					
-					// If input already matches the selected command, execute it
-					if input == command {
-						m.executeCommand(input)
-						m.commandHistory = append(m.commandHistory, input)
-						m.historyIndex = -1
-						m.textInput.SetValue("")
-						m.showSuggestions = false
-						return m, nil
-					}
-					
-					// Otherwise, complete the suggestion first
-					m.textInput.SetValue(command)
-					m.updateSuggestions()
-					return m, nil
-				}
-			}
-			
-			// Execute command if we have input and no suggestions to complete
+			// Always execute command if we have input - prioritize execution over completion
 			if input != "" {
 				m.executeCommand(input)
 				m.commandHistory = append(m.commandHistory, input)
