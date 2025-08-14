@@ -479,6 +479,7 @@ func (id *IntelligentDiscovery) getTroubleshootingSuggestions() []SuggestionScor
 			Reason:     "Troubleshooting mode active",
 			Confidence: 0.9,
 			Urgency:    "high",
+			Context:    make(map[string]interface{}),
 		},
 		{
 			Command:    Command{Name: "doctor", Description: "System health check", Category: "Diagnostics"},
@@ -486,6 +487,7 @@ func (id *IntelligentDiscovery) getTroubleshootingSuggestions() []SuggestionScor
 			Reason:     "Health check recommended",
 			Confidence: 0.8,
 			Urgency:    "medium",
+			Context:    make(map[string]interface{}),
 		},
 		{
 			Command:    Command{Name: "logs", Description: "Analyze system logs", Category: "Diagnostics"},
@@ -493,6 +495,7 @@ func (id *IntelligentDiscovery) getTroubleshootingSuggestions() []SuggestionScor
 			Reason:     "Check logs for errors",
 			Confidence: 0.7,
 			Urgency:    "medium",
+			Context:    make(map[string]interface{}),
 		},
 	}
 	
@@ -507,12 +510,14 @@ func (id *IntelligentDiscovery) getFlakeSuggestions() []SuggestionScore {
 			Score:      0.8,
 			Reason:     "Flake project detected",
 			Confidence: 0.8,
+			Context:    make(map[string]interface{}),
 		},
 		{
 			Command:    Command{Name: "build", Description: "Build configuration", Category: "Build"},
 			Score:      0.7,
 			Reason:     "Build flake project",
 			Confidence: 0.7,
+			Context:    make(map[string]interface{}),
 		},
 	}
 }
@@ -529,6 +534,7 @@ func (id *IntelligentDiscovery) getTimeBasedSuggestions() []SuggestionScore {
 			Score:      0.6,
 			Reason:     "Morning health check",
 			Confidence: 0.6,
+			Context:    make(map[string]interface{}),
 		})
 	}
 	
@@ -539,6 +545,7 @@ func (id *IntelligentDiscovery) getTimeBasedSuggestions() []SuggestionScore {
 			Score:      0.6,
 			Reason:     "Evening maintenance",
 			Confidence: 0.6,
+			Context:    make(map[string]interface{}),
 		})
 	}
 	
@@ -557,6 +564,7 @@ func (id *IntelligentDiscovery) getSystemStateSuggestions() []SuggestionScore {
 			Reason:     "High memory usage detected",
 			Confidence: 0.8,
 			Urgency:    "high",
+			Context:    make(map[string]interface{}),
 		})
 	}
 	
@@ -567,6 +575,7 @@ func (id *IntelligentDiscovery) getSystemStateSuggestions() []SuggestionScore {
 			Score:      0.9,
 			Reason:     "Low disk space",
 			Confidence: 0.9,
+			Context:    make(map[string]interface{}),
 			Urgency:    "critical",
 		})
 	}
@@ -594,6 +603,11 @@ func (as *AISuggester) enhanceSuggestions(ctx context.Context, suggestions []Sug
 
 // enhanceSingleSuggestion enhances a single suggestion with AI context
 func (as *AISuggester) enhanceSingleSuggestion(suggestion SuggestionScore, input string, contextAnalyzer *CommandContextAnalyzer) SuggestionScore {
+	// Initialize Context map if nil
+	if suggestion.Context == nil {
+		suggestion.Context = make(map[string]interface{})
+	}
+	
 	// Add AI-enhanced context
 	suggestion.Context["ai_enhanced"] = true
 	suggestion.Context["input_analysis"] = as.analyzeInput(input)
@@ -673,6 +687,7 @@ func (id *IntelligentDiscovery) getPopularCommands(maxResults int) []SuggestionS
 					Reason:     "Popular command",
 					Confidence: 0.6,
 					Category:   cmd.Category,
+					Context:    make(map[string]interface{}),
 				})
 				break
 			}
