@@ -10,6 +10,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/ai/agent"
+	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 	"nix-ai-help/pkg/version"
@@ -923,15 +926,21 @@ func (m *TUI) executeCommand(input string) {
 		return
 	}
 
-	// Check for commands that shouldn't be run in TUI
+	// Handle TUI-native commands that shouldn't call external CLI
 	args := strings.Fields(input)
 	if len(args) > 0 {
 		command := args[0]
 		switch command {
 		case "ask":
-			m.addOutput(m.styles.error.Render("⚠️  The 'ask' command is interactive and cannot be run from the TUI."))
-			m.addOutput(m.styles.muted.Render("   Try: 'nixai -a \"your question\"' from the command line instead."))
-			m.addOutput("") // Add empty line for separation
+			// Handle ask command natively in TUI
+			if len(args) < 2 {
+				m.addOutput(m.styles.error.Render("⚠️  Please provide a question to ask."))
+				m.addOutput(m.styles.muted.Render("   Example: ask how to configure nginx?"))
+				m.addOutput("") // Add empty line for separation
+				return
+			}
+			question := strings.Join(args[1:], " ")
+			m.handleAskCommand(question)
 			return
 		case "tui":
 			m.addOutput(m.styles.error.Render("⚠️  Cannot run 'tui' command from within the TUI."))
@@ -1002,6 +1011,103 @@ func (m *TUI) executeCommand(input string) {
 	m.addOutput("") // Add empty line for separation
 }
 
+// handleAskCommand handles the TUI-native ask command
+func (m *TUI) handleAskCommand(question string) {
+	m.addOutput(m.styles.info.Render("🤖 Asking AI: " + question))
+	m.addOutput("") // Add empty line for separation
+	
+	// Show thinking indicator
+	m.addOutput(m.styles.muted.Render("💭 Thinking..."))
+	
+	// Load configuration
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		m.addOutput(m.styles.error.Render("⚠️  Failed to load configuration: " + err.Error()))
+		m.addOutput("") // Add empty line for separation
+		return
+	}
+	
+	// Ensure config has proper provider definitions
+	if cfg.AIModels.Providers == nil || len(cfg.AIModels.Providers) == 0 {
+		// Load from embedded YAML and merge providers
+		yamlConfig, err := config.LoadEmbeddedYAMLConfig()
+		if err != nil {
+			m.addOutput(m.styles.error.Render("⚠️  Failed to load embedded config: " + err.Error()))
+			m.addOutput("") // Add empty line for separation
+			return
+		}
+		// Update the config with providers from YAML
+		cfg.AIModels = yamlConfig.AIModels
+	}
+	
+	// Create AI provider manager
+	aiLogger := logger.NewLogger()
+	manager := ai.NewProviderManager(cfg, aiLogger)
+	
+	// Determine which provider to use
+	selectedProvider := "ollama" // Default fallback
+	if cfg.AIModels.SelectionPreferences.DefaultProvider != "" {
+		selectedProvider = cfg.AIModels.SelectionPreferences.DefaultProvider
+	}
+	
+	// Get the AI provider
+	provider, err := manager.GetProvider(selectedProvider)
+	if err != nil {
+		m.addOutput(m.styles.error.Render("⚠️  Failed to initialize AI provider: " + err.Error()))
+		m.addOutput(m.styles.muted.Render("   Make sure your AI provider is configured and running."))
+		m.addOutput("") // Add empty line for separation
+		return
+	}
+	
+	// Create ask agent
+	askAgent := agent.NewAskAgent(provider)
+	
+	// Query the AI with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	
+	// Clear thinking indicator and show querying
+	// Remove the last "Thinking..." line
+	if len(m.output) > 0 {
+		m.output = m.output[:len(m.output)-1]
+	}
+	m.addOutput(m.styles.muted.Render("🔍 Querying AI provider..."))
+	
+	response, err := askAgent.Query(ctx, question)
+	
+	// Remove querying indicator
+	if len(m.output) > 0 {
+		m.output = m.output[:len(m.output)-1]
+	}
+	
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			m.addOutput(m.styles.error.Render("⚠️  AI query timed out after 60 seconds."))
+		} else {
+			m.addOutput(m.styles.error.Render("⚠️  AI query failed: " + err.Error()))
+		}
+		m.addOutput(m.styles.muted.Render("   You can try asking your question differently or check your AI provider connection."))
+		m.addOutput("") // Add empty line for separation
+		return
+	}
+	
+	// Display the response
+	m.addOutput(m.styles.success.Render("🤖 AI Response:"))
+	m.addOutput("")
+	
+	// Split response into lines and add each one
+	lines := strings.Split(strings.TrimSpace(response), "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			m.addOutput(line)
+		} else {
+			m.addOutput("") // Preserve empty lines
+		}
+	}
+	
+	m.addOutput("") // Add empty line for separation
+}
+
 // addOutput adds a line to the output
 func (m *TUI) addOutput(line string) {
 	m.output = append(m.output, line)
@@ -1053,7 +1159,6 @@ func (m *TUI) showHelp() {
 	m.addOutput("  • Examples: 'configure ' shows configuration targets")
 	m.addOutput("")
 	m.addOutput(m.styles.error.Render("⚠️  Commands that don't work in TUI:"))
-	m.addOutput(m.styles.muted.Render("  • ask - Interactive questions (use: nixai -a \"question\")"))
 	m.addOutput(m.styles.muted.Render("  • tui - Cannot run TUI within TUI"))
 	m.addOutput(m.styles.muted.Render("  • mcp-server - Server commands need terminal"))
 	m.addOutput("")
