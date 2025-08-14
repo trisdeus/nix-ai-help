@@ -630,7 +630,7 @@ func (m *TUI) getBasicSuggestions(input string) []string {
 
 // formatSuggestionForDisplay formats an intelligent suggestion for display
 func (m *TUI) formatSuggestionForDisplay(suggestion SuggestionScore) string {
-	// Format: "command - reason (score%)"
+	// Format: "nixai command - reason (score%)"
 	confidence := int(suggestion.Confidence * 100)
 	
 	// Add urgency indicators
@@ -648,9 +648,15 @@ func (m *TUI) formatSuggestionForDisplay(suggestion SuggestionScore) string {
 		}
 	}
 	
+	// Use example if available, otherwise format as "nixai command"
+	commandDisplay := fmt.Sprintf("nixai %s", suggestion.Command.Name)
+	if len(suggestion.Command.Examples) > 0 {
+		commandDisplay = suggestion.Command.Examples[0]
+	}
+	
 	return fmt.Sprintf("%s%s - %s (%d%%)", 
 		indicator, 
-		suggestion.Command.Name, 
+		commandDisplay, 
 		suggestion.Reason, 
 		confidence)
 }

@@ -474,7 +474,7 @@ func (id *IntelligentDiscovery) getContextAwareSuggestions(input string, maxResu
 func (id *IntelligentDiscovery) getTroubleshootingSuggestions() []SuggestionScore {
 	suggestions := []SuggestionScore{
 		{
-			Command:    Command{Name: "diagnose", Description: "Diagnose system issues", Category: "Diagnostics"},
+			Command:    Command{Name: "diagnose", Description: "Diagnose system and configuration issues", Category: "Diagnostics", Usage: "nixai diagnose [category]", Examples: []string{"nixai diagnose boot"}},
 			Score:      0.9,
 			Reason:     "Troubleshooting mode active",
 			Confidence: 0.9,
@@ -482,7 +482,7 @@ func (id *IntelligentDiscovery) getTroubleshootingSuggestions() []SuggestionScor
 			Context:    make(map[string]interface{}),
 		},
 		{
-			Command:    Command{Name: "doctor", Description: "System health check", Category: "Diagnostics"},
+			Command:    Command{Name: "doctor", Description: "Comprehensive system health check", Category: "Diagnostics", Usage: "nixai doctor [options]", Examples: []string{"nixai doctor --full"}},
 			Score:      0.8,
 			Reason:     "Health check recommended",
 			Confidence: 0.8,
@@ -490,7 +490,7 @@ func (id *IntelligentDiscovery) getTroubleshootingSuggestions() []SuggestionScor
 			Context:    make(map[string]interface{}),
 		},
 		{
-			Command:    Command{Name: "logs", Description: "Analyze system logs", Category: "Diagnostics"},
+			Command:    Command{Name: "logs", Description: "Analyze system and service logs", Category: "Diagnostics", Usage: "nixai logs [service]", Examples: []string{"nixai logs nginx"}},
 			Score:      0.7,
 			Reason:     "Check logs for errors",
 			Confidence: 0.7,
@@ -506,14 +506,14 @@ func (id *IntelligentDiscovery) getTroubleshootingSuggestions() []SuggestionScor
 func (id *IntelligentDiscovery) getFlakeSuggestions() []SuggestionScore {
 	return []SuggestionScore{
 		{
-			Command:    Command{Name: "flake", Description: "Manage flakes", Category: "Flakes"},
+			Command:    Command{Name: "flake", Description: "Manage Nix flakes", Category: "Flakes", Usage: "nixai flake [action]", Examples: []string{"nixai flake create"}},
 			Score:      0.8,
 			Reason:     "Flake project detected",
 			Confidence: 0.8,
 			Context:    make(map[string]interface{}),
 		},
 		{
-			Command:    Command{Name: "build", Description: "Build configuration", Category: "Build"},
+			Command:    Command{Name: "build", Description: "Build and manage NixOS configurations", Category: "Build", Usage: "nixai build [action]", Examples: []string{"nixai build analyze"}},
 			Score:      0.7,
 			Reason:     "Build flake project",
 			Confidence: 0.7,
@@ -530,7 +530,7 @@ func (id *IntelligentDiscovery) getTimeBasedSuggestions() []SuggestionScore {
 	// Morning suggestions (6-12)
 	if currentHour >= 6 && currentHour < 12 {
 		suggestions = append(suggestions, SuggestionScore{
-			Command:    Command{Name: "health", Description: "System health check", Category: "Monitoring"},
+			Command:    Command{Name: "health", Description: "System health monitoring and prediction", Category: "Monitoring", Usage: "nixai health [action]", Examples: []string{"nixai health status"}},
 			Score:      0.6,
 			Reason:     "Morning health check",
 			Confidence: 0.6,
@@ -541,7 +541,7 @@ func (id *IntelligentDiscovery) getTimeBasedSuggestions() []SuggestionScore {
 	// Evening suggestions (18-23)
 	if currentHour >= 18 && currentHour < 23 {
 		suggestions = append(suggestions, SuggestionScore{
-			Command:    Command{Name: "gc", Description: "Garbage collection", Category: "Maintenance"},
+			Command:    Command{Name: "gc", Description: "Garbage collection and cleanup", Category: "Maintenance", Usage: "nixai gc [action]", Examples: []string{"nixai gc run"}},
 			Score:      0.6,
 			Reason:     "Evening maintenance",
 			Confidence: 0.6,
@@ -559,7 +559,7 @@ func (id *IntelligentDiscovery) getSystemStateSuggestions() []SuggestionScore {
 	// High memory usage suggestions
 	if id.contextAnalyzer.systemContext.MemoryUsage > 0.8 {
 		suggestions = append(suggestions, SuggestionScore{
-			Command:    Command{Name: "performance", Description: "Performance analysis", Category: "Performance"},
+			Command:    Command{Name: "performance", Description: "Performance analysis and optimization", Category: "Performance", Usage: "nixai performance [action]", Examples: []string{"nixai performance stats"}},
 			Score:      0.8,
 			Reason:     "High memory usage detected",
 			Confidence: 0.8,
@@ -571,7 +571,7 @@ func (id *IntelligentDiscovery) getSystemStateSuggestions() []SuggestionScore {
 	// High disk usage suggestions
 	if id.contextAnalyzer.systemContext.DiskUsage > 0.9 {
 		suggestions = append(suggestions, SuggestionScore{
-			Command:    Command{Name: "gc", Description: "Garbage collection", Category: "Maintenance"},
+			Command:    Command{Name: "gc", Description: "Garbage collection and cleanup", Category: "Maintenance", Usage: "nixai gc [action]", Examples: []string{"nixai gc run"}},
 			Score:      0.9,
 			Reason:     "Low disk space",
 			Confidence: 0.9,
