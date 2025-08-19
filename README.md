@@ -85,6 +85,22 @@ in {
 }
 ```
 
+### NixOS/Home Manager Integration (Flakes)
+
+Add to your `flake.nix`:
+
+```nix
+inputs = {
+  nix-ai.url = "github:olafkfreund/nix-ai-help";
+};
+```
+
+In your packages, add:
+
+```nix
+inputs.nix-ai.packages.${pkgs.system}.default
+```
+
 ## Common Usage
 
 ### Getting Help
