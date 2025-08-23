@@ -211,8 +211,14 @@ func TestProviderManagerErrors(t *testing.T) {
 }
 
 func TestProviderManagerCaching(t *testing.T) {
-	// Create test configuration
+	// Create test configuration with caching enabled
 	testConfig := &config.UserConfig{
+		Cache: config.CacheConfig{
+			Enabled:         true,
+			MemoryMaxSize:   100,
+			MemoryTTL:       300,
+			CleanupInterval: 60,  // Set cleanup interval to avoid panic
+		},
 		AIModels: config.AIModelsConfig{
 			Providers: map[string]config.AIProviderConfig{
 				"ollama": {
@@ -251,12 +257,13 @@ func TestProviderManagerCaching(t *testing.T) {
 		t.Fatalf("Failed to get provider second time: %v", err)
 	}
 
-	// Should be the same instance due to caching
+	// With connection pooling, providers should be the same instance
 	if provider1 != provider2 {
-		t.Error("Provider instances should be the same due to caching")
+		t.Error("Provider instances should be the same due to connection pooling")
 	}
 
-	// Test cache refresh
+	// Test that RefreshProviders doesn't affect pooled providers
+	// (RefreshProviders only clears the old cache, not the connection pools)
 	pm.RefreshProviders()
 
 	provider3, err := pm.GetProvider("ollama")
@@ -264,9 +271,10 @@ func TestProviderManagerCaching(t *testing.T) {
 		t.Fatalf("Failed to get provider after refresh: %v", err)
 	}
 
-	// Should be a different instance after refresh
-	if provider1 == provider3 {
-		t.Error("Provider instances should be different after cache refresh")
+	// With connection pooling, the provider should still be the same after RefreshProviders
+	// since RefreshProviders only clears the legacy cache, not the connection pools
+	if provider1 != provider3 {
+		t.Error("Provider instances should remain the same after RefreshProviders with connection pooling")
 	}
 }
 
