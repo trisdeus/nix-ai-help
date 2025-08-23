@@ -26,7 +26,7 @@ type Logger struct {
 // NewLogger creates a new instance of Logger with default info level.
 func NewLogger() *Logger {
 	return &Logger{
-		Logger: log.New(os.Stdout, "", log.LstdFlags),
+		Logger: log.New(os.Stderr, "", log.LstdFlags),
 		level:  InfoLevel,
 	}
 }
