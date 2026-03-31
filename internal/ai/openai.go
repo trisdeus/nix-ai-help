@@ -40,11 +40,19 @@ func buildOpenAIURL(baseURL string) string {
 		cleanPath = "/v1"
 	}
 
-	if !strings.HasSuffix(cleanPath, "/chat/completions") {
+	const endpointSuffix = "/chat/completions"
+
+	if idx := strings.Index(cleanPath, endpointSuffix); idx != -1 {
+		// Trim any extra segments after /chat/completions
+		cleanPath = cleanPath[:idx+len(endpointSuffix)]
+	} else if !strings.HasSuffix(cleanPath, endpointSuffix) {
+		// Append /chat/completions if it's not present at all
 		cleanPath = path.Join(cleanPath, "chat", "completions")
-		if !strings.HasPrefix(cleanPath, "/") {
-			cleanPath = "/" + cleanPath
-		}
+	}
+
+	// Ensure the path is absolute
+	if !strings.HasPrefix(cleanPath, "/") {
+		cleanPath = "/" + cleanPath
 	}
 
 	u.Path = cleanPath
