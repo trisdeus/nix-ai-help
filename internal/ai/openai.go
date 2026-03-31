@@ -7,41 +7,58 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 	"time"
 )
 
 // OpenAIClient represents a client for interacting with the OpenAI API.
 type OpenAIClient struct {
-        APIKey     string
-        APIURL     string
-        Model      string // Added model support
-        HTTPClient *http.Client
+	APIKey     string
+	APIURL     string
+	Model      string // Added model support
+	HTTPClient *http.Client
 }
 
-// buildOpenAIURL sets a base URL for OpenAI clients
+// buildOpenAIURL sets a base URL for OpenAI clients.
 func buildOpenAIURL(baseURL string) string {
-        baseURL = strings.TrimRight(baseURL, "/")
+	const defaultBaseURL = "https://api.openai.com/v1"
 
-        if baseURL == "" {
-                baseURL = "https://api.openai.com/v1"
-        }
+	raw := strings.TrimSpace(baseURL)
+	if raw == "" {
+		raw = defaultBaseURL
+	}
 
-        if strings.HasSuffix(baseURL, "/chat/completions") {
-                return baseURL
-        }
+	u, err := url.Parse(raw)
+	if err != nil {
+		return defaultBaseURL + "/chat/completions"
+	}
 
-        return baseURL + "/chat/completions"
+	cleanPath := strings.TrimRight(u.Path, "/")
+	if cleanPath == "" {
+		cleanPath = "/v1"
+	}
+
+	if !strings.HasSuffix(cleanPath, "/chat/completions") {
+		cleanPath = path.Join(cleanPath, "chat", "completions")
+		if !strings.HasPrefix(cleanPath, "/") {
+			cleanPath = "/" + cleanPath
+		}
+	}
+
+	u.Path = cleanPath
+	return u.String()
 }
 
 // NewOpenAIClient creates a new OpenAI client with the provided API key.
 func NewOpenAIClient(apiKey, baseURL string) *OpenAIClient {
-        return &OpenAIClient{
-                APIKey:     apiKey,
-                APIURL:     buildOpenAIURL(baseURL),
-                Model:      "gpt-3.5-turbo",
-                HTTPClient: &http.Client{Timeout: 10 * time.Second},
-        }
+	return &OpenAIClient{
+		APIKey:     apiKey,
+		APIURL:     buildOpenAIURL(baseURL),
+		Model:      "gpt-3.5-turbo",
+		HTTPClient: &http.Client{Timeout: 10 * time.Second},
+	}
 }
 
 // Request represents a request to the OpenAI API.
@@ -317,28 +334,43 @@ func (client *OpenAIClient) GetPartialResponse() string {
 
 // CheckHealth checks if the OpenAI API is accessible and responding.
 func (client *OpenAIClient) CheckHealth() error {
-        healthURL := strings.TrimSuffix(client.APIURL, "/chat/completions") + "/models"
+	u, err := url.Parse(client.APIURL)
+	if err != nil {
+		return fmt.Errorf("invalid OpenAI API URL: %w", err)
+	}
 
-        // For OpenAI, we can check by making a simple request to the models endpoint
-        req, err := http.NewRequest("GET", healthURL, nil)
-        if err != nil {
-                return fmt.Errorf("failed to create health check request: %w", err)
-        }
+	cleanPath := strings.TrimRight(u.Path, "/")
+	cleanPath = strings.TrimSuffix(cleanPath, "/chat/completions")
+	if cleanPath == "" {
+		cleanPath = "/v1"
+	}
 
-        req.Header.Set("Authorization", "Bearer "+client.APIKey)
+	u.Path = path.Join(cleanPath, "models")
+	if !strings.HasPrefix(u.Path, "/") {
+		u.Path = "/" + u.Path
+	}
 
-        httpClient := &http.Client{Timeout: 5 * time.Second}
-        resp, err := httpClient.Do(req)
-        if err != nil {
-                return fmt.Errorf("openAI API not accessible: %w", err)
-        }
-        defer resp.Body.Close()
+	healthURL := u.String()
 
-        if resp.StatusCode >= 400 {
-                return fmt.Errorf("openAI API returned error status: %d", resp.StatusCode)
-        }
+	// For OpenAI, we can check by making a simple request to the models endpoint
+	req, err := http.NewRequest("GET", healthURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create health check request: %w", err)
+	}
 
-        return nil
+	req.Header.Set("Authorization", "Bearer "+client.APIKey)
+
+	resp, err := client.HTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("openAI API not accessible: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("openAI API returned error status: %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 // GetSelectedModel returns the currently selected model.
