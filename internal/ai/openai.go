@@ -22,7 +22,7 @@ type OpenAIClient struct {
 }
 
 // buildOpenAIURL constructs the full URL for OpenAI chat completions.
-func buildOpenAIURL(baseURL string) (string, error) {
+func buildOpenAIURL(baseURL string) string {
 	const defaultBaseURL = "https://api.openai.com/v1"
 
 	raw := strings.TrimSpace(baseURL)
@@ -32,7 +32,7 @@ func buildOpenAIURL(baseURL string) (string, error) {
 
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "", fmt.Errorf("invalid OpenAI base URL %q: %w", baseURL, err)
+		return defaultBaseURL + "/chat/completions"
 	}
 
 	cleanPath := strings.TrimRight(u.Path, "/")
@@ -43,20 +43,17 @@ func buildOpenAIURL(baseURL string) (string, error) {
 	const endpointSuffix = "/chat/completions"
 
 	if idx := strings.Index(cleanPath, endpointSuffix); idx != -1 {
-		// Trim any extra segments after /chat/completions
 		cleanPath = cleanPath[:idx+len(endpointSuffix)]
 	} else if !strings.HasSuffix(cleanPath, endpointSuffix) {
-		// Append /chat/completions if it's not present at all
 		cleanPath = path.Join(cleanPath, "chat", "completions")
 	}
 
-	// Ensure the path is absolute
 	if !strings.HasPrefix(cleanPath, "/") {
 		cleanPath = "/" + cleanPath
 	}
 
 	u.Path = cleanPath
-	return u.String(), nil
+	return u.String()
 }
 
 // NewOpenAIClient creates a new OpenAI client with the provided API key.
