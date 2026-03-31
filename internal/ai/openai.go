@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 	"time"
 )
@@ -19,20 +21,58 @@ type OpenAIClient struct {
 	HTTPClient *http.Client
 }
 
+// buildOpenAIURL constructs the full URL for OpenAI chat completions.
+func buildOpenAIURL(baseURL string) (string, error) {
+	const defaultBaseURL = "https://api.openai.com/v1"
+
+	raw := strings.TrimSpace(baseURL)
+	if raw == "" {
+		raw = defaultBaseURL
+	}
+
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("invalid OpenAI base URL %q: %w", baseURL, err)
+	}
+
+	cleanPath := strings.TrimRight(u.Path, "/")
+	if cleanPath == "" {
+		cleanPath = "/v1"
+	}
+
+	const endpointSuffix = "/chat/completions"
+
+	if idx := strings.Index(cleanPath, endpointSuffix); idx != -1 {
+		// Trim any extra segments after /chat/completions
+		cleanPath = cleanPath[:idx+len(endpointSuffix)]
+	} else if !strings.HasSuffix(cleanPath, endpointSuffix) {
+		// Append /chat/completions if it's not present at all
+		cleanPath = path.Join(cleanPath, "chat", "completions")
+	}
+
+	// Ensure the path is absolute
+	if !strings.HasPrefix(cleanPath, "/") {
+		cleanPath = "/" + cleanPath
+	}
+
+	u.Path = cleanPath
+	return u.String(), nil
+}
+
 // NewOpenAIClient creates a new OpenAI client with the provided API key.
-func NewOpenAIClient(apiKey string) *OpenAIClient {
+func NewOpenAIClient(apiKey, baseURL string) *OpenAIClient {
 	return &OpenAIClient{
 		APIKey:     apiKey,
-		APIURL:     "https://api.openai.com/v1/chat/completions",
-		Model:      "gpt-3.5-turbo", // default model
+		APIURL:     buildOpenAIURL(baseURL),
+		Model:      "gpt-3.5-turbo",
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
-// NewOpenAIClientWithModel creates an OpenAI client with a specific model.
-func NewOpenAIClientWithModel(apiKey, model string) *OpenAIClient {
-	client := NewOpenAIClient(apiKey)
-	if model != "" {
+// NewOpenAIClientWithModel creates a new OpenAI client with the provided API key and model.
+func NewOpenAIClientWithModel(apiKey, baseURL, model string) *OpenAIClient {
+	client := NewOpenAIClient(apiKey, baseURL)
+	if strings.TrimSpace(model) != "" {
 		client.Model = model
 	}
 	return client
@@ -311,16 +351,33 @@ func (client *OpenAIClient) GetPartialResponse() string {
 
 // CheckHealth checks if the OpenAI API is accessible and responding.
 func (client *OpenAIClient) CheckHealth() error {
+	u, err := url.Parse(client.APIURL)
+	if err != nil {
+		return fmt.Errorf("invalid OpenAI API URL: %w", err)
+	}
+
+	cleanPath := strings.TrimRight(u.Path, "/")
+	cleanPath = strings.TrimSuffix(cleanPath, "/chat/completions")
+	if cleanPath == "" {
+		cleanPath = "/v1"
+	}
+
+	u.Path = path.Join(cleanPath, "models")
+	if !strings.HasPrefix(u.Path, "/") {
+		u.Path = "/" + u.Path
+	}
+
+	healthURL := u.String()
+
 	// For OpenAI, we can check by making a simple request to the models endpoint
-	req, err := http.NewRequest("GET", "https://api.openai.com/v1/models", nil)
+	req, err := http.NewRequest("GET", healthURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create health check request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+client.APIKey)
 
-	httpClient := &http.Client{Timeout: 5 * time.Second}
-	resp, err := httpClient.Do(req)
+	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("openAI API not accessible: %w", err)
 	}
