@@ -658,7 +658,8 @@ func (pm *ProviderManager) initializeOpenAIProvider(config *config.AIProviderCon
 		defaultModel = "gpt-3.5-turbo" // fallback
 	}
 
-	openaiClient := NewOpenAIClientWithModel(apiKey, defaultModel)
+	
+        openaiClient := NewOpenAIClientWithModel(apiKey, config.BaseURL, defaultModel)
 	return NewProviderWrapper(openaiClient), nil
 }
 

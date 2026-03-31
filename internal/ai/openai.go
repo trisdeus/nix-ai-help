@@ -13,29 +13,35 @@ import (
 
 // OpenAIClient represents a client for interacting with the OpenAI API.
 type OpenAIClient struct {
-	APIKey     string
-	APIURL     string
-	Model      string // Added model support
-	HTTPClient *http.Client
+        APIKey     string
+        APIURL     string
+        Model      string // Added model support
+        HTTPClient *http.Client
+}
+
+// buildOpenAIURL sets a base URL for OpenAI clients
+func buildOpenAIURL(baseURL string) string {
+        baseURL = strings.TrimRight(baseURL, "/")
+
+        if baseURL == "" {
+                baseURL = "https://api.openai.com/v1"
+        }
+
+        if strings.HasSuffix(baseURL, "/chat/completions") {
+                return baseURL
+        }
+
+        return baseURL + "/chat/completions"
 }
 
 // NewOpenAIClient creates a new OpenAI client with the provided API key.
-func NewOpenAIClient(apiKey string) *OpenAIClient {
-	return &OpenAIClient{
-		APIKey:     apiKey,
-		APIURL:     "https://api.openai.com/v1/chat/completions",
-		Model:      "gpt-3.5-turbo", // default model
-		HTTPClient: &http.Client{Timeout: 10 * time.Second},
-	}
-}
-
-// NewOpenAIClientWithModel creates an OpenAI client with a specific model.
-func NewOpenAIClientWithModel(apiKey, model string) *OpenAIClient {
-	client := NewOpenAIClient(apiKey)
-	if model != "" {
-		client.Model = model
-	}
-	return client
+func NewOpenAIClient(apiKey, baseURL string) *OpenAIClient {
+        return &OpenAIClient{
+                APIKey:     apiKey,
+                APIURL:     buildOpenAIURL(baseURL),
+                Model:      "gpt-3.5-turbo",
+                HTTPClient: &http.Client{Timeout: 10 * time.Second},
+        }
 }
 
 // Request represents a request to the OpenAI API.
@@ -311,26 +317,28 @@ func (client *OpenAIClient) GetPartialResponse() string {
 
 // CheckHealth checks if the OpenAI API is accessible and responding.
 func (client *OpenAIClient) CheckHealth() error {
-	// For OpenAI, we can check by making a simple request to the models endpoint
-	req, err := http.NewRequest("GET", "https://api.openai.com/v1/models", nil)
-	if err != nil {
-		return fmt.Errorf("failed to create health check request: %w", err)
-	}
+        healthURL := strings.TrimSuffix(client.APIURL, "/chat/completions") + "/models"
 
-	req.Header.Set("Authorization", "Bearer "+client.APIKey)
+        // For OpenAI, we can check by making a simple request to the models endpoint
+        req, err := http.NewRequest("GET", healthURL, nil)
+        if err != nil {
+                return fmt.Errorf("failed to create health check request: %w", err)
+        }
 
-	httpClient := &http.Client{Timeout: 5 * time.Second}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("openAI API not accessible: %w", err)
-	}
-	defer resp.Body.Close()
+        req.Header.Set("Authorization", "Bearer "+client.APIKey)
 
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("openAI API returned error status: %d", resp.StatusCode)
-	}
+        httpClient := &http.Client{Timeout: 5 * time.Second}
+        resp, err := httpClient.Do(req)
+        if err != nil {
+                return fmt.Errorf("openAI API not accessible: %w", err)
+        }
+        defer resp.Body.Close()
 
-	return nil
+        if resp.StatusCode >= 400 {
+                return fmt.Errorf("openAI API returned error status: %d", resp.StatusCode)
+        }
+
+        return nil
 }
 
 // GetSelectedModel returns the currently selected model.
