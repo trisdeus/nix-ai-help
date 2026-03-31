@@ -22,7 +22,7 @@ type OpenAIClient struct {
 }
 
 // buildOpenAIURL constructs the full URL for OpenAI chat completions.
-func buildOpenAIURL(baseURL string) string {
+func buildOpenAIURL(baseURL string) (string, error) {
 	const defaultBaseURL = "https://api.openai.com/v1"
 
 	raw := strings.TrimSpace(baseURL)
@@ -32,7 +32,7 @@ func buildOpenAIURL(baseURL string) string {
 
 	u, err := url.Parse(raw)
 	if err != nil {
-		return defaultBaseURL + "/chat/completions"
+		return "", fmt.Errorf("invalid OpenAI base URL %q: %w", baseURL, err)
 	}
 
 	cleanPath := strings.TrimRight(u.Path, "/")
@@ -53,26 +53,36 @@ func buildOpenAIURL(baseURL string) string {
 	}
 
 	u.Path = cleanPath
-	return u.String()
+	return u.String(), nil
 }
 
 // NewOpenAIClient creates a new OpenAI client with the provided API key.
-func NewOpenAIClient(apiKey, baseURL string) *OpenAIClient {
+func NewOpenAIClient(apiKey, baseURL string) (*OpenAIClient, error) {
+	apiURL, err := buildOpenAIURL(baseURL)
+	if err != nil {
+		return nil, err
+	}
+
 	return &OpenAIClient{
 		APIKey:     apiKey,
-		APIURL:     buildOpenAIURL(baseURL),
+		APIURL:     apiURL,
 		Model:      "gpt-3.5-turbo",
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
-	}
+	}, nil
 }
 
 // NewOpenAIClientWithModel creates a new OpenAI client with the provided API key and model.
-func NewOpenAIClientWithModel(apiKey, baseURL, model string) *OpenAIClient {
-	client := NewOpenAIClient(apiKey, baseURL)
+func NewOpenAIClientWithModel(apiKey, baseURL, model string) (*OpenAIClient, error) {
+	client, err := NewOpenAIClient(apiKey, baseURL)
+	if err != nil {
+		return nil, err
+	}
+
 	if strings.TrimSpace(model) != "" {
 		client.Model = model
 	}
-	return client
+
+	return client, nil
 }
 
 // Request represents a request to the OpenAI API.

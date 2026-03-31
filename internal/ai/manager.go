@@ -652,14 +652,16 @@ func (pm *ProviderManager) initializeOpenAIProvider(config *config.AIProviderCon
 		return nil, fmt.Errorf("openAI API key not found in environment variable %s", config.EnvVar)
 	}
 
-	// Get default model for OpenAI
 	defaultModel := pm.config.AIModels.SelectionPreferences.DefaultModels["openai"]
 	if defaultModel == "" {
-		defaultModel = "gpt-3.5-turbo" // fallback
+		defaultModel = "gpt-3.5-turbo"
 	}
 
-	
-        openaiClient := NewOpenAIClientWithModel(apiKey, config.BaseURL, defaultModel)
+	openaiClient, err := NewOpenAIClientWithModel(apiKey, config.BaseURL, defaultModel)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize openAI provider: %w", err)
+	}
+
 	return NewProviderWrapper(openaiClient), nil
 }
 
