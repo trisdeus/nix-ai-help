@@ -43,14 +43,11 @@ func buildOpenAIURL(baseURL string) (string, error) {
 	const endpointSuffix = "/chat/completions"
 
 	if idx := strings.Index(cleanPath, endpointSuffix); idx != -1 {
-		// Trim any extra segments after /chat/completions
 		cleanPath = cleanPath[:idx+len(endpointSuffix)]
 	} else if !strings.HasSuffix(cleanPath, endpointSuffix) {
-		// Append /chat/completions if it's not present at all
 		cleanPath = path.Join(cleanPath, "chat", "completions")
 	}
 
-	// Ensure the path is absolute
 	if !strings.HasPrefix(cleanPath, "/") {
 		cleanPath = "/" + cleanPath
 	}
@@ -60,22 +57,32 @@ func buildOpenAIURL(baseURL string) (string, error) {
 }
 
 // NewOpenAIClient creates a new OpenAI client with the provided API key.
-func NewOpenAIClient(apiKey, baseURL string) *OpenAIClient {
+func NewOpenAIClient(apiKey, baseURL string) (*OpenAIClient, error) {
+	apiURL, err := buildOpenAIURL(baseURL)
+	if err != nil {
+		return nil, err
+	}
+
 	return &OpenAIClient{
 		APIKey:     apiKey,
-		APIURL:     buildOpenAIURL(baseURL),
+		APIURL:     apiURL,
 		Model:      "gpt-3.5-turbo",
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
-	}
+	}, nil
 }
 
 // NewOpenAIClientWithModel creates a new OpenAI client with the provided API key and model.
-func NewOpenAIClientWithModel(apiKey, baseURL, model string) *OpenAIClient {
-	client := NewOpenAIClient(apiKey, baseURL)
+func NewOpenAIClientWithModel(apiKey, baseURL, model string) (*OpenAIClient, error) {
+	client, err := NewOpenAIClient(apiKey, baseURL)
+	if err != nil {
+		return nil, err
+	}
+
 	if strings.TrimSpace(model) != "" {
 		client.Model = model
 	}
-	return client
+
+	return client, nil
 }
 
 // Request represents a request to the OpenAI API.
