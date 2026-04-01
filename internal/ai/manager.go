@@ -703,7 +703,7 @@ func (pm *ProviderManager) initializeLlamaCppProvider(config *config.AIProviderC
 	timeout := pm.config.GetAITimeout("llamacpp")
 	llamacppProvider.SetTimeout(timeout)
 
-	pm.logger.Debug(fmt.Sprintf("LlamaCpp provider initialized with %v timeout", timeout))
+	pm.logger.Debug("LlamaCpp provider initialized with timeout " + timeout.String())
 
 	return NewProviderWrapper(llamacppProvider), nil
 }
@@ -744,7 +744,7 @@ func (pm *ProviderManager) initializeCustomProvider(config *config.AIProviderCon
 	timeout := pm.config.GetAITimeout("custom")
 	customProvider.SetTimeout(timeout)
 
-	pm.logger.Debug(fmt.Sprintf("Custom provider initialized with %v timeout", timeout))
+	pm.logger.Debug("Custom provider initialized with timeout " + timeout.String())
 
 	return NewProviderWrapper(customProvider), nil
 }
@@ -773,7 +773,7 @@ func (pm *ProviderManager) initializeClaudeProvider(config *config.AIProviderCon
 	timeout := pm.config.GetAITimeout("claude")
 	claudeClient.SetTimeout(timeout)
 
-	pm.logger.Debug(fmt.Sprintf("Claude provider initialized with %v timeout", timeout))
+	pm.logger.Debug("Claude provider initialized with timeout " + timeout.String())
 
 	// Create legacy wrapper and then wrap that as Provider
 	legacyProvider := &ClaudeLegacyProvider{ClaudeClient: claudeClient}
