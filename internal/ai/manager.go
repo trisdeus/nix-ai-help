@@ -664,7 +664,7 @@ func (pm *ProviderManager) initializeOpenAIProvider(config *config.AIProviderCon
 
 	timeout := pm.config.GetAITimeout("openai")
 	openaiClient.HTTPClient.Timeout = timeout
-	pm.logger.Debug(fmt.Sprintf("OpenAI provider initialized with %v timeout", timeout))
+	pm.logger.Debug("OpenAI provider initialized with timeout " + timeout.String())
 
 	return NewProviderWrapper(openaiClient), nil
 }
